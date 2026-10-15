@@ -19,8 +19,10 @@ escort (M3E) and crowd control (M3F) remain planned follow-ons; helicopter rooft
 rescue/medevac and weather constraints, the full compound stress scenario, browser
 rendering/integration, and M4-M6 remain pending.
 Both dispatch policies can be compared on identical seeds; no universal
-performance/response winner is claimed. W1 templates are
-missing and the strict release-validation command correctly fails.
+performance/response winner is claimed. Four W1 templates are present and the
+`pnpm validate --require-templates` required-presence gate passes. This validation is
+schema-only; template quality, connectivity and full release readiness are separate
+gates and are not confirmed by it.
 
 ## Team
 
