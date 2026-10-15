@@ -5,6 +5,20 @@ import type { VehicleId } from "../contracts/types";
 import { RenderSnapshotSchema, RunSummarySchema } from "../contracts/sim-schemas";
 import { createSimulation, runBatch } from "./runner";
 import { defaultNpcParams } from "./agents/population";
+import { livingFixture } from "./agents/living-fixture";
+
+function policeStationScenario({ policeCars = 1, policeOfficers = 1, safeAccess = true } = {}) {
+  const scenario = livingFixture();
+  scenario.blocks[18] = BlockType.PoliceStation;
+  scenario.buildings.find((building) => building.id === 3)!.type = BlockType.PoliceStation;
+  scenario.fleet.policeCars = policeCars;
+  scenario.fleet.policeOfficers = policeOfficers;
+  scenario.blocks[2] = BlockType.BoatDepot;
+  scenario.buildings.push({ id: 5 as never, type: BlockType.BoatDepot, cells: [2], entrance: 2, capacity: 1, floorHeight: 0 });
+  for (const cell of [17, 19, 25, 35]) scenario.blocks[cell] = BlockType.Road;
+  if (!safeAccess) for (const cell of [17, 19, 25, 26, 35]) scenario.blocks[cell] = BlockType.Grass;
+  return scenario;
+}
 
 function boatHospitalScenario(populationCount: number, boatCount = 1) {
   const scenario = mockScenario();
@@ -107,6 +121,60 @@ it("reports M3B capabilities and projects the finite ambulance fleet in owned sn
   expect(RenderSnapshotSchema.safeParse(snapshot).success).toBe(true);
   snapshot.vehicles.id.fill(-1);
   expect(sim.snapshot().vehicles.id.some((id) => id === -1)).toBe(false);
+});
+
+it("includes only safely deployed police in copied, schema-valid vehicle snapshots", () => {
+  const scenario = policeStationScenario();
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 2 });
+  const snapshot = sim.snapshot();
+  expect(Array.from(snapshot.vehicles.id)).toContain(scenario.fleet.ambulances + 1);
+  expect(Array.from(snapshot.vehicles.kind)).toContain(VehicleKind.PoliceCar);
+  expect(snapshot.vehicles.kind).toContain(VehicleKind.Car);
+  expect(snapshot.vehicles.kind).toContain(VehicleKind.Ambulance);
+  expect(snapshot.vehicles.kind).toContain(VehicleKind.Boat);
+  expect(new Set(snapshot.vehicles.id).size).toBe(snapshot.vehicles.id.length);
+  expect(RenderSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  snapshot.vehicles.id.fill(-1);
+  expect(sim.snapshot().vehicles.id.some((id) => id === -1)).toBe(false);
+
+  const inaccessible = createSimulation(policeStationScenario({ safeAccess: false }), 42, "centralised", { durationTicks: 2 });
+  expect(inaccessible.snapshot().vehicles.kind).not.toContain(VehicleKind.PoliceCar);
+});
+
+it("keeps police outside rescue assignments and omits unstaffed police from snapshots and events", () => {
+  const scenario = policeStationScenario();
+  scenario.injected = [{ kind: "false_report", tick: 0, cell: 24, confidence: 1 }];
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 2,
+    npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, commsDelay: 0 } });
+  sim.step();
+  const events = sim.summary().events;
+  expect(events.some((event) => event.type === "REQUEST_CREATED")).toBe(true);
+  expect(events.some((event) => event.type === "ASSIGNED" && event.actor === 1 && event.actorKind === "vehicle")).toBe(true);
+  expect(events.filter((event) => event.actorKind === "vehicle" && event.actor === scenario.fleet.ambulances + 1)
+    .every((event) => event.targetKind !== "request")).toBe(true);
+
+  const unstaffed = createSimulation(policeStationScenario({ policeOfficers: 0 }), 42, "centralised", { durationTicks: 2 });
+  unstaffed.step();
+  expect(unstaffed.snapshot().vehicles.kind).not.toContain(VehicleKind.PoliceCar);
+  expect(unstaffed.summary().events.some((event) => event.actorKind === "vehicle" && event.actor === 2)).toBe(false);
+  expect(RenderSnapshotSchema.safeParse(unstaffed.snapshot()).success).toBe(true);
+  expect(RunSummarySchema.safeParse(unstaffed.summary()).success).toBe(true);
+
+  const empty = createSimulation(policeStationScenario({ policeCars: 0 }), 42, "centralised", { durationTicks: 2 });
+  empty.step();
+  expect(empty.snapshot().vehicles.kind).not.toContain(VehicleKind.PoliceCar);
+  expect(empty.summary().events.some((event) => event.actorKind === "vehicle" && event.actor === 2)).toBe(false);
+});
+
+it("replays police vehicles, events and metrics identically for the same seed", () => {
+  const scenario = policeStationScenario();
+  const first = createSimulation(scenario, 73, "centralised", { durationTicks: 8 });
+  const second = createSimulation(scenario, 73, "centralised", { durationTicks: 8 });
+  for (let tick = 0; tick < 8; tick++) { first.step(); second.step(); }
+  expect(first.summary().events).toEqual(second.summary().events);
+  expect(first.snapshot().vehicles).toEqual(second.snapshot().vehicles);
+  expect(first.summary().metrics).toEqual(second.summary().metrics);
+  expect(RunSummarySchema.safeParse(first.summary()).success).toBe(true);
 });
 
 it("dispatches a delivered report request and lets field evidence falsify it", () => {

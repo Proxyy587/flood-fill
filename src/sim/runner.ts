@@ -22,6 +22,7 @@ import { runCentralised } from "./dispatch/centralised";
 import { runNegotiation } from "./dispatch/negotiation";
 import type { DispatchAssignment, DispatchDemand, DispatchUnit } from "./dispatch/policy-common";
 import { boatSnapshot, createBoats, loadBoatPassenger, planBoatRoute, stepBoats, BOAT_SEATS } from "./dispatch/boats";
+import { createPolice, policeSnapshot, stepPolice } from "./dispatch/police";
 import { handoffRescuedCivilian, reserveRescuedShelter, releaseRescuedShelter, markRescuedAboard, requeueFailedRescue } from "./agents/system";
 
 export const SIM_CAPABILITIES = { weather: true, flood: true, power: true, agents: true, commuting: true, traffic: true, evacuation: true, reports: true, dispatch: true, hospitals: true, aircraft: false } as const;
@@ -153,6 +154,7 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   events.push(...updateIncidents(incidents, reports, 0));
   const hospitals = createHospitalSystem(scenario, population.civilianCount);
   const ambulances = createAmbulances(scenario, world, blocked);
+  const police = createPolice(scenario, world, blocked);
   const hotspots = createHotspotSystem(world.width, world.height);
   const sceneTarget = new Int32Array(incidents.capacity).fill(-1);
   const sceneWaterTarget = new Int32Array(incidents.capacity).fill(-1);
@@ -719,13 +721,14 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   function snapshot(): RenderSnapshot {
     const agentsSnapshot = agentSnapshot(agents);
     const emergency = ambulanceSnapshot(ambulances);
+    const policeVehicles = policeSnapshot(police);
     const rescueBoats = boatSnapshot(boats);
-    const responseIds = joinedInt32(emergency.id, rescueBoats.id);
-    const responseX = joinedFloat32(emergency.x, rescueBoats.x);
-    const responseZ = joinedFloat32(emergency.z, rescueBoats.z);
-    const responseHeading = joinedFloat32(emergency.heading, rescueBoats.heading);
-    const responseKind = joinedUint8(emergency.kind, rescueBoats.kind);
-    const responseState = joinedUint8(emergency.state, rescueBoats.state);
+    const responseIds = joinedInt32(joinedInt32(emergency.id, policeVehicles.id), rescueBoats.id);
+    const responseX = joinedFloat32(joinedFloat32(emergency.x, policeVehicles.x), rescueBoats.x);
+    const responseZ = joinedFloat32(joinedFloat32(emergency.z, policeVehicles.z), rescueBoats.z);
+    const responseHeading = joinedFloat32(joinedFloat32(emergency.heading, policeVehicles.heading), rescueBoats.heading);
+    const responseKind = joinedUint8(joinedUint8(emergency.kind, policeVehicles.kind), rescueBoats.kind);
+    const responseState = joinedUint8(joinedUint8(emergency.state, policeVehicles.state), rescueBoats.state);
     return { tick, water: world.water.slice(), powered: world.powered.slice(), ...agentsSnapshot,
       vehicles: { id: joinedInt32(agentsSnapshot.vehicles.id, responseIds), x: joinedFloat32(agentsSnapshot.vehicles.x, responseX), z: joinedFloat32(agentsSnapshot.vehicles.z, responseZ),
         heading: joinedFloat32(agentsSnapshot.vehicles.heading, responseHeading), kind: joinedUint8(agentsSnapshot.vehicles.kind, responseKind), state: joinedUint8(agentsSnapshot.vehicles.state, responseState) },
@@ -749,7 +752,9 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
       applyReportInjections(tick + 1);
       events.push(...stepPower(world, scenario, power, tick + 1));
       updateClosures(tick + 1);
-      events.push(...stepAgents(agents, world, scenario, tick + 1, blocked, traffic));
+      const policeStep = stepPolice(police, traffic, world, scenario, blocked, navVersion, tick + 1);
+      events.push(...policeStep.events);
+      events.push(...stepAgents(agents, world, scenario, tick + 1, blocked, traffic, policeStep.controlled));
       tick++;
       stepExposure(population, world, loadedForExposure);
       events.push(...stepReports(reports, population, tick, tick < outageUntil));
