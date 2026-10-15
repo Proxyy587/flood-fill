@@ -24,6 +24,7 @@ import type { DispatchAssignment, DispatchDemand, DispatchUnit } from "./dispatc
 import { boatSnapshot, createBoats, loadBoatPassenger, planBoatRoute, stepBoats, BOAT_SEATS } from "./dispatch/boats";
 import { createPolice, policeSnapshot, stepPolice } from "./dispatch/police";
 import { createEscortSystem, escortCandidates, stepEscortGroups } from "./dispatch/police-escort";
+import { createCrowdControl, stepCrowdControl } from "./dispatch/police-crowd";
 import { handoffRescuedCivilian, reserveRescuedShelter, releaseRescuedShelter, markRescuedAboard, requeueFailedRescue } from "./agents/system";
 
 export const SIM_CAPABILITIES = { weather: true, flood: true, power: true, agents: true, commuting: true, traffic: true, evacuation: true, reports: true, dispatch: true, hospitals: true, aircraft: false } as const;
@@ -157,6 +158,7 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   const ambulances = createAmbulances(scenario, world, blocked);
   const police = createPolice(scenario, world, blocked);
   const escorts = createEscortSystem(population.civilianCount, world.width);
+  const crowdControl = createCrowdControl(world, scenario, blocked);
   const hotspots = createHotspotSystem(world.width, world.height);
   const sceneTarget = new Int32Array(incidents.capacity).fill(-1);
   const sceneWaterTarget = new Int32Array(incidents.capacity).fill(-1);
@@ -756,9 +758,10 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
       updateClosures(tick + 1);
       const groups = stepEscortGroups(escorts, agents, tick + 1);
       const escortTasks = escortCandidates(groups, agents, world, scenario, blocked, police.cell);
-      const policeStep = stepPolice(police, traffic, world, scenario, blocked, navVersion, tick + 1, escortTasks);
+      const crowdStep = stepCrowdControl(crowdControl, agents, world, scenario, blocked, navVersion, tick + 1, police.cell);
+      const policeStep = stepPolice(police, traffic, world, scenario, blocked, navVersion, tick + 1, escortTasks, crowdStep.candidates);
       events.push(...policeStep.events);
-        events.push(...stepAgents(agents, world, scenario, tick + 1, blocked, traffic, policeStep.controlled, policeStep.escortGuidance));
+      events.push(...stepAgents(agents, world, scenario, tick + 1, blocked, traffic, policeStep.controlled, policeStep.escortGuidance, policeStep.crowdGuidance));
       tick++;
       stepExposure(population, world, loadedForExposure);
       events.push(...stepReports(reports, population, tick, tick < outageUntil));

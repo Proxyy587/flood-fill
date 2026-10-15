@@ -1,15 +1,33 @@
 # AK execution checkpoints
 
-## Current AK status (2026-10-15): M3A-M3E implemented; follow-ons remain
+## Current AK status (2026-10-15): M3A-M3F implemented; follow-ons remain
 
 The AK headless core now includes M3C boat rescue and M3D independent police
-gridlock traffic control and M3E civilian escort, in addition to M3A reports and M3B ambulance dispatch,
-field triage, hospital balancing and adaptive hot-zone staging. M3D police work is
-limited to gridlock control and civilian route guidance and remains separate from rescue dispatch. Still planned
-are M3F crowd control, helicopter rooftop rescue/medevac and
+gridlock traffic control, M3E civilian escort, and M3F crowd control, in addition to M3A reports and M3B ambulance dispatch,
+field triage, hospital balancing and adaptive hot-zone staging. Independent police
+work remains separate from rescue dispatch. Still planned
+are helicopter rooftop rescue/medevac and
 weather constraints, and the full compound stress scenario. Browser/worker integration,
 independent review, remaining invariants and later M4-M6 work also remain open; this
 status is not release approval.
+
+### M3F: adaptive police crowd control implemented
+
+The existing finite, officer-staffed police fleet now shares deterministic dispatch
+between gridlock, escort, and crowd-control tasks. Crowd pressure is measured at
+chokepoints and shelter approaches: 4 people in a 4 m × 4 m cell (0.25 people/m²)
+for 2 ticks activates control; pressure below 2 for 5 ticks clears it. Critical
+pressure (at least 8 people, 0.5 people/m², with approach depth at least 0.3 m)
+can preempt lower-priority work. Cars approach only reachable safe roads; after
+arrival, guidance raises the walking cost of the managed cell by 4× without making
+unsafe routes passable or changing a civilian's destination, shelter reservation,
+rescue ownership, or medical assignment. Active work is stable outside critical
+preemption; canceled work can retry. Deterministic pressure/replay, dispatch,
+partial-edge reroute, and runner integration are covered by focused tests (124/124).
+Full health passes lint, strict types, all 538 tests and schema-only validation;
+production build and standalone validation pass. A 120-tick comparison on seeds
+0/42/77 produces byte-identical outputs across independent runs. No contract or
+renderer changes; browser integration, compound stress, and release approval remain open.
 
 ### Earlier checkpoint evidence
 

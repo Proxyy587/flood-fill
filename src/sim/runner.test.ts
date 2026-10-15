@@ -187,6 +187,30 @@ it("integrates independent police guidance for an evacuating civilian", () => {
   expect(sim.snapshot()).toEqual(replay.snapshot());
 });
 
+it("dispatches finite police crowd control without taking shelter or rescue ownership", () => {
+  const scenario = policeStationScenario();
+  scenario.population.count = 16;
+  scenario.population.mix = { carOwners: 0, limitedMobility: 0.1, needsAssist: 0.1 };
+  scenario.fleet.ambulances = 0;
+  scenario.fleet.boats = 0;
+  scenario.fleet.boatOperators = 0;
+  scenario.buildings.find((building) => building.type === BlockType.Shelter)!.capacity = 16;
+  scenario.weather.warningDelay = 0;
+  scenario.weather.sources = [{ cell: 0, startT: 0, endT: 100, rate: 0.1 }];
+  for (const cell of [26, 27, 28, 29, 30, 35, 36, 37, 43, 44, 45]) scenario.blocks[cell] = BlockType.Road;
+  const params = { ...defaultNpcParams(scenario), panicMean: 1, complianceMean: 1, riskToleranceMean: 0, awarenessMean: 1, falseReportRate: 0 };
+  const first = createSimulation(scenario, 91, "centralised", { durationTicks: 100, npcParams: params });
+  const replay = createSimulation(scenario, 91, "centralised", { durationTicks: 100, npcParams: params });
+  for (let tick = 0; tick < 100; tick++) { first.step(); replay.step(); }
+  const events = first.summary().events;
+  expect(events.some((event) => event.type === "ASSIGNED" && /crowd/i.test(event.reason))).toBe(true);
+  expect(events.some((event) => event.type === "ARRIVED" && /crowd/i.test(event.reason))).toBe(true);
+  expect(events.some((event) => event.type === "SERVED" || event.type === "HOSPITAL_ASSIGN")).toBe(false);
+  expect(first.snapshot().vehicles.kind).toContain(VehicleKind.PoliceCar);
+  expect(first.summary()).toEqual(replay.summary());
+  expect(first.snapshot()).toEqual(replay.snapshot());
+});
+
 it("replays police vehicles, events and metrics identically for the same seed", () => {
   const scenario = policeStationScenario();
   const first = createSimulation(scenario, 73, "centralised", { durationTicks: 8 });

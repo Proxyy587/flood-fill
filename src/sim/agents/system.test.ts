@@ -6,6 +6,7 @@ import { createWorld } from "../world/grid";
 import { createPopulation } from "./population";
 import { createAgentSystem, handoffRescuedCivilian, reserveRescuedShelter, stepAgents, agentSnapshot, inspectAgent } from "./system";
 import { createTraffic } from "../traffic";
+import { buildHazardGrid } from "../nav/hazards";
 import { livingFixture } from "./living-fixture";
 
 function town(cars = 0): Scenario {
@@ -16,8 +17,120 @@ function town(cars = 0): Scenario {
 function setup(s: Scenario) {
   const w = createWorld(s); const p = createPopulation(s, 42); const a = createAgentSystem(p, w, s);
   const traffic = createTraffic(w); const blocked = new Uint8Array(w.water.length);
-  return { w, p, a, traffic, blocked, step: (tick: number, policeControlled?: Uint8Array, escortGuidance?: ReadonlySet<number>) => stepAgents(a, w, s, tick, blocked, traffic, policeControlled, escortGuidance) };
+  return { w, p, a, traffic, blocked, step: (tick: number, policeControlled?: Uint8Array, escortGuidance?: ReadonlySet<number>, crowdGuidance?: Uint8Array) => stepAgents(a, w, s, tick, blocked, traffic, policeControlled, escortGuidance, crowdGuidance) };
 }
+it("reroutes an evacuation around a police-guided hotspot without changing its shelter reservation", () => {
+  const s = town();
+  const { a, p, step } = setup(s);
+  a.intent[0] = 3; a.shelterAssignment[0] = 0; a.shelterRemaining[0]--;
+  p.npcs.state[0] = NpcState.Evacuate;
+  step(1);
+  const original = a.routes.get(0)!;
+  expect(original.goal).toBe(46);
+  const start = original.cells[0];
+  p.npcs.cell[0] = start; p.npcs.x[0] = start % 8 + 0.5; p.npcs.z[0] = Math.floor(start / 8) + 0.5;
+  original.cursor = 1; original.progress = 0;
+  const hotspot = original.cells[2];
+  const guidance = new Uint8Array(64); guidance[hotspot] = 1;
+  const events = step(2, undefined, undefined, guidance);
+  const route = a.routes.get(0)!;
+  expect(route.cells).not.toContain(hotspot);
+  expect(route.goal).toBe(46);
+  expect(a.intent[0]).toBe(3);
+  expect(a.shelterAssignment[0]).toBe(0);
+  expect(events.some((event) => event.type === "REROUTE" && /police crowd guidance/i.test(event.reason))).toBe(true);
+});
+it("rejects malformed police crowd guidance masks", () => {
+  const short = setup(town());
+  expect(() => short.step(1, undefined, undefined, new Uint8Array(63))).toThrow(RangeError);
+  const nonBinary = setup(town()); const mask = new Uint8Array(64); mask[10] = 2;
+  expect(() => nonBinary.step(1, undefined, undefined, mask)).toThrow(RangeError);
+});
+it("finishes a partial foot edge before applying changed crowd guidance", () => {
+  const { a, p, w, step } = setup(town());
+  a.intent[0] = 2; p.npcs.home[0] = 46; p.npcs.state[0] = NpcState.ReturnHome;
+  step(1);
+  const original = a.routes.get(0)!;
+  const hotspot = original.cells[2]; const guidance = new Uint8Array(64); guidance[hotspot] = 1;
+  const x = p.npcs.x[0]; const z = p.npcs.z[0];
+  const beforeCell = p.npcs.cell[0];
+  const events = step(2, undefined, undefined, guidance);
+  expect(a.routes.get(0)).toBe(original);
+  expect(events.some((event) => event.type === "REROUTE")).toBe(false);
+  expect(Math.hypot(p.npcs.x[0] - x, p.npcs.z[0] - z)).toBeLessThanOrEqual(0.5);
+  expect(p.npcs.cell[0]).toBe(beforeCell);
+  let rerouted = false;
+  for (let tick = 3; tick <= 15; tick++) {
+    const routeBefore = a.routes.get(0)!;
+    const wasMidEdge = routeBefore.progress > 0;
+    const previousX = p.npcs.x[0]; const previousZ = p.npcs.z[0];
+    const events = step(tick, undefined, undefined, guidance);
+    const didReroute = events.some((event) => event.type === "REROUTE" && /police crowd guidance/i.test(event.reason));
+    if (!rerouted && !didReroute) expect(a.routes.get(0)).toBe(original);
+    if (didReroute) {
+      expect(routeBefore.progress).toBe(0);
+      rerouted = true;
+    }
+    expect(Math.hypot(p.npcs.x[0] - previousX, p.npcs.z[0] - previousZ)).toBeLessThanOrEqual(0.5);
+    if (wasMidEdge && !didReroute && routeBefore === original) expect(a.routes.get(0)).toBe(original);
+  }
+  expect(rerouted).toBe(true);
+  expect(a.routes.get(0)!.cells).not.toContain(hotspot);
+  expect(w.water[hotspot]).toBe(0);
+});
+it("keeps police-guided routes within the live flood-safe foot graph", () => {
+  const s = town(); const { a, p, w, step } = setup(s);
+  a.intent[0] = 2; p.npcs.home[0] = 46; p.npcs.state[0] = NpcState.ReturnHome;
+  step(1);
+  const original = a.routes.get(0)!; original.progress = 0;
+  const hotspot = original.cells[2]; w.water[hotspot] = 1;
+  const guidance = new Uint8Array(w.water.length); guidance[hotspot] = 1;
+  step(2, undefined, undefined, guidance);
+  const passable = buildHazardGrid(w, s, "foot").passable;
+  expect(a.routes.get(0)!.cells).not.toContain(hotspot);
+  expect(a.routes.get(0)!.cells.every((cell) => passable[cell] === 1)).toBe(true);
+});
+it("does not repeatedly reroute when the only reachable route crosses guided cells", () => {
+  const s = town(); const { a, p, w, step } = setup(s);
+  const onlyRoute = [9, 10, 11, 19, 27, 35, 43, 44, 45, 46];
+  w.water.fill(1);
+  for (const cell of onlyRoute) w.water[cell] = 0;
+  a.intent[0] = 3; a.shelterAssignment[0] = 0; a.shelterRemaining[0]--;
+  p.npcs.state[0] = NpcState.Evacuate; p.npcs.cell[0] = 9;
+  a.routes.set(0, { cells: onlyRoute.slice(), modes: onlyRoute.map(() => 0), cursor: 1, progress: 0, goal: 46, version: 1 });
+  const guidance = new Uint8Array(w.water.length); guidance[11] = 1;
+  const events = [...step(1, undefined, undefined, guidance), ...step(2, undefined, undefined, guidance)];
+  const active = a.routes.get(0)!;
+  expect(events.filter((event) => event.type === "REROUTE" && /police crowd guidance/i.test(event.reason))).toHaveLength(1);
+  expect(active.goal).toBe(46);
+  expect(active.cells).toEqual(onlyRoute);
+  const passable = buildHazardGrid(w, s, "foot").passable;
+  expect(Array.from(passable).every((value, cell) => value === Number(onlyRoute.includes(cell)))).toBe(true);
+});
+it("reroutes only for crowd-guidance cells changed in the current tick", () => {
+  const { a, p, step } = setup(town());
+  a.intent[0] = 2; p.npcs.home[0] = 20; p.npcs.state[0] = NpcState.ReturnHome;
+  const historical = new Uint8Array(64); historical[20] = 1;
+  a.routes.set(0, { cells: [9, 10, 11, 19, 20], modes: [0, 0, 0, 0, 0], cursor: 1, progress: 0, goal: 20, version: 1 });
+  step(1, undefined, undefined, historical);
+  const current = p.npcs.cell[0];
+  a.routes.set(0, { cells: [current, 10, 11, 19, 20], modes: [0, 0, 0, 0, 0], cursor: 1, progress: 0, goal: 20, version: 2, guidanceVersion: a.guidanceVersion });
+  const next = historical.slice(); next[21] = 1;
+  const events = step(2, undefined, undefined, next);
+  expect(events.some((event) => event.type === "REROUTE" && /crowd guidance/i.test(event.reason))).toBe(false);
+});
+it("replays police crowd-guided route decisions deterministically", () => {
+  const replay = () => {
+    const s = town(); const { a, p, step } = setup(s);
+    a.intent[0] = 2; p.npcs.home[0] = 46; p.npcs.state[0] = NpcState.ReturnHome;
+    step(1);
+    const route = a.routes.get(0)!; route.progress = 0;
+    const guidance = new Uint8Array(64); guidance[route.cells[2]] = 1;
+    const events = step(2, undefined, undefined, guidance);
+    return { cells: a.routes.get(0)!.cells, position: [p.npcs.x[0], p.npcs.z[0]], events: events.map((event) => [event.type, event.reason]) };
+  };
+  expect(replay()).toEqual(replay());
+});
 it("increases walking progress only while the assigned police escort is present", () => {
   const scenario = town();
   const ordinary = setup(scenario);

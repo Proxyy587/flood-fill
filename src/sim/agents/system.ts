@@ -7,7 +7,7 @@ import { beginTrafficTick, congestionFactors, finishTrafficTick, markTrafficWait
 import type { PopulationState } from "./population";
 import { assertMovementEntry } from "../invariants/movement";
 
-export interface AgentRoute { cells: number[]; modes: number[]; cursor: number; progress: number; goal: number; version: number }
+export interface AgentRoute { cells: number[]; modes: number[]; cursor: number; progress: number; goal: number; version: number; guidanceVersion?: number; crowdReroutePending?: boolean }
 interface Routing {
   foot: NavGrid; road: NavGrid;
   footFields: Map<number, ReturnType<typeof buildFlowField>>;
@@ -31,6 +31,8 @@ export interface AgentSystem {
   planningQueued: Uint8Array;
   planningStats: { fields: number; plans: number; deferred: number; retainedBytes: number };
   routeCells: number;
+  guidanceVersion: number;
+  crowdGuidance: Uint8Array;
 }
 
 function pathToField(grid: NavGrid, start: number, field: ReturnType<typeof buildFlowField>): number[] | null {
@@ -61,7 +63,8 @@ export function createAgentSystem(population: PopulationState, world: World, sce
   const shelters = scenario.buildings.filter((building) => building.type === BlockType.Shelter).sort((a, b) => a.id - b.id);
   return { population, routes: new Map(), shelters, shelterRemaining: Int32Array.from(shelters.map((b) => b.capacity)), shelterAssignment: new Int32Array(population.npcs.id.length).fill(-1), hazardSince: -1,
     intent: new Uint8Array(population.npcs.id.length), rescueHandoff: new Uint8Array(population.npcs.id.length), retry: new Int32Array(population.npcs.id.length), decisions: new Map(), version: 0, lastTick: 0,
-    planningQueued: new Uint8Array(population.npcs.id.length), planningStats: { fields: 0, plans: 0, deferred: 0, retainedBytes: 0 }, routeCells: 0 };
+    planningQueued: new Uint8Array(population.npcs.id.length), planningStats: { fields: 0, plans: 0, deferred: 0, retainedBytes: 0 }, routeCells: 0,
+    guidanceVersion: 0, crowdGuidance: new Uint8Array(world.width * world.height) };
 }
 function discardRoute(a: AgentSystem, i: number): void {
   const route = a.routes.get(i);
@@ -213,10 +216,26 @@ function plan(a: AgentSystem, i: number, goal: number, routing: Routing): AgentR
 }
 
 /** One deterministic second. All entry checks use the current hazard graph. */
-export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tick: number, blocked: Uint8Array, traffic: TrafficState, policeControlled?: Uint8Array, escortGuidance?: ReadonlySet<number>): SimEvent[] {
+export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tick: number, blocked: Uint8Array, traffic: TrafficState, policeControlled?: Uint8Array, escortGuidance?: ReadonlySet<number>, crowdGuidance?: Uint8Array): SimEvent[] {
   if (!Number.isSafeInteger(tick) || tick !== a.lastTick + 1) throw new RangeError("Agents require consecutive one-second ticks");
   for (const npc of escortGuidance ?? []) if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Police escort guidance contains an invalid civilian index");
-  const foot = buildHazardGrid(world, scenario, "foot", blocked);
+  const count = world.width * world.height;
+  if (crowdGuidance !== undefined && (!(crowdGuidance instanceof Uint8Array) || crowdGuidance.length !== count)) throw new RangeError("Police crowd guidance mask must be a grid-sized Uint8Array");
+  const nextGuidance = crowdGuidance ?? new Uint8Array(count);
+  const guidanceChangedCells = new Uint8Array(count);
+  let guidanceChanged = false;
+  for (let cell = 0; cell < count; cell++) {
+    if (nextGuidance[cell] > 1) throw new RangeError("Police crowd guidance mask must contain only binary values");
+    if (nextGuidance[cell] !== a.crowdGuidance[cell]) { guidanceChanged = true; guidanceChangedCells[cell] = 1; }
+  }
+  if (guidanceChanged) { a.guidanceVersion++; a.crowdGuidance = nextGuidance.slice(); }
+  const baseFoot = buildHazardGrid(world, scenario, "foot", blocked);
+  let foot = baseFoot;
+  if (nextGuidance.some((value) => value !== 0)) {
+    const costs = baseFoot.costs!.slice();
+    for (let cell = 0; cell < count; cell++) if (nextGuidance[cell] && baseFoot.passable[cell]) costs[cell] = Math.min(65536, costs[cell] * 4);
+    foot = { ...baseFoot, costs };
+  }
   beginTrafficTick(traffic, world, policeControlled);
   const road = buildHazardGrid(world, scenario, "car", blocked, congestionFactors(traffic));
   const routing: Routing = { foot, road, footFields: new Map(), carFields: new Map(), remainingCells: 49152, fields: 0, plans: 0 };
@@ -343,7 +362,14 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
     const goal = shelterTrip ? a.shelters[a.shelterAssignment[i]].entrance : a.intent[i] === 1 ? n.work[i] : n.home[i];
     if (goal < 0) { n.state[i] = NpcState.SeekHelp; continue; }
     let route = a.routes.get(i);
+    let pendingCrowdReroute = false;
     if (route) {
+      const guidanceStale = (route.guidanceVersion ?? 0) !== a.guidanceVersion;
+      const guidedRouteChanged = guidanceStale && (route.cursor > 0 && route.modes[route.cursor - 1] === 0 && guidanceChangedCells[route.cells[route.cursor - 1]] !== 0 ||
+        route.cells.slice(route.cursor).some((cell, offset) => route!.modes[route!.cursor + offset] === 0 && guidanceChangedCells[cell] !== 0));
+      pendingCrowdReroute = route.crowdReroutePending === true || guidedRouteChanged && route.progress > 0;
+      route.crowdReroutePending = pendingCrowdReroute;
+      if (guidanceStale && !guidedRouteChanged && !pendingCrowdReroute) route.guidanceVersion = a.guidanceVersion;
       const carFailed = n.car[i] >= 0 && cars.state[n.car[i]] === VehicleState.Failed;
       if (carFailed) n.role[i] = n.baseRole[i];
       if (carFailed && route.progress > 0 && route.modes[route.cursor] === 1) {
@@ -353,18 +379,20 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
         route.goal = -1; // Finish this edge walking, then replan before any next edge.
       }
       const invalid = route.goal !== goal || route.cells.slice(route.cursor).some((cell, j) => !(route!.modes[route!.cursor + j] ? road : foot).passable[cell]);
-      if (route.progress === 0 && (invalid || carFailed && route.modes.includes(1))) {
+      const crowdReroute = route.progress === 0 && (guidedRouteChanged || pendingCrowdReroute);
+      if (route.progress === 0 && (invalid || carFailed && route.modes.includes(1) || crowdReroute)) {
+        if (crowdReroute) { route.guidanceVersion = a.guidanceVersion; route.crowdReroutePending = false; }
         discardRoute(a, i); route = undefined; a.retry[i] = tick;
         const car = n.car[i]; if (car >= 0 && cars.state[car] !== VehicleState.Failed) cars.state[car] = VehicleState.Idle;
         n.role[i] = n.baseRole[i];
-        event(i, "REROUTE", "Remaining route or vehicle is unavailable; recomputing without teleporting");
+        event(i, "REROUTE", crowdReroute ? "Police crowd guidance changed the foot-route cost; recomputing at a safe node" : "Remaining route or vehicle is unavailable; recomputing without teleporting");
       }
     }
     if (!route && tick >= a.retry[i] && goal >= 0) {
         route = plan(a, i, goal, routing) ?? undefined;
       a.planningQueued[i] = 0;
       if (route) {
-        route.version = ++a.version; a.routeCells += route.cells.length + route.modes.length;
+        route.version = ++a.version; route.guidanceVersion = a.guidanceVersion; a.routeCells += route.cells.length + route.modes.length;
         a.routes.set(i, route); n.state[i] = shelterTrip ? NpcState.Evacuate : a.intent[i] === 1 ? NpcState.Commute : NpcState.ReturnHome;
         event(i, "ROUTE_PLANNED", "Selected the fastest currently reachable walking or walk-drive-walk route");
       } else {
@@ -406,7 +434,7 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
       }
       if (route.progress >= 1) {
         n.cell[i] = target; route.cursor++; route.progress = 0;
-        if (route.goal !== goal) break; // Replan at this node next tick, never reset a partial edge.
+        if (route.goal !== goal || pendingCrowdReroute) break; // Replan at this node next tick, never reset a partial edge.
       }
     }
     if (route.cursor === route.cells.length && route.goal === goal) {

@@ -14,8 +14,8 @@ warnings and capacity-reserved shelter evacuation; powered pump configuration an
 expanded hazard integration remain. Blackout traffic is implemented.
 M3A uncertain reports and M3B ambulance dispatch, field triage, hospital balancing
 and hot-zone staging are implemented in the AK headless core. M3C boat rescue and
-M3D independent police gridlock traffic control and M3E independent police civilian
-escort are also implemented. Crowd control (M3F) remains the next police follow-on; helicopter rooftop
+M3D independent police gridlock traffic control, M3E independent police civilian
+escort, and M3F adaptive police crowd control are implemented. Helicopter rooftop
 rescue/medevac and weather constraints, the full compound stress scenario, browser
 rendering/integration, and M4-M6 remain pending.
 Both dispatch policies can be compared on identical seeds; no universal
@@ -65,7 +65,7 @@ gates and are not confirmed by it.
 - Negotiation and centralised baseline, same seed (AK)
 - Ambulance dispatch, hospital balancing/diversion and adaptive hot-zone staging (M3B, implemented, AK)
 - Boat rescue with injured-patient handoff into ambulance hospital balancing (M3C, implemented, AK)
-- Independent finite police dispatch for gridlock traffic control (M3D, implemented, AK) and civilian escort (M3E, implemented, AK); crowd control (M3F) remains planned
+- Independent finite police dispatch for gridlock traffic control (M3D), civilian escort (M3E), and adaptive crowd control (M3F), implemented by AK
 - **Helicopters (planned)**: Rooftop rescue of stranded civilians; medevac transfers between helipads; weather constraints (grounded if wind > threshold); air graph routing (AK)
 - Metrics and `sim:compare`; dashboard with comparison charts, power outage %, and aerial rescue stats (W3)
 - Event log, replay timeline, "why was this rerouted" panel (W3 + W2)

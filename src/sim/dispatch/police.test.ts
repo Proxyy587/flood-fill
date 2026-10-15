@@ -118,6 +118,133 @@ it("keeps an escort roadside cell from claiming an independent gridlock task", (
   expect(Array.from(fixture.police.assignment)).toEqual([10, 26]);
 });
 
+const escortCandidate = (urgency: number, subject = 1) => ({ kind: PoliceTaskKind.Escort as const, subject, civilianId: subject, members: [subject], assignmentCell: 10 + subject, targetCell: 19, urgency, critical: false as const, eligibleSince: 1 });
+const crowdCandidate = (assignmentCell: number, urgency: number, critical: boolean) => ({ kind: PoliceTaskKind.CrowdControl as const, subject: -1 as const, assignmentCell, targetCell: 26, urgency, critical });
+
+it("arbitrates critical crowd ahead of high-need escort and gridlock", () => {
+  const fixture = trafficFixture();
+  fixture.traffic.intersections[27] = 1;
+  fixture.traffic.gridlock[27] = 1;
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1,
+    [escortCandidate(2000)], [crowdCandidate(10, 1_000_000, true)]);
+  expect(fixture.police.taskKind[0]).toBe(PoliceTaskKind.CrowdControl);
+  expect(fixture.police.assignment[0]).toBe(10);
+});
+
+it("arbitrates high-need escort above ordinary crowd and gridlock", () => {
+  const fixture = trafficFixture();
+  fixture.traffic.intersections[27] = 1;
+  fixture.traffic.gridlock[27] = 1;
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1,
+    [escortCandidate(1000)], [crowdCandidate(10, 100, false)]);
+  expect(fixture.police.taskKind[0]).toBe(PoliceTaskKind.Escort);
+  expect(fixture.police.assignment[0]).toBe(11);
+});
+
+it("arbitrates ordinary crowd ahead of ordinary escort and gridlock", () => {
+  const fixture = trafficFixture();
+  fixture.traffic.intersections[27] = 1;
+  fixture.traffic.gridlock[27] = 1;
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1,
+    [escortCandidate(999)], [crowdCandidate(10, 100, false)]);
+  expect(fixture.police.taskKind[0]).toBe(PoliceTaskKind.CrowdControl);
+  expect(fixture.police.assignment[0]).toBe(10);
+});
+
+it("keeps an equal-tier active assignment stable when another task appears", () => {
+  const fixture = trafficFixture();
+  const first = escortCandidate(1500, 3);
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1, [first]);
+  const originalTarget = fixture.police.target[0];
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 2,
+    [first, escortCandidate(1500, 2)]);
+  expect(fixture.police.taskKind[0]).toBe(PoliceTaskKind.Escort);
+  expect(fixture.police.taskSubject[0]).toBe(3);
+  expect(fixture.police.target[0]).toBe(originalTarget);
+});
+
+it("does not preempt an ordinary active job for noncritical crowd pressure", () => {
+  const fixture = trafficFixture();
+  fixture.traffic.intersections[27] = 1;
+  fixture.traffic.gridlock[27] = 1;
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
+  const result = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 2,
+    [], [crowdCandidate(10, 900_000, false)]);
+  expect(fixture.police.taskKind[0]).toBe(PoliceTaskKind.TrafficControl);
+  expect(result.events.some((event) => event.type === "COMMIT_CANCELLED")).toBe(false);
+});
+
+it("preempts only for critical crowd and makes displaced gridlock retryable", () => {
+  const fixture = trafficFixture();
+  fixture.traffic.intersections[27] = 1;
+  fixture.traffic.gridlock[27] = 1;
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
+  const displaced = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 2,
+    [], [crowdCandidate(10, 1_000_000, true)]);
+  expect(fixture.police.taskKind[0]).toBe(PoliceTaskKind.CrowdControl);
+  expect(displaced.events).toContainEqual(expect.objectContaining({ type: "COMMIT_CANCELLED", cell: 27, reason: expect.stringMatching(/preempt/i) }));
+  const crowdCleared = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 3);
+  expect(crowdCleared.events).toContainEqual(expect.objectContaining({ type: "COMMIT_CANCELLED", cell: 10 }));
+  expect(fixture.police.taskKind[0]).toBe(PoliceTaskKind.TrafficControl);
+  expect(fixture.police.assignment[0]).toBe(27);
+});
+
+it("preempts only once when the same critical crowd remains active", () => {
+  const fixture = trafficFixture({ policeCars: 2, policeOfficers: 2 });
+  for (const cell of [26, 27]) {
+    fixture.traffic.intersections[cell] = 1;
+    fixture.traffic.gridlock[cell] = 1;
+  }
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
+  const critical = [crowdCandidate(10, 1_000_000, true)];
+  const activated = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 2, [], critical);
+  expect(activated.events.filter((event) => event.type === "COMMIT_CANCELLED")).toHaveLength(1);
+  const sustained = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 3, [], critical);
+  expect(sustained.events.filter((event) => event.type === "COMMIT_CANCELLED")).toHaveLength(0);
+  expect(Array.from(fixture.police.taskKind)).toContain(PoliceTaskKind.TrafficControl);
+});
+
+it("keeps an unassigned critical hotspot pending until it can displace a newly lower-tier job", () => {
+  const fixture = trafficFixture({ policeCars: 2, policeOfficers: 2 });
+  const pending = crowdCandidate(12, 800_000, true);
+  const first = [crowdCandidate(10, 1_000_000, true), crowdCandidate(11, 900_000, true), pending];
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1, [], first);
+  expect(Array.from(fixture.police.assignment)).toEqual([10, 11]);
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 2, [], [
+    crowdCandidate(10, 100, false), crowdCandidate(11, 900_000, true), pending,
+  ]);
+  expect(fixture.police.assignment).toContain(12);
+  expect(fixture.police.assignment).not.toContain(10);
+});
+
+it("preempts the lowest-urgency job within the same tier before vehicle-ID ties", () => {
+  const fixture = trafficFixture({ policeCars: 2, policeOfficers: 2 });
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1, [], [
+    crowdCandidate(10, 50, false), crowdCandidate(11, 100, false),
+  ]);
+  expect(Array.from(fixture.police.assignment)).toEqual([11, 10]);
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 2, [], [
+    crowdCandidate(10, 100, false), crowdCandidate(11, 10, false), crowdCandidate(12, 1_000, true),
+  ]);
+  expect(Array.from(fixture.police.assignment)).toEqual([12, 10]);
+});
+
+it("assigns distinct crowd jobs to distinct available cars and guides only arrived assignments", () => {
+  const fixture = trafficFixture({ policeCars: 2, policeOfficers: 2 });
+  fixture.world.block[27] = BlockType.Road;
+  fixture.scenario.blocks[27] = BlockType.Road;
+  const result = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1,
+    [], [crowdCandidate(10, 200, false), crowdCandidate(11, 100, false)]);
+  expect(Array.from(fixture.police.assignment)).toEqual([10, 11]);
+  expect(new Set(Array.from(fixture.police.assignment)).size).toBe(2);
+  expect(result.crowdGuidance).toEqual(new Uint8Array(64));
+  let arrived = result;
+  for (let tick = 2; tick <= 4; tick++) arrived = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, tick,
+    [], [crowdCandidate(10, 200, false), crowdCandidate(11, 100, false)]);
+  expect(arrived.crowdGuidance[10]).toBe(1);
+  expect(arrived.crowdGuidance[11]).toBe(1);
+});
+
 it("leaves the configured unit unavailable when no safe adjacent station road exists", () => {
   const { scenario, world } = setup({ safeStationRoad: false });
   const police = createPolice(scenario, world, new Uint8Array(64));
