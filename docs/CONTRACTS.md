@@ -48,6 +48,20 @@ Decisions frozen by AK:
 
 Health gate: `pnpm test src/contracts/contracts.test.ts`, `pnpm typecheck`, `pnpm lint`.
 
+## M1 additive amendments (AK-approved 2026-10-15)
+
+- Optional Scenario.bridges: absolute deckHeight (metres), above ground and <=510m,
+  unique bridge cells. Legacy bridge metadata defaults to ground+1m in the sim.
+- Population.customSchedule is required only for schedule custom: departAt 0..86399
+  seconds of day and workTicks 1..86400. Office/night need no extra metadata.
+- RunOptions.startTimeSeconds selects initial sim time; npcParams sets initial
+  per-run sliders. Population allocation rechecks vehicle budgets after overrides.
+- SimEvent actorKind/targetKind disambiguates numeric ID namespaces. Live M1 events
+  include these fields; legacy logs without kinds remain parseable. Added NPC_CREATED,
+  NPC_STATE, ROUTE_PLANNED and ARRIVED event names. Inspector already identifies kind.
+
+The draft below predates these additions; source types and schemas remain authoritative.
+
 ## Historical draft
 
 ```ts

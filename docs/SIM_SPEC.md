@@ -2,7 +2,7 @@
 
 Everything here is the **intended behaviour**. Build the numbered milestone in `docs/ROADMAP.md` first, then extend.
 
-## Implemented foundation (2026-10-15)
+## Implemented headless core (2026-10-15)
 
 - Seeded Mulberry32 RNG; schema-validated independent typed-array grid state.
 - Deterministic weighted A* and reverse multi-target Dijkstra flow fields, 4-connected.
@@ -22,11 +22,30 @@ Everything here is the **intended behaviour**. Build the numbered milestone in `
 - Plant/substation depth >0.5m causes a latched trip. Reachability is BFS from all
   live plants. Hospitals use fuel-counted generators, enter diversion on interior
   flood or no power. Hospital loads/capacity allocation wait for agents/dispatch.
-- Road/car closure thresholds emit events and increment navVersion. Actual agent
-  replanning, bridges with separate deck geometry and traffic capacities are pending.
-- runBatch emits measured water/power plus clearly unavailable agent metrics.
-  Only substation_flooded injection is supported; other injected actions explicitly
-  reject instead of silently doing nothing. Aircraft/weather safety follows in M3.
+- Seeded civilians and configured doctors/nurses/police/boat operators; capacity
+  housing/employment with explicit unhoused/unemployed fallback. Office/night/custom
+  schedules, continuous foot/car commutes and daily returns. Medical staff reassign
+  to reachable powered nonzero-capacity hospitals; patient/bed balancing is pending.
+- Foot/car/emergency/boat passability respects operating depths, entrances, closures
+  and bridge decks. Bridges default to ground+1m, or use explicit absolute deckHeight.
+  Active commuting uses foot/car only. No boat underpass geometry yet. Closure events
+  increment navVersion; future routes retry/replan without teleporting. Interrupted
+  edges hold position while unsafe. Flooded cars fail and obstruct driving cells.
+- Walking is 1.4m/s times speed/mobility/fatigue, halved when wading above 0.3m;
+  cars are 8m/s adjusted by BPR costs. Independent adjacency/depth/deck assertions
+  run on every movement segment, including multi-cell car ticks.
+- Traffic credits: ordinary road 2 entries/s; intersections 1/s powered, 0.5/s dark,
+  0.8/s with police-control hook. Rotation is deterministic. Thirty consecutive
+  queued ticks produce connected GRIDLOCK episodes. This is throughput, not headway.
+- Route planning uses bounded caches/search work and retained route entries (see
+  ARCHITECTURE). Queue delay under high load is explicit; it is not unreachable-path
+  evidence. Inspector planningQueued and decision reasons distinguish this case.
+  Panic/compliance/awareness are seeded attributes only until M2 evacuation logic;
+  initial run sliders work, live mutation and partial-information beliefs do not yet.
+- runBatch measures water/power, stranded commuters, current idle cars and gridlock.
+  Response TTS/unmet/fairness/evacuation/aircraft metrics remain zero placeholders.
+  substation_flooded, bridge_closed and road_blocked_by_debris injections are supported;
+  other actions reject. Closures latch; repair actions are not implemented.
 - Injected faults apply at the named state boundary, including tick 0, before
   power propagation. Generator activation, blackout state and event timestamps agree.
 

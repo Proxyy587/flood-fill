@@ -7,10 +7,12 @@ emergency-planning authority.
 
 ## Current state
 
-AK foundation: frozen contracts/mocks, seeded RNG, grid loading, weighted A*/flow
-fields, weather, virtual-pipe flood, power cascade/generators, pure headless runner.
-The browser still displays the Next.js starter page. Agents, dispatch, aircraft,
-editor, renderer, replay and critic integration are pending. See docs/AK_STATUS.md.
+AK headless core: frozen contracts/mocks, seeded population, weighted A*/flow fields,
+weather/flood/power, continuous walking/driving commutes, hazard rerouting and traffic.
+Snapshots and inspectors expose live civilians, staff and civilian cars. The browser
+still displays the Next.js starter page. Rescue dispatch, evacuation, reports,
+aircraft, editor, renderer, replay and critic integration remain pending.
+See docs/AK_STATUS.md for checkpoint evidence and incomplete review gates.
 
 ## Setup and verification
 
@@ -28,10 +30,10 @@ pnpm validate --require-templates  # schema/presence gate: fails until templates
 
 ```ts
 import { runBatch, createSimulation } from "./src/sim";
-import { mockScenario } from "./src/contracts/mocks";
+import { livingFixture } from "./src/sim/agents/living-fixture";
 
-const runs = runBatch(mockScenario(), [0, 42, 77], "negotiation", { durationTicks: 600 });
-const simulation = createSimulation(mockScenario(), 42, "centralised");
+const runs = runBatch(livingFixture(), [0, 42, 77], "negotiation", { durationTicks: 600 });
+const simulation = createSimulation(livingFixture(), 42, "centralised");
 simulation.step(); // one simulated second; no wall-clock dependency
 const snapshot = simulation.snapshot(); // owns all buffers, safe to transfer
 ```
@@ -39,14 +41,18 @@ const snapshot = simulation.snapshot(); // owns all buffers, safe to transfer
 ```powershell
 pnpm sim:batch --ticks 600 --seeds '0,42,77' --out out/batch.json
 pnpm sim:compare --ticks 600 --seeds '0,42,77' --out out/compare.json
+pnpm exec tsx scripts/health-living.ts # synthetic 12/1000/10000-civilian movement/load probes
 pnpm sim:batch --scenario scenarios/riverside-town.json --ticks 1200 --out out/town.json
 ```
 
 Quote comma-separated seeds in PowerShell. Without --scenario, commands use
-MOCK foundation town; output includes implemented capabilities. Comparison runs
-both mode labels but explicitly declares dispatch unavailable. Agent-dependent
-metrics are zero placeholders and idle fractions are empty; only weather, water
-and power are currently measured. unpoweredPopPct estimates homes by capacity.
+MOCK living town; output includes implemented capabilities. Comparison runs both
+mode labels but explicitly declares dispatch unavailable. Water/power, stranded
+commuters and gridlock are measured. idleFrac.car is the current idle-car fraction,
+not cumulative duty utilization. unpoweredPopPct counts actual NPC current cells,
+including staff/unhoused people, not housing capacity or district outage exposure.
+Response TTS, unmet rescue requests, fairness, evacuation and aerial rescue metrics
+remain zero placeholders. Mode labels must not be interpreted as policy evidence.
 
 No Worker 1 templates exist yet. `pnpm validate` checks the contract fixture and
 all scenario files present, prints their count and reports templatesPresent.

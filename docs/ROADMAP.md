@@ -7,9 +7,11 @@ Ambition is high, so this roadmap is built around **vertical slices** and **expl
 Tooling repaired after syncing main 181ea06. Contracts, schemas/mocks, deterministic
 grid/navigation, flood/power primitives and headless API/CLI are implemented with
 health tests. See AK_STATUS.md for exact gates and local checkpoint commits.
-M0 remains partial until AJ's mock-snapshot renderer/bridge exists. M1 lacks living
-agents/traffic and browser integration. M2 lacks full mode passability, pumps/signals
-and evacuation integration. M3-M6 remain pending. Dispatch comparison is labelled
+M0 remains partial until AJ's mock-snapshot renderer/bridge exists. M1 now has
+headless commuting agents/cars/staff, mode hazard grids and basic traffic; browser
+integration and independent review approval are still pending. M2 lacks powered
+pump configuration and evacuation integration; blackout traffic is implemented.
+M3-M6 remain pending. Dispatch comparison is labelled
 unavailable; no performance/response benefit has been measured. W1 templates are
 missing and the strict release-validation command correctly fails.
 

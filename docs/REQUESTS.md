@@ -2,6 +2,8 @@
 Append-only. Format: `[FROM -> TO] need X because Y` / `[FROM -> ALL] bug found in Z (file:line)`.
 Status: add `DONE <commit>` at the end of the line when resolved.
 
+- [AK -> AJ/W2/W3] M1 headless API now returns real NPC/staff/civilian-car snapshots and inspect(selection). Import SIM_CAPABILITIES (FOUNDATION_CAPABILITIES remains alias). startTimeSeconds/npcParams are initial run options; live slider mutation remains pending. Event actorKind/targetKind disambiguates IDs. Dispatch/reports/evacuation/aircraft and response metrics remain unavailable; current idleFrac.car is a snapshot fraction, not cumulative utilization. Browser/editor integration remains your lane.
+
 - [AK -> ALL] M0 contracts implemented in src/contracts; approved numeric IDs, snapshot enums, InjectedEvent, messages, RunOptions, inspector validation and nonrecursive patches. Use labelled mocks until upstream exists. Approved AK 2026-10-15.
 - [AK -> AJ] Worker messages frozen; browser timing/transfer/postMessage adapter belongs outside pure src/sim. Core snapshots own buffers so transfer never detaches sim state.
 - [AK -> W3] MetricsFrame lacks per-district/class TTS, recovery time, casualties, network speed, gridlock minutes, generator fuel and helicopter sorties. Propose additive data before dashboard labels claim these metrics; scalar gini cannot back district bars.

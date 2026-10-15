@@ -1,4 +1,36 @@
-# AK foundation review ledger — 2026-10-15
+# AK review ledger — 2026-10-15
+
+## M1 continuation: aggregate INCONCLUSIVE — not approved
+
+Initial independent review failed with reproduced car recovery, hospital eligibility,
+planning allocation/performance and stale-documentation defects. These were fixed
+with RED-to-GREEN regressions. Rechecks used GPT-6 Luna, medium reasoning, as requested.
+
+| Lane | Final lane status | Evidence/limitation |
+|---|---|---|
+| Goal/constraints | INCONCLUSIVE | Hospital fixes and focused tests verified; CodeRabbit prerequisite unavailable |
+| QA | PASS | Failed-car walking speed, edge holds, abandoned state and hospital regressions pass |
+| Code quality | PASS | Bounds and recovery pass; 96x96/40-car-origin probe plans all routes by tick 20 |
+| Security | INCONCLUSIVE | Substantive bounded-memory recheck passes, but required security-review skill unavailable |
+| Context | INCONCLUSIVE | Initial stale M0 claims updated; rechecker stopped at missing CodeRabbit CLI |
+
+CodeRabbit was not run and its result is unknown. Direct local tests are not a
+substitute for that service or aggregate approval. Installation/authentication
+would require a separate setup step; no remote review/authentication was initiated.
+Only a local progress checkpoint is permitted here, not merge/release signoff.
+
+Safety corrections: failed-car owners finish only the interrupted edge on foot,
+then replan; medical targets require reachability, power, capacity and dry interiors;
+abandoned cars become Idle. FIFO caches cap at 16 fields/mode (6MiB at maximum grid),
+search work caps at 49,152 grid cells/tick and 256 plan attempts, and retained route
+cells/modes cap at 262,144 entries. Excess work queues deterministically. The 8ms
+tick target remains unproven; synthetic 10k-civilian load exceeds it on this host.
+
+Verification evidence and commit follow in AK_STATUS.md. Production build and
+multi-seed CLI smoke pass; missing W1 templates/AJ integration and response metrics
+remain open. Historical foundation review below remains scoped to that checkpoint.
+
+## Historical foundation review
 
 Scope: the approved foundation checkpoint, not completion of the full roadmap.
 Review uses superpowers spec/quality gates plus the five-area post-implementation

@@ -4,19 +4,32 @@
 
 The architecture below is the target. src/contracts now contains frozen types,
 schemas and labelled mocks; src/sim contains a pure grid, RNG, navigation, weather,
-flood/power and headless runner. Browser timing, transfer, rendering, UI, agents,
-dispatch, replay and critic integration are pending.
+flood/power, seeded typed-array NPC/car tables, commuting/traffic and headless runner.
+Browser timing, transfer, rendering, UI, evacuation, reports, rescue dispatch,
+aircraft, replay and critic integration are pending.
 
 `createSimulation(scenario,seed,mode,options)` exposes tick/done/navVersion, step,
-snapshot and summary. `runBatch(scenario,seeds,mode,options?)` runs the same core.
+snapshot, summary and inspect(selection). `runBatch(scenario,seeds,mode,options?)`
+runs the same core. Inspector data and entity snapshot arrays are detached copies.
 Snapshots own copied buffers; transfer cannot detach the world. The worker adapter
 will live outside src/sim so the pure core never imports host APIs.
 
 State 0 applies any tick-0 faults before initial power propagation. Step samples
 weather/sources on [tick,tick+1), applies flood, scheduled faults and power at
-boundary tick+1, then derives closures. Metrics include 0,
+boundary tick+1, then derives closures and steps agents/traffic. Metrics include 0,
 every 10 ticks and the final state. RUN_STARTED declares dispatchImplemented:false.
-Mode labels do not select policies yet. The run RNG is reserved for agent work.
+Mode labels do not select rescue policies yet. Population uses its own seeded
+stream; no wall-clock input affects outcomes. Foot destination and car-origin flow
+fields are shared across same-tick route requests. Routes keep fractional edge
+progress; replanning waits for a node and never resets a partially travelled edge.
+Car destination access minimizes walking/driving ETA including current BPR costs.
+Failed cars obstruct roads; traffic uses deterministic rotating agent priority,
+throughput credits and sustained connected queue episodes, not lane/headway physics.
+Planning is resource-bounded: at most 49,152 grid-cell flow-search units and 256
+plan attempts per tick; deterministic FIFO caches hold at most 16 fields per mode
+(6 MiB combined at 128x128). Retained route cells plus mode entries total at most
+262,144. Excess requests queue for later ticks rather than allocating without bound.
+These are deterministic work/allocation bounds, not proof of the 8ms tick target.
 
 Power edges are undirected; trips latch until a future repair action. Hospitals
 use generators until fuel exhaustion or interior flooding. Physics is synthetic;

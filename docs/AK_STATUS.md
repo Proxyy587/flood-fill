@@ -1,5 +1,37 @@
 # AK execution checkpoints
 
+## Active M1 continuation — stages A/B/C (2026-10-15)
+
+Bridge metadata/custom schedules/run parameters are schema-checked. Seeded population,
+hazard mode grids and traffic primitives are implemented. Continuous walk-drive-walk
+commuting, failed-car obstruction, dynamic retry/reroute, medical workplace reassignment
+and copied snapshot/inspector outputs now run through the headless API. Both policy
+labels still use the same non-dispatch core; rescue/evacuation effectiveness is unavailable.
+
+Stage B/C evidence: missing-module RED observed before movement implementation;
+329-test health passed before runner integration. Runner integration tests then
+reproduced empty tables/unsupported closures and passed after wiring. Interrupted-edge
+state and daily-departure regressions reproduced two failures and now pass. Focused
+agent/invariant suite initially passed 22 tests. A first five-area review reproduced
+ghost driving after car failure, unavailable medical workplaces, stationary Moving
+cars, unbounded search/cache work and stale docs. Regression tests went RED, then
+passed after fixes. Search/cache/route retention now have deterministic budgets.
+
+Final pre-checkpoint health: 348 tests, lint/types/schema pass; production build
+passes after the retained-route bound. Independent Luna-medium delta assertions
+confirm exact route counters on completion and failed-car truncation; the long-snake
+case retains 247,650 entries and defers 25 requests within the 262,144-entry cap.
+Multi-seed 600-tick CLI batch/compare pass on seeds 0/42/77:
+61 metric frames/run, 12 NPC creation events/run and 10 arrivals/run. Comparison is
+explicitly unavailable for rescue policies. Synthetic load/movement probes pass
+12/1000/10000 civilians, including no teleport checks; the 10000-civilian/30-tick
+probe takes about 1.9 seconds with queue budgeting, not an 8ms/tick guarantee.
+
+Initial primitive reviewer hit usage limits; subsequent review ran. Luna-medium
+QA/quality/security substantive rechecks pass, but goal/context could not complete
+CodeRabbit prerequisites and the security-review skill is absent. Aggregate review
+is INCONCLUSIVE, not approved. See AK_REVIEW.md. No merge/push/PR or release claim.
+
 ## 2026-10-15 baseline
 
 - Pulled main d5a990b → 181ea06 by fast-forward; clean checkout before work.
@@ -75,3 +107,10 @@ Remaining: full M1 living-city agents/traffic, mode-specific hazard routing and
 replanning; M3 uncertain reports/dispatch/hospital allocation/aircraft and safety
 invariants; M4 patch verification; M5 full stress integration. AJ's worker/render
 and W1 templates remain separate ownership dependencies. Goal remains active.
+
+## M1 planning baseline (historical)
+
+Revalidated clean f058ff3 and full baseline health (209 passing tests). Design/plan:
+docs/superpowers/{specs/2026-10-15-ak-living-city-design,plans/2026-10-15-ak-living-city}.md.
+Stage A began with bridge decks, schedules, run parameters and typed live-event
+actors. Current implementation/evidence is recorded in the active M1 section above.

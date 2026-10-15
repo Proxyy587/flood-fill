@@ -45,8 +45,9 @@ export const ScenarioSchema: z.ZodType<Scenario> = z.strictObject({
   schemaVersion: z.literal(1), name: z.string().trim().min(1).max(120),
   size: z.strictObject({ w: count.min(1).max(128), h: count.min(1).max(128) }),
   ground: z.array(count.max(255)), blocks: z.array(block), buildings: z.array(BuildingDefSchema),
+  bridges: z.array(z.strictObject({ cell: count, deckHeight: nonnegative.max(510) })).max(16384).optional(),
   districts: z.array(z.strictObject({ id: count, name: z.string().min(1), cells: z.array(count).min(1) })).min(1),
-  population: z.strictObject({ count: count.max(10000), mix: z.strictObject({ carOwners: unit, limitedMobility: unit, needsAssist: unit }), schedule: z.enum(["office-hours", "night", "custom"]) }),
+  population: z.strictObject({ count: count.max(10000), mix: z.strictObject({ carOwners: unit, limitedMobility: unit, needsAssist: unit }), schedule: z.enum(["office-hours", "night", "custom"]), customSchedule: z.strictObject({ departAt: count.max(86399), workTicks: count.min(1).max(86400) }).optional() }),
   fleet: z.strictObject({ ambulances: count, policeCars: count, boats: count, helicopters: count, doctors: count, nurses: count, policeOfficers: count, boatOperators: count }),
   weather, injected: z.array(InjectedEventSchema),
   powerGrid: z.strictObject({ nodes: z.array(z.strictObject({ id: count, kind: z.enum(["plant", "substation", "load"]), cell: count, building: BuildingIdSchema.optional() })), edges: z.array(z.tuple([count, count])) }),
@@ -57,6 +58,14 @@ export const ScenarioSchema: z.ZodType<Scenario> = z.strictObject({
   const inGrid = (cell: number, path: (string | number)[]) => { if (cell >= length) issue(path, "Cell outside grid"); };
   if (s.ground.length !== length) issue(["ground"], "Expected w*h entries");
   if (s.blocks.length !== length) issue(["blocks"], "Expected w*h entries");
+  const bridgeCells = new Set<number>();
+  s.bridges?.forEach((b, i) => {
+    inGrid(b.cell, ["bridges", i, "cell"]);
+    if (s.blocks[b.cell] !== BlockType.Bridge || bridgeCells.has(b.cell)) issue(["bridges", i, "cell"], "Expected unique bridge cell");
+    if (b.deckHeight <= s.ground[b.cell]) issue(["bridges", i, "deckHeight"], "Deck must be above terrain");
+    bridgeCells.add(b.cell);
+  });
+  if ((s.population.schedule === "custom") !== (s.population.customSchedule !== undefined)) issue(["population", "customSchedule"], "Custom schedule requires departAt/workTicks; other schedules must omit it");
   if (s.population.mix.limitedMobility + s.population.mix.needsAssist > 1) issue(["population", "mix"], "Mobility shares must sum to at most 1");
   const civilianCars = Math.round(s.population.count * s.population.mix.carOwners);
   const fleetCount = s.fleet.ambulances + s.fleet.policeCars + s.fleet.boats + s.fleet.helicopters + civilianCars;
@@ -137,7 +146,7 @@ export const PatchCommandSchema = z.discriminatedUnion("kind", [
 export const ScenarioPatchSchema = z.strictObject({ title: z.string().min(1), rationale: z.string().min(1), commands: z.array(PatchCommandSchema).max(1024), estimatedCost: nonnegative });
 export const EditCommandSchema = z.union([PatchCommandSchema, z.strictObject({ kind: z.literal("applyPatch"), patch: ScenarioPatchSchema })]);
 const entityId = z.union([NpcIdSchema, VehicleIdSchema, BuildingIdSchema]);
-export const SimEventSchema: z.ZodType<SimEvent> = z.strictObject({ tick: count, type: z.enum(SIM_EVENT_TYPES), actor: entityId.optional(), target: z.union([entityId, RequestIdSchema]).optional(), cell: count.optional(), data: z.record(z.string(), z.union([finite, z.string(), z.boolean()])).optional(), reason: z.string().trim().min(1) });
+export const SimEventSchema: z.ZodType<SimEvent> = z.strictObject({ tick: count, type: z.enum(SIM_EVENT_TYPES), actor: entityId.optional(), actorKind: z.enum(["npc", "vehicle", "building"]).optional(), target: z.union([entityId, RequestIdSchema]).optional(), targetKind: z.enum(["npc", "vehicle", "building", "request"]).optional(), cell: count.optional(), data: z.record(z.string(), z.union([finite, z.string(), z.boolean()])).optional(), reason: z.string().trim().min(1) });
 export const MetricsFrameSchema: z.ZodType<MetricsFrame> = z.strictObject({
   tick: count, tts: z.strictObject({ mean: nonnegative, p50: nonnegative, p90: nonnegative }), unmet: count,
   idleFrac: z.record(z.string(), unit), gini: unit,
@@ -146,7 +155,7 @@ export const MetricsFrameSchema: z.ZodType<MetricsFrame> = z.strictObject({
   floodedCells: count, maxDepth: nonnegative, unpoweredPopPct: finite.min(0).max(100), heliRescues: count, routeViolations: count,
 });
 export const RunSummarySchema: z.ZodType<RunSummary> = z.strictObject({ scenario: z.string().min(1), seed: SeedSchema, mode: DispatchModeSchema, metrics: z.array(MetricsFrameSchema), events: z.array(SimEventSchema), hotspots: z.array(z.strictObject({ kind: z.enum(["gridlock", "isolated", "hospital_overload", "power"]), cells: z.array(count), score: nonnegative })) });
-export const RunOptionsSchema = z.strictObject({ durationTicks: count.min(1).max(86400).optional(), metricsEvery: count.min(1).max(86400).optional() });
+export const RunOptionsSchema = z.strictObject({ durationTicks: count.min(1).max(86400).optional(), metricsEvery: count.min(1).max(86400).optional(), startTimeSeconds: count.max(86399).optional(), npcParams: NpcParamsSchema.optional() });
 export const MainToWorkerSchema: z.ZodType<MainToWorker> = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("load"), scenario: ScenarioSchema, seed: SeedSchema, options: RunOptionsSchema.optional() }),
   ...(["play", "pause", "step", "exportLog"] as const).map((kind) => z.strictObject({ kind: z.literal(kind) })),

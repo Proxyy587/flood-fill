@@ -1,6 +1,14 @@
 import { expect, it } from "vitest";
 import { mockScenario } from "../../contracts/mocks";
 import { createWorld, neighbours } from "./grid";
+import { BlockType } from "../../contracts";
+
+it("stores explicit bridge decks with a one-metre legacy fallback", () => {
+  const s = mockScenario(); s.blocks[24] = BlockType.Bridge; s.blocks[25] = BlockType.Bridge;
+  s.bridges = [{ cell: 24, deckHeight: 2 }];
+  const w = createWorld(s);
+  expect(w.bridgeDeck[24]).toBe(2); expect(w.bridgeDeck[25]).toBe(1);
+});
 
 it("creates independent typed arrays without mutating scenario input", () => {
   const s = mockScenario(); const a = createWorld(s); const b = createWorld(s);

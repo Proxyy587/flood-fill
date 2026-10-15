@@ -33,6 +33,7 @@ export interface BuildingDef {
 export interface PopulationDef {
   count: number; mix: { carOwners: number; limitedMobility: number; needsAssist: number };
   schedule: "office-hours" | "night" | "custom";
+  customSchedule?: { departAt: number; workTicks: number };
 }
 export interface FleetDef {
   ambulances: number; policeCars: number; boats: number; helicopters: number;
@@ -50,6 +51,7 @@ export interface PowerNode {
 export interface Scenario {
   schemaVersion: 1; name: string; size: { w: number; h: number };
   ground: number[]; blocks: number[]; buildings: BuildingDef[];
+  bridges?: { cell: number; deckHeight: number }[];
   districts: { id: number; name: string; cells: number[] }[];
   population: PopulationDef; fleet: FleetDef; weather: WeatherDef;
   injected: InjectedEvent[]; powerGrid: { nodes: PowerNode[]; edges: [number, number][] };
@@ -73,6 +75,7 @@ export interface ScenarioPatch { title: string; rationale: string; commands: Pat
 
 export const SIM_EVENT_TYPES = [
   "RUN_STARTED", "RUN_FINISHED",
+  "NPC_CREATED", "NPC_STATE", "ROUTE_PLANNED", "ARRIVED",
   "WEATHER", "FLOOD_THRESHOLD", "ROAD_CLOSED", "ROAD_REOPENED", "BRIDGE_OVERTOPPED",
   "REPORT_CREATED", "REPORT_VERIFIED", "REPORT_FALSE", "REQUEST_CREATED", "BID",
   "ASSIGNED", "COMMIT_CANCELLED", "REROUTE", "SERVED", "HOSPITAL_ASSIGN", "HOSPITAL_DIVERT",
@@ -86,6 +89,8 @@ export type SimEventType = typeof SIM_EVENT_TYPES[number];
 export interface SimEvent {
   tick: number; type: SimEventType; actor?: NpcId | VehicleId | BuildingId;
   target?: NpcId | VehicleId | BuildingId | RequestId; cell?: number;
+  actorKind?: "npc" | "vehicle" | "building";
+  targetKind?: "npc" | "vehicle" | "building" | "request";
   data?: Record<string, number | string | boolean>; reason: string;
 }
 export interface RenderSnapshot {
@@ -121,7 +126,9 @@ export interface RunSummary {
   metrics: MetricsFrame[]; events: SimEvent[];
   hotspots: { kind: "gridlock" | "isolated" | "hospital_overload" | "power"; cells: number[]; score: number }[];
 }
-export interface RunOptions { durationTicks?: number; metricsEvery?: number }
+export interface RunOptions {
+  durationTicks?: number; metricsEvery?: number; startTimeSeconds?: number; npcParams?: NpcParams;
+}
 export type MainToWorker =
   | { kind: "load"; scenario: Scenario; seed: number; options?: RunOptions }
   | { kind: "play" | "pause" | "step" | "exportLog" }

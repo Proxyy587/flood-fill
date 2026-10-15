@@ -1,6 +1,16 @@
 # CHANGELOG
 One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order changes are marked **[ADR]**.
 
+- 2026-10-15 (AK, M1 local checkpoint gate): final health passes 348 tests, lint, strict types and schema validation; production build and 3-seed/600-tick batch/compare pass. Synthetic 12/1000/10000-civilian movement/load smoke and independent route-retention counter probes pass. Review remains INCONCLUSIVE; 8ms target, missing templates/browser integration and rescue roadmap remain open. Local progress commit only, no merge/push/PR.
+
+- 2026-10-15 (AK, M1 review fixes): reproduced and fixed failed-car ghost driving, abandoned Moving-car state, unreachable/interior-flooded/zero-capacity medical workplace selection and daily schedule drift. Added interrupted-edge and independent entry assertions. Bounded flow caches, search/plan work and retained route entries with deterministic deferral; refreshed current capability/metric docs. Luna-medium substantive QA/quality/security rechecks pass; aggregate independent gate remains inconclusive due missing CodeRabbit/security-skill prerequisites. No merge or release approval.
+
+- 2026-10-15 **[ADR]** (AK, M1 stage C): added seeded typed-array population, safe continuous walk-drive-walk commuting, capacity-aware housing/employment, operational medical workplace reassignment, failed-car obstruction, traffic/gridlock and independent movement assertions. Runner now steps agents after boundary hazards/power/closures and exposes copied live snapshots/inspectors; CLI uses a labelled living mock. Dispatch/evacuation/aircraft remain unavailable. Focused regression suite passes; final health/review gates pending.
+
+- 2026-10-15 **[CONTRACT]** (AK, M1 stage A): added optional bridge deck metadata, explicit custom schedules, initial sim-time/NPC run parameters and optional typed event actor/target namespaces. Added live NPC/route event names; legacy M0 schemas remain compatible apart from rejecting undefined custom schedules. Red tests captured before implementation.
+
+- 2026-10-15 (AK, M1 stage A started): revalidated clean foundation and 209-test health; recorded living-city design/plan covering seeded civilians/staff, multimodal commuting, traffic and safe dynamic routes. Original M2-M5 obligations stay pending.
+
 - 2026-10-15 (AK, documentation checkpoint): recorded source commit 7c19583 and tooling commit d077579; closed the foundation plan and review ledger, with 209 passing tests, build, committed-source batch/compare smoke and HTTP 200 evidence. Full roadmap, absent templates/browser integration and inherited development advisory remain explicitly open.
 
 - 2026-10-15 (AK, source checkpoint verification): full health passes 209 tests plus lint, generated Next.js route types, strict TypeScript and schema validation; production build passes after final review fixes. Five-area review rechecks recorded in AK_REVIEW.md; whole AK roadmap remains active.

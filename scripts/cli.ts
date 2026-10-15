@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import { DispatchModeSchema, RunOptionsSchema, ScenarioSchema, SeedSchema } from "../src/contracts";
 import { mockScenario } from "../src/contracts/mocks";
+import { livingFixture } from "../src/sim/agents/living-fixture";
 
 export function parseRunArgs(args: string[]) {
   const { values } = parseArgs({ args, options: { scenario: { type: "string" }, seeds: { type: "string", default: "42,43,44" }, ticks: { type: "string", default: "600" }, mode: { type: "string", default: "negotiation" }, out: { type: "string" } }, strict: true, allowPositionals: false });
@@ -15,7 +16,7 @@ export function parseRunArgs(args: string[]) {
   return { scenario: values.scenario, seeds, ticks, mode: DispatchModeSchema.parse(values.mode), out: values.out };
 }
 export async function loadScenario(path?: string) {
-  return ScenarioSchema.parse(path === undefined ? mockScenario() : JSON.parse(await readFile(path, "utf8")));
+  return ScenarioSchema.parse(path === undefined ? livingFixture() : JSON.parse(await readFile(path, "utf8")));
 }
 export async function saveOutput(path: string | undefined, output: unknown) {
   const json = JSON.stringify(output, null, 2);
