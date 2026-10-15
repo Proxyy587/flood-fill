@@ -122,47 +122,54 @@ export function stepPolice(
   }
 
   const owned = new Uint8Array(traffic.gridlock.length);
+  let remainingUnits = 0;
   for (let unit = 0; unit < system.count; unit++) {
     const assigned = system.assignment[unit];
     if (assigned >= 0 && assigned < owned.length) owned[assigned] = 1;
+    if (system.available[unit] && system.state[unit] === VehicleState.Idle && assigned === -1 &&
+        system.target[unit] === -1 && system.routes[unit] === null) remainingUnits++;
   }
-  const eligible: number[] = [];
-  for (let cell = 0; cell < traffic.gridlock.length; cell++) {
-    if (traffic.intersections[cell] === 1 && traffic.gridlock[cell] === 1 && owned[cell] === 0) eligible.push(cell);
-  }
-  eligible.sort((a, b) => traffic.waited[b] - traffic.waited[a] ||
-    traffic.lastDemand[b] - traffic.lastDemand[a] || a - b);
-
-  const hazardGrid = buildHazardGrid(world, scenario, "car", blocked);
-  for (const target of eligible) {
-    let selected = -1;
-    let selectedPath: number[] | null = null;
-    for (let unit = 0; unit < system.count; unit++) {
-      if (!system.available[unit] || system.state[unit] !== VehicleState.Idle ||
-          system.assignment[unit] !== -1 || system.target[unit] !== -1 || system.routes[unit] !== null) continue;
-      const path = findPath(hazardGrid, system.cell[unit], target);
-      if (!path) continue;
-      if (selectedPath === null || path.length < selectedPath.length ||
-          (path.length === selectedPath.length && system.id[unit] < system.id[selected])) {
-        selected = unit;
-        selectedPath = path;
-      }
+  if (remainingUnits > 0) {
+    const eligible: number[] = [];
+    for (let cell = 0; cell < traffic.gridlock.length; cell++) {
+      if (traffic.intersections[cell] === 1 && traffic.gridlock[cell] === 1 && owned[cell] === 0) eligible.push(cell);
     }
-    if (selected < 0 || selectedPath === null) continue;
-    system.assignment[selected] = target;
-    system.target[selected] = target;
-    system.routes[selected] = { cells: Int32Array.from(selectedPath), cursor: 1, target, navVersion };
-    system.state[selected] = selectedPath.length > 1 ? VehicleState.Moving : VehicleState.Idle;
-    owned[target] = 1;
-    events.push({
-      tick,
-      type: "ASSIGNED",
-      actor: system.id[selected] as VehicleId,
-      actorKind: "vehicle",
-      cell: target,
-      data: { targetCell: target },
-      reason: `Police vehicle dispatched to gridlocked intersection ${target}`,
-    });
+    eligible.sort((a, b) => traffic.waited[b] - traffic.waited[a] ||
+      traffic.lastDemand[b] - traffic.lastDemand[a] || a - b);
+
+    const hazardGrid = buildHazardGrid(world, scenario, "car", blocked);
+    for (const target of eligible) {
+      let selected = -1;
+      let selectedPath: number[] | null = null;
+      for (let unit = 0; unit < system.count; unit++) {
+        if (!system.available[unit] || system.state[unit] !== VehicleState.Idle ||
+            system.assignment[unit] !== -1 || system.target[unit] !== -1 || system.routes[unit] !== null) continue;
+        const path = findPath(hazardGrid, system.cell[unit], target);
+        if (!path) continue;
+        if (selectedPath === null || path.length < selectedPath.length ||
+            (path.length === selectedPath.length && system.id[unit] < system.id[selected])) {
+          selected = unit;
+          selectedPath = path;
+        }
+      }
+      if (selected < 0 || selectedPath === null) continue;
+      system.assignment[selected] = target;
+      system.target[selected] = target;
+      system.routes[selected] = { cells: Int32Array.from(selectedPath), cursor: 1, target, navVersion };
+      system.state[selected] = selectedPath.length > 1 ? VehicleState.Moving : VehicleState.Idle;
+      owned[target] = 1;
+      remainingUnits--;
+      events.push({
+        tick,
+        type: "ASSIGNED",
+        actor: system.id[selected] as VehicleId,
+        actorKind: "vehicle",
+        cell: target,
+        data: { targetCell: target },
+        reason: `Police vehicle dispatched to gridlocked intersection ${target}`,
+      });
+      if (remainingUnits === 0) break;
+    }
   }
 
   for (let unit = 0; unit < system.count; unit++) {

@@ -65,6 +65,31 @@ it("supports zero and mismatched vehicle or officer counts", () => {
   expect(setup({ policeCars: 1, policeOfficers: 4 }).police.count).toBe(1);
 });
 
+it("skips scanning gridlock targets when the staffed police fleet is empty", () => {
+  const fixture = trafficFixture({ policeCars: 0, policeOfficers: 2 });
+  let intersectionReads = 0;
+  let gridlockReads = 0;
+  fixture.traffic.intersections = new Proxy(fixture.traffic.intersections, {
+    get(target, property) {
+      if (typeof property === "string" && /^\d+$/.test(property)) intersectionReads++;
+      return Reflect.get(target, property, target) as number;
+    },
+  });
+  fixture.traffic.gridlock = new Proxy(fixture.traffic.gridlock, {
+    get(target, property) {
+      if (typeof property === "string" && /^\d+$/.test(property)) gridlockReads++;
+      return Reflect.get(target, property, target) as number;
+    },
+  });
+
+  const result = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
+
+  expect(intersectionReads).toBe(0);
+  expect(gridlockReads).toBe(0);
+  expect(result.events).toEqual([]);
+  expect(result.controlled).toEqual(new Uint8Array(64));
+});
+
 it("spawns only on safe road cells adjacent to a police station", () => {
   const { police } = setup();
   expect(police.available[0]).toBe(1);
