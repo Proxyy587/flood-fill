@@ -1,0 +1,58 @@
+[
+  {
+    "id": "riverside-town",
+    "name": "Riverside Town",
+    "file": "riverside-town.json",
+    "size": {
+      "w": 64,
+      "h": 64
+    },
+    "description": "A river with one bridge dividing two medical centers, flood HQ, shelter and boat depot.",
+    "districts": 4,
+    "population": 400,
+    "floodKind": "growing",
+    "defaultMode": "negotiation"
+  },
+  {
+    "id": "coastal-grid",
+    "name": "Coastal Grid City",
+    "file": "coastal-grid.json",
+    "size": {
+      "w": 96,
+      "h": 96
+    },
+    "description": "A flat coastal grid city with flash flood depression, marina depot, and levee defense.",
+    "districts": 4,
+    "population": 600,
+    "floodKind": "compound",
+    "defaultMode": "negotiation"
+  },
+  {
+    "id": "dense-basin-city",
+    "name": "Dense Basin City",
+    "file": "dense-basin-city.json",
+    "size": {
+      "w": 96,
+      "h": 96
+    },
+    "description": "Bowl-shaped topography with 3 hospitals, 2 helipads, a floodplain substation, and 6 districts.",
+    "districts": 6,
+    "population": 750,
+    "floodKind": "compound",
+    "defaultMode": "negotiation"
+  },
+  {
+    "id": "stress-triple",
+    "name": "Stress Triple Disaster",
+    "file": "stress-triple.json",
+    "size": {
+      "w": 96,
+      "h": 96
+    },
+    "description": "Compound stress test: simultaneous bridge closure, boat failure, shelter overflow, substation blackout, and gale wind grounding.",
+    "districts": 6,
+    "population": 800,
+    "floodKind": "compound",
+    "defaultMode": "negotiation"
+  }
+]
