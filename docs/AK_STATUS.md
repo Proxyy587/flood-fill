@@ -2,6 +2,11 @@
 
 ## Active M1 continuation — stages A/B/C (2026-10-15)
 
+Local source checkpoint: **b5ad965** on codex/ak-foundation. Source, tests and stage
+docs committed together. It is a progress checkpoint, not aggregate review approval.
+Next AK slice: M2 evacuation/shelter allocation and uncertain-report prerequisites,
+while preserving the pending review/tooling and browser/template integration gates.
+
 Bridge metadata/custom schedules/run parameters are schema-checked. Seeded population,
 hazard mode grids and traffic primitives are implemented. Continuous walk-drive-walk
 commuting, failed-car obstruction, dynamic retry/reroute, medical workplace reassignment

@@ -1,6 +1,8 @@
 # CHANGELOG
 One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order changes are marked **[ADR]**.
 
+- 2026-10-15 (AK, checkpoint record): source/tests/stage docs saved in b5ad965 on codex/ak-foundation. Verified 348-test health/build and deterministic smoke; no publication. Next M2 slice is evacuation/shelter allocation; aggregate M1 review approval and external integration gates remain pending.
+
 - 2026-10-15 (AK, M1 local checkpoint gate): final health passes 348 tests, lint, strict types and schema validation; production build and 3-seed/600-tick batch/compare pass. Synthetic 12/1000/10000-civilian movement/load smoke and independent route-retention counter probes pass. Review remains INCONCLUSIVE; 8ms target, missing templates/browser integration and rescue roadmap remain open. Local progress commit only, no merge/push/PR.
 
 - 2026-10-15 (AK, M1 review fixes): reproduced and fixed failed-car ghost driving, abandoned Moving-car state, unreachable/interior-flooded/zero-capacity medical workplace selection and daily schedule drift. Added interrupted-edge and independent entry assertions. Bounded flow caches, search/plan work and retained route entries with deterministic deferral; refreshed current capability/metric docs. Luna-medium substantive QA/quality/security rechecks pass; aggregate independent gate remains inconclusive due missing CodeRabbit/security-skill prerequisites. No merge or release approval.
