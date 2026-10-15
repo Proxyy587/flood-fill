@@ -1,6 +1,6 @@
 # AK execution checkpoints
 
-## M1 checkpoint; active M2 continuation (2026-10-15)
+## M1/M2 checkpoints; active M3A reports slice (2026-10-15)
 
 Local source checkpoint: **b5ad965** on codex/ak-foundation. Source, tests and stage
 docs committed together. It is a progress checkpoint, not aggregate review approval.
@@ -51,7 +51,27 @@ one-seat contention smoke deterministically produces one evacuation order and on
 stranded civilian per run. Synthetic population probes pass 12/1000/10000 residents;
 the 10000-resident/30-tick run takes about 2.7s. This is not full rescue stress or
 proof of the 8ms target. Dispatch comparison and worker/template release gates remain
-unavailable; M3 reports and rescue dispatch are still pending.
+unavailable.
+
+### M3A: uncertain reports and HQ belief (implemented in AK core; UI integration pending)
+
+Detailed reports-first design and inline plan are committed in 1f9c471. The managed
+worktree `codex/ak-m3-reports` excludes active untracked W1 assets. Frozen-lockfile
+install succeeds. Clean baseline `pnpm health` passes lint, strict types, 356 tests,
+and schema-only validation (`releaseReady:false`). The first four report tests were
+written before the subsystem; missing-module RED was observed, then the behavioral
+suite passes 4/4 after implementing deterministic distress reporting, awareness
+gating/confidence, bounded position error, and a dedicated report RNG stream.
+The M3A reports slice adds bounded typed-array report state, independent
+distress/false-alarm RNG streams, per-civilian false alarms, delayed delivery,
+outage buffering, maximum-confidence clustering and owned snapshots. Runner support
+for existing false_report/comms_outage injections is in place. Focused subsystem and
+runner tests pass 19/19. Final health passes lint, strict types, 366 tests and
+schema-only validation (`releaseReady:false`); production build, batch/compare and
+the living-city script pass. Its three-seed report smoke confirms 15,000 deterministic
+deliveries/run at 10,000 civilians without exceeding capacity. No contract, renderer,
+or W1 files have been changed. M3B rescue requests/dispatch, aircraft, full stress
+scenario and UI integration remain pending.
 
 ## 2026-10-15 baseline
 

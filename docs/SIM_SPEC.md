@@ -52,15 +52,26 @@ Everything here is the **intended behaviour**. Build the numbered milestone in `
   Flooding above a shelter floor closes it. `shelter_overflow` sets capacity to zero
   at its scheduled boundary, including tick 0. Mid-edge warnings finish the current
   movement edge before a new route takes over.
+- M3A reports are generated once per civilian's first qualifying distress episode
+  (`SeekHelp`/`Stranded`) with awareness as call probability and confidence; the
+  estimated position is bounded by `ceil((1-awareness)*4)` Manhattan cells.
+  `falseReportRate` independently samples at most one anonymous synthetic false
+  alarm per civilian/run. Reports remain `Unverified` and are absent from snapshots
+  and HQ belief until `commsDelay` expires and communications recover. The outage
+  interval is half-open. Delivered reports retain separate provenance; nearby
+  same/adjacent-cell reports within 30 seconds contribute the maximum confidence
+  at the earliest report's cell, never a sum. Internal truth/source labels do not
+  enter snapshots, events or belief. This is not verification or rescue dispatch.
 - `evacDonePct` is sheltered civilians divided by all civilians. Stranded includes
   residents seeking help or waiting without a reachable shelter. Staff evacuation,
-  bus evacuation, casualties and live reports are pending. Mode labels do not select
+  bus evacuation, casualties and verified/resolved report lifecycle are pending. Mode labels do not select
   evacuation policies.
 - runBatch measures water/power, evacuation completion, stranded residents, current
   idle cars and gridlock. Response TTS/unmet/fairness/casualty/aircraft metrics remain
   zero placeholders. substation_flooded, bridge_closed, road_blocked_by_debris and
   shelter_overflow injections are supported;
-  other actions reject. Closures latch; repair actions are not implemented.
+  `false_report` and `comms_outage` are also supported; other actions reject.
+  Closures latch; repair actions are not implemented.
 - Injected faults apply at the named state boundary, including tick 0, before
   power propagation. Generator activation, blackout state and event timestamps agree.
 

@@ -12,7 +12,9 @@ headless commuting agents/cars/staff, mode hazard grids and basic traffic; brows
 integration and independent review approval are still pending. M2 now has delayed
 warnings and capacity-reserved shelter evacuation; powered pump configuration and
 expanded hazard integration remain. Blackout traffic is implemented.
-M3-M6 remain pending. Dispatch comparison is labelled
+M3A uncertain reports and HQ belief are implemented in the AK headless core; M3
+rescue dispatch, helicopters, full stress scenario, browser rendering, and M4-M6
+remain pending. Dispatch comparison is labelled
 unavailable; no performance/response benefit has been measured. W1 templates are
 missing and the strict release-validation command correctly fails.
 
