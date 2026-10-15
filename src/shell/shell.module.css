@@ -220,6 +220,11 @@
   animation: flyIn 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+.flyoutWide {
+  width: min(540px, calc(100vw - 420px));
+  min-width: 360px;
+}
+
 @keyframes flyIn {
   from {
     opacity: 0;
@@ -292,6 +297,38 @@
   color: #6b4a00;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.rescue {
+  background: var(--green-soft);
+  border-color: rgba(31, 157, 99, 0.35);
+  color: #11643e;
+  white-space: nowrap;
+}
+
+@media (max-width: 1240px) {
+  .rescueLabel {
+    display: none;
+  }
+}
+
+.floodEffect {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--blue-soft);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.floodEffect svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--blue);
 }
 
 .iconButton {
@@ -1240,6 +1277,28 @@
   z-index: 2;
   pointer-events: none;
   text-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+}
+
+.app[data-night='true'] .footer {
+  color: rgba(236, 242, 250, 0.86);
+  text-shadow: 0 0 4px rgba(4, 8, 16, 0.95);
+}
+
+/* ---------- recovery prompt ---------- */
+
+.recovery {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 /* ---------- toasts (top centre) ---------- */

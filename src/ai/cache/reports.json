@@ -1,0 +1,3715 @@
+{
+ "riverside-test-city": {
+  "response": {
+   "source": "cache",
+   "report": {
+    "summary": "The deterministic analysers flagged 8 issues. Most serious: Traffic stopped in Old Town; Traffic stopped in Millbrook; Old Town Substation flooded and tripped. 3 small, cheap changes are proposed below; verify each by re-running the storm before trusting it.",
+    "findings": [
+     {
+      "id": "gridlock-1",
+      "severity": "high",
+      "title": "Traffic stopped in Old Town",
+      "explanation": "12 stalled or gridlocked road cells in Old Town, first at (44, 64) in Old Town, 75 m from Fire Station 3. Across the city 38 vehicles stalled in water and some road was gridlocked for 1 min (peak 1 cells).",
+      "evidence": [
+       {
+        "cells": [
+         6188,
+         5031,
+         6477,
+         4882,
+         6864,
+         6979,
+         6004,
+         6109,
+         7546,
+         6777,
+         6013,
+         5419
+        ],
+        "eventTicks": [
+         960,
+         1028,
+         1274,
+         1676
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 1
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "gridlock-2",
+      "severity": "high",
+      "title": "Traffic stopped in Millbrook",
+      "explanation": "10 stalled or gridlocked road cells in Millbrook, first at (40, 86) in Millbrook. Across the city 38 vehicles stalled in water and some road was gridlocked for 1 min (peak 1 cells).",
+      "evidence": [
+       {
+        "cells": [
+         8296,
+         9063,
+         6946,
+         5587,
+         8669,
+         5499,
+         6835,
+         7410,
+         6354,
+         5395
+        ],
+        "eventTicks": [
+         632,
+         960,
+         1028,
+         1676
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 1
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "power-1",
+      "severity": "high",
+      "title": "Old Town Substation flooded and tripped",
+      "explanation": "Old Town Substation flooded: depth 0.56 > trip threshold 0.4. 3367 cells (37% of the map) lost grid power. At worst 44% of residents were without power.",
+      "evidence": [
+       {
+        "cells": [
+         6591,
+         6592,
+         6687,
+         6688
+        ],
+        "eventTicks": [
+         1273
+        ]
+       },
+       {
+        "metric": "unpoweredPopPct",
+        "value": 44
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "drainage-1",
+      "severity": "medium",
+      "title": "Water pooled in Old Town with no drain within 24 m",
+      "explanation": "2 ponding sites in Old Town had no storm drain within 6 cells, starting at (82, 51) in Old Town, 71 m from Old Town Gym. The city has 10 drain cells; 2 of 6 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         4978,
+         4860
+        ],
+        "eventTicks": [
+         538,
+         792,
+         1339
+        ]
+       },
+       {
+        "metric": "drainCells",
+        "value": 10
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "response-1",
+      "severity": "low",
+      "title": "3 of 19 calls from Old Town were still unanswered",
+      "explanation": "Answered requests from Old Town waited 3 min on average against 4 min citywide; 3 were still open at minute 30. Citywide Gini of time to service is 0.17 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         5414,
+         7827,
+         5800,
+         6671,
+         6285,
+         7636,
+         6769,
+         5606,
+         5799,
+         5995,
+         5997,
+         7732,
+         5606,
+         6781,
+         6595,
+         7164,
+         6595,
+         6972,
+         6780
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.17
+       },
+       {
+        "metric": "unmet",
+        "value": 3
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "response-2",
+      "severity": "medium",
+      "title": "Millbrook waited longest for help",
+      "explanation": "Answered requests from Millbrook waited 6 min on average against 4 min citywide; 0 were still open at minute 30. Citywide Gini of time to service is 0.17 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         8295,
+         7323,
+         5403,
+         5403,
+         5402,
+         6362,
+         5691,
+         8381,
+         7524,
+         8289,
+         5682,
+         6363,
+         6365
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.17
+       },
+       {
+        "metric": "unmet",
+        "value": 0
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "hospitals-1",
+      "severity": "low",
+      "title": "St. Avery General Hospital took the load while Eastbank Medical Centre stayed quiet",
+      "explanation": "St. Avery General Hospital peaked at 30% of beds, Eastbank Medical Centre at 0%; the widest gap was 30%. Hospitals spent 0 min on diversion and 0 patients were redirected.",
+      "evidence": [
+       {
+        "cells": [
+         2708,
+         2709,
+         2710,
+         2804,
+         2805,
+         2806,
+         2900,
+         2901,
+         2902
+        ],
+        "eventTicks": [
+         1760
+        ]
+       },
+       {
+        "metric": "peakUtil",
+        "value": 0.3
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "rooftops-1",
+      "severity": "low",
+      "title": "3 people still stranded in Old Town",
+      "explanation": "61 people were stranded during the storm and 3 were never reached (3 at the end). In Old Town they were around (61, 70) in Old Town, 8 m from Fire Station 3. Helicopters made 18 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         6781,
+         7164,
+         6595
+        ],
+        "eventTicks": [
+         1274
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 3
+       }
+      ],
+      "confidence": "medium"
+     }
+    ],
+    "proposals": [
+     {
+      "id": "substation-levee",
+      "addresses": [
+       "power-1"
+      ],
+      "title": "Ring Old Town Substation with a levee",
+      "rationale": "The substation tripped when water reached it. A low levee on the open ground around it keeps shallow water out without blocking its road access.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 6494,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6495,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6496,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6590,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6497,
+        "block": 23
+       }
+      ],
+      "expectedEffect": "The substation trips later or not at all, so fewer residents and hospitals lose grid power. A hypothesis until verified.",
+      "cost": 10
+     },
+     {
+      "id": "add-drains",
+      "addresses": [
+       "drainage-1"
+      ],
+      "title": "Add 2 storm drains in Old Town",
+      "rationale": "Ponding sites had no drain within 6 cells. Each drain is placed on open ground beside a ponding site, never on a road or building.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 5073,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4763,
+        "block": 7
+       }
+      ],
+      "expectedEffect": "Less standing water near these sites, fewer stalled vehicles and road closures there. A hypothesis until verified.",
+      "cost": 4
+     },
+     {
+      "id": "helipad-rooftops",
+      "addresses": [
+       "rooftops-1"
+      ],
+      "title": "Add a helipad in Old Town",
+      "rationale": "3 people still stranded in Old Town. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "commands": [
+       {
+        "kind": "placeBuilding",
+        "def": {
+         "type": 19,
+         "cells": [
+          6490,
+          6491,
+          6586,
+          6587
+         ],
+         "entrance": 6490
+        }
+       }
+      ],
+      "expectedEffect": "Faster rooftop rescues and fewer people left stranded in this area. A hypothesis until verified.",
+      "cost": 60
+     }
+    ],
+    "limitations": [
+     "Synthetic city and synthetic people; no real map, population or live feed is used.",
+     "Simplified flood, traffic and power physics; magnitudes are indicative, not calibrated.",
+     "Simulation output; not an emergency-planning authority.",
+     "Proposals are hypotheses until re-simulation verifies them, and even then only inside this model.",
+     "Written from rule-based analysers without a language model."
+    ]
+   },
+   "notice": "Pre-generated offline by the rule-based analysers on the preview model (seed 7, 30 simulated minutes from 08:00). Run the storm and critique it for a report on your own run."
+  },
+  "verifications": {
+   "substation-levee": {
+    "engine": "preview",
+    "seeds": [
+     7,
+     8
+    ],
+    "ticks": 900,
+    "metrics": [
+     {
+      "key": "score",
+      "label": "City resilience score",
+      "unit": "pts",
+      "better": "higher",
+      "baseline": {
+       "mean": 98.5,
+       "min": 97,
+       "max": 100
+      },
+      "patched": {
+       "mean": 94,
+       "min": 91,
+       "max": 97
+      },
+      "delta": {
+       "mean": -4.5,
+       "min": -6,
+       "max": -3
+      },
+      "verdict": "worse"
+     },
+     {
+      "key": "residentsAffected",
+      "label": "Residents whose homes flooded",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "patched": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "ttsP90",
+      "label": "Slowest 10% wait for help",
+      "unit": "s",
+      "better": "lower",
+      "baseline": {
+       "mean": 143.5,
+       "min": 46,
+       "max": 241
+      },
+      "patched": {
+       "mean": 241,
+       "min": 241,
+       "max": 241
+      },
+      "delta": {
+       "mean": 97.5,
+       "min": 0,
+       "max": 195
+      },
+      "verdict": "worse"
+     },
+     {
+      "key": "unmetPct",
+      "label": "Calls never answered",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "patched": {
+       "mean": 12.5,
+       "min": 0,
+       "max": 25
+      },
+      "delta": {
+       "mean": 12.5,
+       "min": 0,
+       "max": 25
+      },
+      "verdict": "worse"
+     },
+     {
+      "key": "stranded",
+      "label": "People stranded at the end",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "patched": {
+       "mean": 0.5,
+       "min": 0,
+       "max": 1
+      },
+      "delta": {
+       "mean": 0.5,
+       "min": 0,
+       "max": 1
+      },
+      "verdict": "worse"
+     },
+     {
+      "key": "gridlockMin",
+      "label": "Minutes with gridlock",
+      "unit": "min",
+      "better": "lower",
+      "baseline": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "patched": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "hospitalSpread",
+      "label": "Hospital load imbalance",
+      "unit": "pts",
+      "better": "lower",
+      "baseline": {
+       "mean": 3.5,
+       "min": 2,
+       "max": 5
+      },
+      "patched": {
+       "mean": 5,
+       "min": 5,
+       "max": 5
+      },
+      "delta": {
+       "mean": 1.5,
+       "min": 0,
+       "max": 3
+      },
+      "verdict": "worse"
+     },
+     {
+      "key": "unpoweredPeak",
+      "label": "Peak residents without power",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "patched": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "floodedCells",
+      "label": "Flooded cells at the end",
+      "unit": "cells",
+      "better": "lower",
+      "baseline": {
+       "mean": 1639,
+       "min": 1639,
+       "max": 1639
+      },
+      "patched": {
+       "mean": 1639,
+       "min": 1639,
+       "max": 1639
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     }
+    ],
+    "verdict": "worse"
+   }
+  }
+ },
+ "Riverside Town": {
+  "response": {
+   "source": "cache",
+   "report": {
+    "summary": "The deterministic analysers flagged 10 issues. Most serious: Traffic stopped in Southeast Suburbs; Traffic stopped in Southwest Civic; Water pooled in Southwest Civic with no drain within 24 m. 3 small, cheap changes are proposed below; verify each by re-running the storm before trusting it.",
+    "findings": [
+     {
+      "id": "gridlock-1",
+      "severity": "high",
+      "title": "Traffic stopped in Southeast Suburbs",
+      "explanation": "19 stalled or gridlocked road cells in Southeast Suburbs, first at (48, 44) in Southeast Suburbs, 54 m from Boat Depot #6. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 3 cells).",
+      "evidence": [
+       {
+        "cells": [
+         2864,
+         2160,
+         2166,
+         2600,
+         2085,
+         2105,
+         2599,
+         3061,
+         2736,
+         3125,
+         3376,
+         2103,
+         2097,
+         2741,
+         2604,
+         2612,
+         2352,
+         2224,
+         2096
+        ],
+        "eventTicks": [
+         719
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 30
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "gridlock-2",
+      "severity": "high",
+      "title": "Traffic stopped in Southwest Civic",
+      "explanation": "15 stalled or gridlocked road cells in Southwest Civic, first at (8, 35) in Southwest Civic, 26 m from St. Avery General Hospital. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 3 cells).",
+      "evidence": [
+       {
+        "cells": [
+         2248,
+         2640,
+         2055,
+         2064,
+         2448,
+         2128,
+         3028,
+         3408,
+         2512,
+         2065,
+         3024,
+         2053,
+         2384,
+         2704,
+         2247
+        ],
+        "eventTicks": [
+         1324
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 30
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "drainage-1",
+      "severity": "high",
+      "title": "Water pooled in Southwest Civic with no drain within 24 m",
+      "explanation": "51 ponding sites in Southwest Civic had no storm drain within 6 cells, starting at (18, 32) in Southwest Civic, 25 m from St. Avery General Hospital. The city has 4 drain cells; 93 of 96 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         2066,
+         3207,
+         2576,
+         3600,
+         3093,
+         2503,
+         2184,
+         2056,
+         3091,
+         2768,
+         3271,
+         2896,
+         2256,
+         3408,
+         2053,
+         2067,
+         2759,
+         2823,
+         3098,
+         2320,
+         3097,
+         2311,
+         3280,
+         3346,
+         2964,
+         2384,
+         2192,
+         2054,
+         2448,
+         2960,
+         2247,
+         3094,
+         2065,
+         2052,
+         2055,
+         3143,
+         3024,
+         3344,
+         2704,
+         2831
+        ],
+        "eventTicks": []
+       },
+       {
+        "metric": "drainCells",
+        "value": 4
+       }
+      ],
+      "confidence": "low"
+     },
+     {
+      "id": "drainage-2",
+      "severity": "high",
+      "title": "Water pooled in Northwest Heights with no drain within 24 m",
+      "explanation": "42 ponding sites in Northwest Heights had no storm drain within 6 cells, starting at (16, 10) in Northwest Heights, 18 m from Substation #45. The city has 4 drain cells; 93 of 96 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         656,
+         1681,
+         1041,
+         1098,
+         1044,
+         778,
+         650,
+         1424,
+         1162,
+         1104,
+         1232,
+         1168,
+         657,
+         1552,
+         1296,
+         592,
+         912,
+         906,
+         1680,
+         1418,
+         1049,
+         654,
+         651,
+         1034,
+         1226,
+         1360,
+         714,
+         1290,
+         1488,
+         653,
+         1048,
+         655,
+         1426,
+         658,
+         585,
+         659,
+         976,
+         848,
+         842,
+         1744
+        ],
+        "eventTicks": []
+       },
+       {
+        "metric": "drainCells",
+        "value": 4
+       }
+      ],
+      "confidence": "low"
+     },
+     {
+      "id": "power-1",
+      "severity": "high",
+      "title": "Substation #46 flooded and tripped",
+      "explanation": "Substation #45 flooded: depth 0.4 > trip threshold 0.4. 2108 cells (51% of the map) lost grid power. At worst 51% of residents were without power.",
+      "evidence": [
+       {
+        "cells": [
+         942,
+         1006,
+         943,
+         1007
+        ],
+        "eventTicks": [
+         779
+        ]
+       },
+       {
+        "metric": "unpoweredPopPct",
+        "value": 51
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "power-2",
+      "severity": "high",
+      "title": "Substation #45 flooded and tripped",
+      "explanation": "Substation #44 flooded: depth 0.4 > trip threshold 0.4. 1988 cells (49% of the map) lost grid power. At worst 51% of residents were without power.",
+      "evidence": [
+       {
+        "cells": [
+         910,
+         974,
+         911,
+         975
+        ],
+        "eventTicks": [
+         1420
+        ]
+       },
+       {
+        "metric": "unpoweredPopPct",
+        "value": 51
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "response-1",
+      "severity": "high",
+      "title": "82 of 91 calls from Northwest Heights were still unanswered",
+      "explanation": "Answered requests from Northwest Heights waited 4 min on average against 6 min citywide; 82 were still open at minute 30. Citywide Gini of time to service is 0.17 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         656,
+         1681,
+         1041,
+         1098,
+         1044,
+         778,
+         1041,
+         650,
+         1872,
+         1424,
+         1162,
+         778,
+         1104,
+         1232,
+         1744,
+         1168,
+         657,
+         1044,
+         1041,
+         1552,
+         1296,
+         592,
+         657,
+         912,
+         906,
+         1680,
+         1418,
+         1049,
+         654,
+         1104,
+         651,
+         1034,
+         654,
+         1226,
+         1360,
+         714,
+         1296,
+         1034,
+         592,
+         1290
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.17
+       },
+       {
+        "metric": "unmet",
+        "value": 82
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "response-2",
+      "severity": "high",
+      "title": "100 of 114 calls from Southwest Civic were still unanswered",
+      "explanation": "Answered requests from Southwest Civic waited 3 min on average against 6 min citywide; 100 were still open at minute 30. Citywide Gini of time to service is 0.17 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         2076,
+         2066,
+         2072,
+         2059,
+         3207,
+         2576,
+         3600,
+         2071,
+         3093,
+         2503,
+         2184,
+         2056,
+         2184,
+         2056,
+         3091,
+         2768,
+         3271,
+         2896,
+         2256,
+         2072,
+         2061,
+         3093,
+         2056,
+         3408,
+         2053,
+         2067,
+         2064,
+         2759,
+         2823,
+         3098,
+         2071,
+         2768,
+         2320,
+         2064,
+         3097,
+         2311,
+         2256,
+         2066,
+         2060,
+         3280
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.17
+       },
+       {
+        "metric": "unmet",
+        "value": 100
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "rooftops-1",
+      "severity": "medium",
+      "title": "54 people still stranded in Southwest Civic",
+      "explanation": "398 people were stranded during the storm and 182 were never reached (182 at the end). In Southwest Civic they were around (18, 32) in Southwest Civic, 25 m from St. Avery General Hospital. Helicopters made 32 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         2066,
+         2072,
+         3207,
+         2576,
+         3600,
+         2071,
+         3093,
+         2503,
+         2184,
+         2056,
+         3091,
+         2768,
+         3271,
+         2896,
+         2256,
+         3408,
+         2053,
+         2067,
+         2759,
+         2823,
+         3098,
+         2320,
+         3097,
+         2311,
+         3280,
+         3346,
+         2964,
+         2384,
+         2192,
+         2054,
+         2448,
+         2960,
+         2247,
+         3094,
+         2065,
+         2052,
+         2055,
+         3143,
+         3024,
+         3344
+        ],
+        "eventTicks": [
+         1366
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 182
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "rooftops-2",
+      "severity": "medium",
+      "title": "42 people still stranded in Northwest Heights",
+      "explanation": "398 people were stranded during the storm and 182 were never reached (182 at the end). In Northwest Heights they were around (16, 10) in Northwest Heights, 18 m from Substation #45. Helicopters made 32 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         656,
+         1681,
+         1041,
+         1098,
+         1044,
+         778,
+         650,
+         1424,
+         1162,
+         1104,
+         1232,
+         1168,
+         657,
+         1552,
+         1296,
+         592,
+         912,
+         906,
+         1680,
+         1418,
+         1049,
+         654,
+         651,
+         1034,
+         1226,
+         1360,
+         714,
+         1290,
+         1488,
+         653,
+         1048,
+         655,
+         1426,
+         658,
+         585,
+         659,
+         976,
+         848,
+         842,
+         1744
+        ],
+        "eventTicks": [
+         1366
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 182
+       }
+      ],
+      "confidence": "medium"
+     }
+    ],
+    "proposals": [
+     {
+      "id": "add-drains",
+      "addresses": [
+       "drainage-1",
+       "drainage-2"
+      ],
+      "title": "Add 6 storm drains in Northwest Heights",
+      "rationale": "Ponding sites had no drain within 6 cells. Each drain is placed on open ground beside a ponding site, never on a road or building.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 2001,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 591,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3142,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 977,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1033,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 2511,
+        "block": 7
+       }
+      ],
+      "expectedEffect": "Less standing water near these sites, fewer stalled vehicles and road closures there. A hypothesis until verified.",
+      "cost": 12
+     },
+     {
+      "id": "substation-levee",
+      "addresses": [
+       "power-1",
+       "power-2"
+      ],
+      "title": "Ring Substation #46 with a levee",
+      "rationale": "The substation tripped when water reached it. A low levee on the open ground around it keeps shallow water out without blocking its road access.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 877,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 878,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 879,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 941,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1005,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 845,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 846,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 847,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 909,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 973,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1037,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1038,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1039,
+        "block": 23
+       }
+      ],
+      "expectedEffect": "The substation trips later or not at all, so fewer residents and hospitals lose grid power. A hypothesis until verified.",
+      "cost": 26
+     },
+     {
+      "id": "helipad-rooftops",
+      "addresses": [
+       "rooftops-1",
+       "rooftops-2"
+      ],
+      "title": "Add a helipad in Southwest Civic",
+      "rationale": "54 people still stranded in Southwest Civic. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "commands": [
+       {
+        "kind": "placeBuilding",
+        "def": {
+         "type": 19,
+         "cells": [
+          2129,
+          2130,
+          2193,
+          2194
+         ],
+         "entrance": 2129
+        }
+       }
+      ],
+      "expectedEffect": "Faster rooftop rescues and fewer people left stranded in this area. A hypothesis until verified.",
+      "cost": 60
+     }
+    ],
+    "limitations": [
+     "Synthetic city and synthetic people; no real map, population or live feed is used.",
+     "Simplified flood, traffic and power physics; magnitudes are indicative, not calibrated.",
+     "Simulation output; not an emergency-planning authority.",
+     "Proposals are hypotheses until re-simulation verifies them, and even then only inside this model.",
+     "Written from rule-based analysers without a language model."
+    ]
+   },
+   "notice": "Pre-generated offline by the rule-based analysers on the preview model (seed 42, 30 simulated minutes from 08:00). Run the storm and critique it for a report on your own run."
+  },
+  "verifications": {
+   "add-drains": {
+    "engine": "preview",
+    "seeds": [
+     42,
+     43
+    ],
+    "ticks": 900,
+    "metrics": [
+     {
+      "key": "score",
+      "label": "City resilience score",
+      "unit": "pts",
+      "better": "higher",
+      "baseline": {
+       "mean": 47,
+       "min": 47,
+       "max": 47
+      },
+      "patched": {
+       "mean": 47,
+       "min": 47,
+       "max": 47
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "residentsAffected",
+      "label": "Residents whose homes flooded",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "patched": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "ttsP90",
+      "label": "Slowest 10% wait for help",
+      "unit": "s",
+      "better": "lower",
+      "baseline": {
+       "mean": 125,
+       "min": 119,
+       "max": 131
+      },
+      "patched": {
+       "mean": 128.5,
+       "min": 126,
+       "max": 131
+      },
+      "delta": {
+       "mean": 3.5,
+       "min": 0,
+       "max": 7
+      },
+      "verdict": "worse"
+     },
+     {
+      "key": "unmetPct",
+      "label": "Calls never answered",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 97.70644590232219,
+       "min": 97.47474747474747,
+       "max": 97.9381443298969
+      },
+      "patched": {
+       "mean": 97.70110430732193,
+       "min": 97.47474747474747,
+       "max": 97.92746113989638
+      },
+      "delta": {
+       "mean": -0.005341595000260213,
+       "min": -0.010683190000520426,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "stranded",
+      "label": "People stranded at the end",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 191.5,
+       "min": 190,
+       "max": 193
+      },
+      "patched": {
+       "mean": 191,
+       "min": 189,
+       "max": 193
+      },
+      "delta": {
+       "mean": -0.5,
+       "min": -1,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "gridlockMin",
+      "label": "Minutes with gridlock",
+      "unit": "min",
+      "better": "lower",
+      "baseline": {
+       "mean": 14.666666666666666,
+       "min": 14.666666666666666,
+       "max": 14.666666666666666
+      },
+      "patched": {
+       "mean": 14.666666666666666,
+       "min": 14.666666666666666,
+       "max": 14.666666666666666
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "hospitalSpread",
+      "label": "Hospital load imbalance",
+      "unit": "pts",
+      "better": "lower",
+      "baseline": {
+       "mean": 4,
+       "min": 4,
+       "max": 4
+      },
+      "patched": {
+       "mean": 4,
+       "min": 4,
+       "max": 4
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "unpoweredPeak",
+      "label": "Peak residents without power",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 48.33,
+       "min": 48.19,
+       "max": 48.47
+      },
+      "patched": {
+       "mean": 48.19,
+       "min": 48.19,
+       "max": 48.19
+      },
+      "delta": {
+       "mean": -0.14000000000000057,
+       "min": -0.28000000000000114,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "floodedCells",
+      "label": "Flooded cells at the end",
+      "unit": "cells",
+      "better": "lower",
+      "baseline": {
+       "mean": 2061,
+       "min": 2061,
+       "max": 2061
+      },
+      "patched": {
+       "mean": 2061,
+       "min": 2061,
+       "max": 2061
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     }
+    ],
+    "verdict": "worse"
+   }
+  }
+ },
+ "Coastal Grid City": {
+  "response": {
+   "source": "cache",
+   "report": {
+    "summary": "The deterministic analysers flagged 10 issues. Most serious: Traffic stopped in Northeast Commercial; Traffic stopped in Northwest Residential; Substation #128 flooded and tripped. 3 small, cheap changes are proposed below; verify each by re-running the storm before trusting it.",
+    "findings": [
+     {
+      "id": "gridlock-1",
+      "severity": "high",
+      "title": "Traffic stopped in Northeast Commercial",
+      "explanation": "25 stalled or gridlocked road cells in Northeast Commercial, first at (60, 41) in Northeast Commercial, 42 m from Police Station #5. Across the city 104 vehicles stalled in water and some road was gridlocked for 30 min (peak 4 cells).",
+      "evidence": [
+       {
+        "cells": [
+         3996,
+         1212,
+         1236,
+         2292,
+         1226,
+         3505,
+         2352,
+         3537,
+         2363,
+         2844,
+         3533,
+         2358,
+         3510,
+         1208,
+         1227,
+         2751,
+         3519,
+         3514,
+         1219,
+         4584,
+         2737,
+         936,
+         3912,
+         1417,
+         4294
+        ],
+        "eventTicks": [
+         538,
+         687,
+         775
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 30
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "gridlock-2",
+      "severity": "high",
+      "title": "Traffic stopped in Northwest Residential",
+      "explanation": "24 stalled or gridlocked road cells in Northwest Residential, first at (24, 45) in Northwest Residential. Across the city 104 vehicles stalled in water and some road was gridlocked for 30 min (peak 4 cells).",
+      "evidence": [
+       {
+        "cells": [
+         4344,
+         1168,
+         1740,
+         1175,
+         1164,
+         3503,
+         1171,
+         984,
+         792,
+         2904,
+         2332,
+         4524,
+         3471,
+         2797,
+         3012,
+         1180,
+         2315,
+         1764,
+         1464,
+         3502,
+         2628,
+         2349,
+         4428,
+         1965
+        ],
+        "eventTicks": [
+         687,
+         775
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 30
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "power-1",
+      "severity": "high",
+      "title": "Substation #128 flooded and tripped",
+      "explanation": "Substation #127 flooded: depth 0.4 > trip threshold 0.4. 3844 cells (42% of the map) lost grid power. At worst 99% of residents were without power.",
+      "evidence": [
+       {
+        "cells": [
+         1008,
+         1104,
+         1009,
+         1105
+        ],
+        "eventTicks": [
+         732
+        ]
+       },
+       {
+        "metric": "unpoweredPopPct",
+        "value": 99
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "power-2",
+      "severity": "high",
+      "title": "Substation #129 flooded and tripped",
+      "explanation": "Substation #128 flooded: depth 0.4 > trip threshold 0.4. 5372 cells (58% of the map) lost grid power. At worst 99% of residents were without power.",
+      "evidence": [
+       {
+        "cells": [
+         6576,
+         6672,
+         6577,
+         6673
+        ],
+        "eventTicks": [
+         732
+        ]
+       },
+       {
+        "metric": "unpoweredPopPct",
+        "value": 99
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "drainage-1",
+      "severity": "high",
+      "title": "Water pooled in Northwest Residential with no drain within 24 m",
+      "explanation": "6 ponding sites in Northwest Residential had no storm drain within 6 cells, starting at (20, 12) in Northwest Residential, 6 m from Shelter #3. The city has 3 drain cells; 17 of 17 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         1172,
+         1173,
+         1174,
+         1169,
+         3467,
+         1165
+        ],
+        "eventTicks": []
+       },
+       {
+        "metric": "drainCells",
+        "value": 3
+       }
+      ],
+      "confidence": "low"
+     },
+     {
+      "id": "drainage-2",
+      "severity": "high",
+      "title": "Water pooled in Northeast Commercial with no drain within 24 m",
+      "explanation": "6 ponding sites in Northeast Commercial had no storm drain within 6 cells, starting at (84, 39) in Northeast Commercial, 59 m from Police Station #5. The city has 3 drain cells; 17 of 17 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         3828,
+         1220,
+         3156,
+         3531,
+         1584,
+         936
+        ],
+        "eventTicks": []
+       },
+       {
+        "metric": "drainCells",
+        "value": 3
+       }
+      ],
+      "confidence": "low"
+     },
+     {
+      "id": "response-1",
+      "severity": "medium",
+      "title": "143 of 354 calls from Northwest Residential were still unanswered",
+      "explanation": "Answered requests from Northwest Residential waited 13 min on average against 11 min citywide; 143 were still open at minute 30. Citywide Gini of time to service is 0.11 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         3876,
+         4548,
+         3878,
+         4260,
+         1172,
+         1173,
+         2341,
+         1173,
+         1173,
+         1172,
+         1172,
+         1173,
+         1172,
+         1173,
+         1172,
+         1173,
+         1173,
+         1174,
+         1173,
+         1173,
+         1572,
+         1173,
+         1173,
+         1162,
+         1174,
+         1174,
+         1173,
+         1174,
+         1172,
+         2316,
+         1172,
+         1174,
+         1172,
+         3865,
+         3853,
+         1173,
+         1173,
+         1173,
+         1172,
+         1173
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.11
+       },
+       {
+        "metric": "unmet",
+        "value": 143
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "response-2",
+      "severity": "low",
+      "title": "6 of 102 calls from Northeast Commercial were still unanswered",
+      "explanation": "Answered requests from Northeast Commercial waited 10 min on average against 11 min citywide; 6 were still open at minute 30. Citywide Gini of time to service is 0.11 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         4176,
+         4560,
+         4188,
+         4476,
+         3892,
+         4092,
+         3816,
+         2379,
+         1226,
+         1884,
+         1219,
+         2737,
+         2389,
+         3444,
+         3518,
+         1332,
+         4008,
+         2376,
+         1211,
+         840,
+         4104,
+         1212,
+         2376,
+         2362,
+         3519,
+         3924,
+         912,
+         3336,
+         816,
+         1214,
+         3525,
+         2376,
+         1201,
+         1211,
+         1204,
+         1203,
+         816,
+         1608,
+         2772,
+         4308
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.11
+       },
+       {
+        "metric": "unmet",
+        "value": 6
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "hospitals-1",
+      "severity": "medium",
+      "title": "Hospital #1 took the load while Hospital #2 stayed quiet",
+      "explanation": "Hospital #1 peaked at 68% of beds, Hospital #2 at 0%; the widest gap was 68%. Hospitals spent 0 min on diversion and 0 patients were redirected.",
+      "evidence": [
+       {
+        "cells": [
+         1965,
+         2061,
+         2157,
+         1966,
+         2062,
+         2158,
+         1967,
+         2063,
+         2159,
+         1968,
+         2064,
+         2160
+        ],
+        "eventTicks": [
+         1790
+        ]
+       },
+       {
+        "metric": "peakUtil",
+        "value": 0.68
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "rooftops-1",
+      "severity": "low",
+      "title": "6 people still stranded in Northwest Residential",
+      "explanation": "600 people were stranded during the storm and 154 were never reached (154 at the end). In Northwest Residential they were around (20, 12) in Northwest Residential, 6 m from Shelter #3. Helicopters made 68 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         1172,
+         1173,
+         1174,
+         1169,
+         3467,
+         1165
+        ],
+        "eventTicks": [
+         710
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 154
+       }
+      ],
+      "confidence": "medium"
+     }
+    ],
+    "proposals": [
+     {
+      "id": "substation-levee",
+      "addresses": [
+       "power-1",
+       "power-2"
+      ],
+      "title": "Ring Substation #128 with a levee",
+      "rationale": "The substation tripped when water reached it. A low levee on the open ground around it keeps shallow water out without blocking its road access.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 911,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 913,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1007,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1103,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 914,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1010,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1106,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6479,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6481,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6575,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6671,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6767,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6769,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6482,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6578,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6674,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6770,
+        "block": 23
+       }
+      ],
+      "expectedEffect": "The substation trips later or not at all, so fewer residents and hospitals lose grid power. A hypothesis until verified.",
+      "cost": 34
+     },
+     {
+      "id": "add-drains",
+      "addresses": [
+       "drainage-1",
+       "drainage-2"
+      ],
+      "title": "Add 6 storm drains in Northwest Residential",
+      "rationale": "Ponding sites had no drain within 6 cells. Each drain is placed on open ground beside a ponding site, never on a road or building.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 1075,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 7091,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 7067,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6119,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3731,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 1123,
+        "block": 7
+       }
+      ],
+      "expectedEffect": "Less standing water near these sites, fewer stalled vehicles and road closures there. A hypothesis until verified.",
+      "cost": 12
+     },
+     {
+      "id": "helipad-rooftops",
+      "addresses": [
+       "rooftops-1",
+       "rooftops-2"
+      ],
+      "title": "Add a helipad in Northwest Residential",
+      "rationale": "6 people still stranded in Northwest Residential. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "commands": [
+       {
+        "kind": "placeBuilding",
+        "def": {
+         "type": 19,
+         "cells": [
+          1267,
+          1268,
+          1363,
+          1364
+         ],
+         "entrance": 1267
+        }
+       }
+      ],
+      "expectedEffect": "Faster rooftop rescues and fewer people left stranded in this area. A hypothesis until verified.",
+      "cost": 60
+     }
+    ],
+    "limitations": [
+     "Synthetic city and synthetic people; no real map, population or live feed is used.",
+     "Simplified flood, traffic and power physics; magnitudes are indicative, not calibrated.",
+     "Simulation output; not an emergency-planning authority.",
+     "Proposals are hypotheses until re-simulation verifies them, and even then only inside this model.",
+     "Written from rule-based analysers without a language model."
+    ]
+   },
+   "notice": "Pre-generated offline by the rule-based analysers on the preview model (seed 77, 30 simulated minutes from 08:00). Run the storm and critique it for a report on your own run."
+  },
+  "verifications": {
+   "substation-levee": {
+    "engine": "preview",
+    "seeds": [
+     77,
+     78
+    ],
+    "ticks": 900,
+    "metrics": [
+     {
+      "key": "score",
+      "label": "City resilience score",
+      "unit": "pts",
+      "better": "higher",
+      "baseline": {
+       "mean": 34.5,
+       "min": 34,
+       "max": 35
+      },
+      "patched": {
+       "mean": 34.5,
+       "min": 34,
+       "max": 35
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "residentsAffected",
+      "label": "Residents whose homes flooded",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 120,
+       "min": 120,
+       "max": 120
+      },
+      "patched": {
+       "mean": 120,
+       "min": 120,
+       "max": 120
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "ttsP90",
+      "label": "Slowest 10% wait for help",
+      "unit": "s",
+      "better": "lower",
+      "baseline": {
+       "mean": 179.5,
+       "min": 177,
+       "max": 182
+      },
+      "patched": {
+       "mean": 178.5,
+       "min": 177,
+       "max": 180
+      },
+      "delta": {
+       "mean": -1,
+       "min": -2,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "unmetPct",
+      "label": "Calls never answered",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 93.08333333333333,
+       "min": 92.33333333333333,
+       "max": 93.83333333333333
+      },
+      "patched": {
+       "mean": 92.66666666666666,
+       "min": 91.66666666666666,
+       "max": 93.66666666666667
+      },
+      "delta": {
+       "mean": -0.4166666666666643,
+       "min": -0.6666666666666714,
+       "max": -0.1666666666666572
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "stranded",
+      "label": "People stranded at the end",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 558.5,
+       "min": 554,
+       "max": 563
+      },
+      "patched": {
+       "mean": 556,
+       "min": 550,
+       "max": 562
+      },
+      "delta": {
+       "mean": -2.5,
+       "min": -4,
+       "max": -1
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "gridlockMin",
+      "label": "Minutes with gridlock",
+      "unit": "min",
+      "better": "lower",
+      "baseline": {
+       "mean": 14.666666666666666,
+       "min": 14.666666666666666,
+       "max": 14.666666666666666
+      },
+      "patched": {
+       "mean": 14.666666666666666,
+       "min": 14.666666666666666,
+       "max": 14.666666666666666
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "hospitalSpread",
+      "label": "Hospital load imbalance",
+      "unit": "pts",
+      "better": "lower",
+      "baseline": {
+       "mean": 23.5,
+       "min": 23,
+       "max": 24
+      },
+      "patched": {
+       "mean": 23.5,
+       "min": 23,
+       "max": 24
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "unpoweredPeak",
+      "label": "Peak residents without power",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 98.33500000000001,
+       "min": 98.15,
+       "max": 98.52
+      },
+      "patched": {
+       "mean": 98.33500000000001,
+       "min": 98.15,
+       "max": 98.52
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "floodedCells",
+      "label": "Flooded cells at the end",
+      "unit": "cells",
+      "better": "lower",
+      "baseline": {
+       "mean": 8186,
+       "min": 8186,
+       "max": 8186
+      },
+      "patched": {
+       "mean": 8169,
+       "min": 8169,
+       "max": 8169
+      },
+      "delta": {
+       "mean": -17,
+       "min": -17,
+       "max": -17
+      },
+      "verdict": "no_clear_effect"
+     }
+    ],
+    "verdict": "no_clear_effect"
+   }
+  }
+ },
+ "Dense Basin City": {
+  "response": {
+   "source": "cache",
+   "report": {
+    "summary": "The deterministic analysers flagged 10 issues. Most serious: Traffic stopped in Central Basin Floodplain; Traffic stopped in Mid-East Commercial District; Substation #9 flooded and tripped. 4 small, cheap changes are proposed below; verify each by re-running the storm before trusting it.",
+    "findings": [
+     {
+      "id": "gridlock-1",
+      "severity": "high",
+      "title": "Traffic stopped in Central Basin Floodplain",
+      "explanation": "40 stalled or gridlocked road cells in Central Basin Floodplain, first at (49, 48) in Central Basin Floodplain, 38 m from Boat Depot #8. Across the city 51 vehicles stalled in water and some road was gridlocked for 30 min (peak 8 cells).",
+      "evidence": [
+       {
+        "cells": [
+         4657,
+         4656,
+         4645,
+         4650,
+         5424,
+         4651,
+         3975,
+         4661,
+         3984,
+         5700,
+         3708,
+         4836,
+         4380,
+         5412,
+         5892,
+         5800,
+         5124,
+         5908,
+         4068,
+         4356,
+         3900,
+         5244,
+         5810,
+         4452,
+         4670,
+         3507,
+         4543,
+         3492,
+         4548,
+         3684,
+         5809,
+         5807,
+         3509,
+         4284,
+         4644,
+         5808,
+         5316,
+         5821,
+         5804,
+         5604
+        ],
+        "eventTicks": [
+         9,
+         776,
+         929,
+         1323,
+         1432,
+         1545
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 30
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "gridlock-2",
+      "severity": "high",
+      "title": "Traffic stopped in Mid-East Commercial District",
+      "explanation": "3 stalled or gridlocked road cells in Mid-East Commercial District, first at (74, 48) in Mid-East Commercial District, 16 m from Hospital #3. Across the city 51 vehicles stalled in water and some road was gridlocked for 30 min (peak 8 cells).",
+      "evidence": [
+       {
+        "cells": [
+         4682,
+         6013,
+         6012
+        ],
+        "eventTicks": [
+         1185,
+         1432
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 30
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "power-1",
+      "severity": "high",
+      "title": "Substation #9 flooded and tripped",
+      "explanation": "Substation #8 flooded: depth 0.4 > trip threshold 0.4. 6251 cells (68% of the map) lost grid power. At worst 77% of residents were without power.",
+      "evidence": [
+       {
+        "cells": [
+         3977,
+         4073,
+         3978,
+         4074
+        ],
+        "eventTicks": [
+         854
+        ]
+       },
+       {
+        "metric": "unpoweredPopPct",
+        "value": 77
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "drainage-1",
+      "severity": "high",
+      "title": "Water pooled in Central Basin Floodplain with no drain within 24 m",
+      "explanation": "12 ponding sites in Central Basin Floodplain had no storm drain within 6 cells, starting at (48, 36) in Central Basin Floodplain, 34 m from Substation #9. The city has 4 drain cells; 13 of 15 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         3504,
+         3506,
+         3505,
+         3408,
+         4671,
+         3703,
+         3510,
+         3515,
+         3517,
+         5724,
+         4285,
+         3502
+        ],
+        "eventTicks": []
+       },
+       {
+        "metric": "drainCells",
+        "value": 4
+       }
+      ],
+      "confidence": "low"
+     },
+     {
+      "id": "drainage-2",
+      "severity": "high",
+      "title": "Water pooled in Mid-East Commercial District with no drain within 24 m",
+      "explanation": "1 ponding sites in Mid-East Commercial District had no storm drain within 6 cells, starting at (53, 67) in Mid-East Commercial District. The city has 4 drain cells; 13 of 15 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         6485
+        ],
+        "eventTicks": []
+       },
+       {
+        "metric": "drainCells",
+        "value": 4
+       }
+      ],
+      "confidence": "low"
+     },
+     {
+      "id": "isolated-1",
+      "severity": "medium",
+      "title": "Mid-East Commercial District was cut off from every hospital and shelter",
+      "explanation": "At the worst moment 240 road cells were closed. 70 of 230 open road cells in Mid-East Commercial District (30%) had no open route to any hospital or shelter, around (48, 20) in Mid-East Commercial District, 8 m from Substation #11.",
+      "evidence": [
+       {
+        "cells": [
+         1968,
+         1969,
+         1970,
+         1971,
+         2064,
+         2160,
+         2256,
+         2257,
+         2258,
+         2259,
+         2352,
+         2355,
+         2358,
+         2448,
+         2451,
+         2452,
+         2453,
+         2454,
+         2544,
+         2548,
+         2640,
+         2644,
+         2645,
+         2646,
+         2736,
+         2742,
+         5347,
+         5443,
+         5539,
+         5635,
+         5731,
+         5732,
+         5733,
+         5734,
+         5827,
+         5830,
+         5923,
+         5926,
+         6019,
+         6022
+        ],
+        "eventTicks": [
+         1432
+        ]
+       },
+       {
+        "metric": "closedRoadCells",
+        "value": 240
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "response-1",
+      "severity": "low",
+      "title": "19 of 223 calls from Central Basin Floodplain were still unanswered",
+      "explanation": "Answered requests from Central Basin Floodplain waited 3 min on average against 3 min citywide; 19 were still open at minute 30. Citywide Gini of time to service is 0.07 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         4654,
+         4944,
+         4656,
+         4656,
+         4656,
+         4656,
+         4656,
+         4944,
+         4657,
+         4657,
+         4658,
+         4652,
+         3888,
+         4651,
+         3888,
+         4648,
+         4666,
+         3984,
+         4666,
+         5328,
+         4272,
+         4663,
+         5616,
+         4651,
+         4665,
+         4651,
+         5232,
+         3888,
+         3976,
+         3984,
+         5136,
+         4651,
+         5030,
+         3696,
+         4663,
+         4666,
+         5328,
+         4552,
+         4663,
+         3976
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.07
+       },
+       {
+        "metric": "unmet",
+        "value": 19
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "response-2",
+      "severity": "low",
+      "title": "1 of 15 calls from Mid-East Commercial District were still unanswered",
+      "explanation": "Answered requests from Mid-East Commercial District waited 4 min on average against 3 min citywide; 1 were still open at minute 30. Citywide Gini of time to service is 0.07 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         6012,
+         6484,
+         6484,
+         6485,
+         3324,
+         5822,
+         5059,
+         5059,
+         5155,
+         6485,
+         6484,
+         6013,
+         3518,
+         6484,
+         6485
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.07
+       },
+       {
+        "metric": "unmet",
+        "value": 1
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "hospitals-1",
+      "severity": "low",
+      "title": "Hospital #1 took the load while Hospital #3 stayed quiet",
+      "explanation": "Hospital #1 peaked at 22% of beds, Hospital #3 at 0%; the widest gap was 22%. Hospitals spent 0 min on diversion and 0 patients were redirected.",
+      "evidence": [
+       {
+        "cells": [
+         1196,
+         1292,
+         1388,
+         1197,
+         1293,
+         1389,
+         1198,
+         1294,
+         1390,
+         1199,
+         1295,
+         1391
+        ],
+        "eventTicks": [
+         1790
+        ]
+       },
+       {
+        "metric": "peakUtil",
+        "value": 0.22
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "rooftops-1",
+      "severity": "low",
+      "title": "14 people still stranded in Central Basin Floodplain",
+      "explanation": "251 people were stranded during the storm and 20 were never reached (20 at the end). In Central Basin Floodplain they were around (48, 41) in Central Basin Floodplain, 28 m from Substation #9. Helicopters made 26 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         3984,
+         4464,
+         3504,
+         3506,
+         3505,
+         3408,
+         4671,
+         3703,
+         3510,
+         3515,
+         3517,
+         5724,
+         4285,
+         3502
+        ],
+        "eventTicks": [
+         816,
+         1460
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 20
+       }
+      ],
+      "confidence": "medium"
+     }
+    ],
+    "proposals": [
+     {
+      "id": "substation-levee",
+      "addresses": [
+       "power-1"
+      ],
+      "title": "Ring Substation #9 with a levee",
+      "rationale": "The substation tripped when water reached it. A low levee on the open ground around it keeps shallow water out without blocking its road access.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 3881,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3882,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4072,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4168,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4169,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4170,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3883,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3979,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4075,
+        "block": 23
+       }
+      ],
+      "expectedEffect": "The substation trips later or not at all, so fewer residents and hospitals lose grid power. A hypothesis until verified.",
+      "cost": 18
+     },
+     {
+      "id": "add-drains",
+      "addresses": [
+       "drainage-1",
+       "drainage-2"
+      ],
+      "title": "Add 6 storm drains in Central Basin Floodplain",
+      "rationale": "Ponding sites had no drain within 6 cells. Each drain is placed on open ground beside a ponding site, never on a road or building.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 3407,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4574,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3606,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3421,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6388,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 5627,
+        "block": 7
+       }
+      ],
+      "expectedEffect": "Less standing water near these sites, fewer stalled vehicles and road closures there. A hypothesis until verified.",
+      "cost": 12
+     },
+     {
+      "id": "helipad-cutoff",
+      "addresses": [
+       "isolated-1"
+      ],
+      "title": "Add a helipad in Mid-West Residential Slope",
+      "rationale": "Mid-East Commercial District was cut off from every hospital and shelter. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "commands": [
+       {
+        "kind": "placeBuilding",
+        "def": {
+         "type": 19,
+         "cells": [
+          2062,
+          2063,
+          2158,
+          2159
+         ],
+         "entrance": 2062
+        }
+       }
+      ],
+      "expectedEffect": "Faster rooftop rescues and fewer people left stranded in this area. A hypothesis until verified.",
+      "cost": 60
+     },
+     {
+      "id": "helipad-rooftops",
+      "addresses": [
+       "rooftops-1",
+       "rooftops-2"
+      ],
+      "title": "Add a helipad in Central Basin Floodplain",
+      "rationale": "14 people still stranded in Central Basin Floodplain. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "commands": [
+       {
+        "kind": "placeBuilding",
+        "def": {
+         "type": 19,
+         "cells": [
+          3889,
+          3890,
+          3985,
+          3986
+         ],
+         "entrance": 3889
+        }
+       }
+      ],
+      "expectedEffect": "Faster rooftop rescues and fewer people left stranded in this area. A hypothesis until verified.",
+      "cost": 60
+     }
+    ],
+    "limitations": [
+     "Synthetic city and synthetic people; no real map, population or live feed is used.",
+     "Simplified flood, traffic and power physics; magnitudes are indicative, not calibrated.",
+     "Simulation output; not an emergency-planning authority.",
+     "Proposals are hypotheses until re-simulation verifies them, and even then only inside this model.",
+     "Written from rule-based analysers without a language model."
+    ]
+   },
+   "notice": "Pre-generated offline by the rule-based analysers on the preview model (seed 55, 30 simulated minutes from 08:00). Run the storm and critique it for a report on your own run."
+  },
+  "verifications": {
+   "substation-levee": {
+    "engine": "preview",
+    "seeds": [
+     55,
+     56
+    ],
+    "ticks": 900,
+    "metrics": [
+     {
+      "key": "score",
+      "label": "City resilience score",
+      "unit": "pts",
+      "better": "higher",
+      "baseline": {
+       "mean": 61.5,
+       "min": 61,
+       "max": 62
+      },
+      "patched": {
+       "mean": 61,
+       "min": 60,
+       "max": 62
+      },
+      "delta": {
+       "mean": -0.5,
+       "min": -1,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "residentsAffected",
+      "label": "Residents whose homes flooded",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "patched": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "ttsP90",
+      "label": "Slowest 10% wait for help",
+      "unit": "s",
+      "better": "lower",
+      "baseline": {
+       "mean": 208,
+       "min": 84,
+       "max": 332
+      },
+      "patched": {
+       "mean": 207.5,
+       "min": 83,
+       "max": 332
+      },
+      "delta": {
+       "mean": -0.5,
+       "min": -1,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "unmetPct",
+      "label": "Calls never answered",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 65.8983451536643,
+       "min": 59.57446808510638,
+       "max": 72.22222222222221
+      },
+      "patched": {
+       "mean": 65.34346846846847,
+       "min": 60.416666666666664,
+       "max": 70.27027027027027
+      },
+      "delta": {
+       "mean": -0.5548766851958291,
+       "min": -1.9519519519519406,
+       "max": 0.8421985815602824
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "stranded",
+      "label": "People stranded at the end",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 27,
+       "min": 26,
+       "max": 28
+      },
+      "patched": {
+       "mean": 27.5,
+       "min": 26,
+       "max": 29
+      },
+      "delta": {
+       "mean": 0.5,
+       "min": 0,
+       "max": 1
+      },
+      "verdict": "worse"
+     },
+     {
+      "key": "gridlockMin",
+      "label": "Minutes with gridlock",
+      "unit": "min",
+      "better": "lower",
+      "baseline": {
+       "mean": 14.666666666666666,
+       "min": 14.666666666666666,
+       "max": 14.666666666666666
+      },
+      "patched": {
+       "mean": 14.666666666666666,
+       "min": 14.666666666666666,
+       "max": 14.666666666666666
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "hospitalSpread",
+      "label": "Hospital load imbalance",
+      "unit": "pts",
+      "better": "lower",
+      "baseline": {
+       "mean": 8.5,
+       "min": 6,
+       "max": 11
+      },
+      "patched": {
+       "mean": 8.5,
+       "min": 6,
+       "max": 11
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "unpoweredPeak",
+      "label": "Peak residents without power",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 76.02,
+       "min": 75.49,
+       "max": 76.55
+      },
+      "patched": {
+       "mean": 75.64500000000001,
+       "min": 74.89,
+       "max": 76.4
+      },
+      "delta": {
+       "mean": -0.3749999999999929,
+       "min": -1.6599999999999966,
+       "max": 0.9100000000000108
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "floodedCells",
+      "label": "Flooded cells at the end",
+      "unit": "cells",
+      "better": "lower",
+      "baseline": {
+       "mean": 381,
+       "min": 381,
+       "max": 381
+      },
+      "patched": {
+       "mean": 372,
+       "min": 372,
+       "max": 372
+      },
+      "delta": {
+       "mean": -9,
+       "min": -9,
+       "max": -9
+      },
+      "verdict": "improved"
+     }
+    ],
+    "verdict": "worse"
+   }
+  }
+ },
+ "Stress Triple Disaster": {
+  "response": {
+   "source": "cache",
+   "report": {
+    "summary": "The deterministic analysers flagged 10 issues. Most serious: Traffic stopped in Central Basin Floodplain; Traffic stopped in Mid-West Residential Slope; Substation #9 flooded and tripped. 4 small, cheap changes are proposed below; verify each by re-running the storm before trusting it.",
+    "findings": [
+     {
+      "id": "gridlock-1",
+      "severity": "high",
+      "title": "Traffic stopped in Central Basin Floodplain",
+      "explanation": "36 stalled or gridlocked road cells in Central Basin Floodplain, first at (48, 42) in Central Basin Floodplain, 28 m from Substation #9. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 13 cells).",
+      "evidence": [
+       {
+        "cells": [
+         4080,
+         5712,
+         5232,
+         4651,
+         4646,
+         5700,
+         5797,
+         5508,
+         5436,
+         5604,
+         5341,
+         3396,
+         5799,
+         3900,
+         4452,
+         5796,
+         5124,
+         5028,
+         3780,
+         5148,
+         5802,
+         5892,
+         5798,
+         3514,
+         5532,
+         5053,
+         4284,
+         5820,
+         5814,
+         5904,
+         3023,
+         4836,
+         3684,
+         4548,
+         4638,
+         3517
+        ],
+        "eventTicks": [
+         776,
+         1173,
+         1293,
+         1413,
+         1432
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 30
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "gridlock-2",
+      "severity": "high",
+      "title": "Traffic stopped in Mid-West Residential Slope",
+      "explanation": "1 stalled or gridlocked road cells in Mid-West Residential Slope, first at (36, 62) in Mid-West Residential Slope, 70 m from Boat Depot #8. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 13 cells).",
+      "evidence": [
+       {
+        "cells": [
+         5988
+        ],
+        "eventTicks": [
+         1432
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 30
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "power-1",
+      "severity": "high",
+      "title": "Substation #9 flooded and tripped",
+      "explanation": "Substation #8 flooded: depth 0.4 > trip threshold 0.4. 6251 cells (68% of the map) lost grid power. At worst 75% of residents were without power.",
+      "evidence": [
+       {
+        "cells": [
+         3977,
+         4073,
+         3978,
+         4074
+        ],
+        "eventTicks": [
+         854
+        ]
+       },
+       {
+        "metric": "unpoweredPopPct",
+        "value": 75
+       }
+      ],
+      "confidence": "high"
+     },
+     {
+      "id": "drainage-1",
+      "severity": "high",
+      "title": "Water pooled in Central Basin Floodplain with no drain within 24 m",
+      "explanation": "27 ponding sites in Central Basin Floodplain had no storm drain within 6 cells, starting at (36, 39) in Central Basin Floodplain, 22 m from Substation #9. The city has 4 drain cells; 36 of 36 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         3780,
+         3973,
+         3493,
+         3496,
+         3497,
+         3972,
+         3396,
+         3876,
+         4068,
+         3495,
+         3974,
+         4164,
+         3684,
+         3499,
+         3312,
+         3510,
+         4670,
+         3492,
+         5124,
+         3408,
+         4092,
+         4640,
+         3612,
+         5316,
+         6288,
+         5820,
+         4543
+        ],
+        "eventTicks": []
+       },
+       {
+        "metric": "drainCells",
+        "value": 4
+       }
+      ],
+      "confidence": "low"
+     },
+     {
+      "id": "drainage-2",
+      "severity": "high",
+      "title": "Water pooled in Mid-East Commercial District with no drain within 24 m",
+      "explanation": "6 ponding sites in Mid-East Commercial District had no storm drain within 6 cells, starting at (54, 30) in Mid-East Commercial District, 54 m from Substation #11. The city has 4 drain cells; 36 of 36 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         2934,
+         3030,
+         3228,
+         5155,
+         6484,
+         6013
+        ],
+        "eventTicks": []
+       },
+       {
+        "metric": "drainCells",
+        "value": 4
+       }
+      ],
+      "confidence": "low"
+     },
+     {
+      "id": "isolated-1",
+      "severity": "medium",
+      "title": "Mid-East Commercial District was cut off from every hospital and shelter",
+      "explanation": "At the worst moment 240 road cells were closed. 70 of 230 open road cells in Mid-East Commercial District (30%) had no open route to any hospital or shelter, around (48, 20) in Mid-East Commercial District, 8 m from Substation #11.",
+      "evidence": [
+       {
+        "cells": [
+         1968,
+         1969,
+         1970,
+         1971,
+         2064,
+         2160,
+         2256,
+         2257,
+         2258,
+         2259,
+         2352,
+         2355,
+         2358,
+         2448,
+         2451,
+         2452,
+         2453,
+         2454,
+         2544,
+         2548,
+         2640,
+         2644,
+         2645,
+         2646,
+         2736,
+         2742,
+         5347,
+         5443,
+         5539,
+         5635,
+         5731,
+         5732,
+         5733,
+         5734,
+         5827,
+         5830,
+         5923,
+         5926,
+         6019,
+         6022
+        ],
+        "eventTicks": [
+         1432
+        ]
+       },
+       {
+        "metric": "closedRoadCells",
+        "value": 240
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "response-1",
+      "severity": "medium",
+      "title": "6 of 15 calls from Mid-East Commercial District were still unanswered",
+      "explanation": "Answered requests from Mid-East Commercial District waited 4 min on average against 3 min citywide; 6 were still open at minute 30. Citywide Gini of time to service is 0.08 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         2934,
+         3228,
+         3030,
+         6484,
+         5059,
+         6012,
+         6012,
+         6013,
+         5155,
+         6484,
+         3228,
+         5155,
+         6484,
+         3324,
+         6013
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.08
+       },
+       {
+        "metric": "unmet",
+        "value": 6
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "response-2",
+      "severity": "medium",
+      "title": "5 of 18 calls from Mid-West Residential Slope were still unanswered",
+      "explanation": "Answered requests from Mid-West Residential Slope waited 4 min on average against 3 min citywide; 5 were still open at minute 30. Citywide Gini of time to service is 0.08 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         5214,
+         5118,
+         5118,
+         5214,
+         5022,
+         3300,
+         3300,
+         5022,
+         5022,
+         4926,
+         3204,
+         5214,
+         3204,
+         5022,
+         5022,
+         5214,
+         5310,
+         5022
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.08
+       },
+       {
+        "metric": "unmet",
+        "value": 5
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "rooftops-1",
+      "severity": "low",
+      "title": "27 people still stranded in Central Basin Floodplain",
+      "explanation": "279 people were stranded during the storm and 55 were never reached (55 at the end). In Central Basin Floodplain they were around (36, 39) in Central Basin Floodplain, 22 m from Substation #9. Helicopters made 16 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         3780,
+         3973,
+         3493,
+         3496,
+         3497,
+         3972,
+         3396,
+         3876,
+         4068,
+         3495,
+         3974,
+         4164,
+         3684,
+         3499,
+         3312,
+         3510,
+         4670,
+         3492,
+         5124,
+         3408,
+         4092,
+         4640,
+         3612,
+         5316,
+         6288,
+         5820,
+         4543
+        ],
+        "eventTicks": [
+         1460
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 55
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "rooftops-2",
+      "severity": "low",
+      "title": "6 people still stranded in Mid-East Commercial District",
+      "explanation": "279 people were stranded during the storm and 55 were never reached (55 at the end). In Mid-East Commercial District they were around (54, 30) in Mid-East Commercial District, 54 m from Substation #11. Helicopters made 16 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         2934,
+         3030,
+         3228,
+         5155,
+         6484,
+         6013
+        ],
+        "eventTicks": [
+         1460
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 55
+       }
+      ],
+      "confidence": "medium"
+     }
+    ],
+    "proposals": [
+     {
+      "id": "substation-levee",
+      "addresses": [
+       "power-1"
+      ],
+      "title": "Ring Substation #9 with a levee",
+      "rationale": "The substation tripped when water reached it. A low levee on the open ground around it keeps shallow water out without blocking its road access.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 3881,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3882,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4072,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4168,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4169,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4170,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3883,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3979,
+        "block": 23
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4075,
+        "block": 23
+       }
+      ],
+      "expectedEffect": "The substation trips later or not at all, so fewer residents and hospitals lose grid power. A hypothesis until verified.",
+      "cost": 18
+     },
+     {
+      "id": "add-drains",
+      "addresses": [
+       "drainage-1",
+       "drainage-2"
+      ],
+      "title": "Add 6 storm drains in Mid-East Commercial District",
+      "rationale": "Ponding sites had no drain within 6 cells. Each drain is placed on open ground beside a ponding site, never on a road or building.",
+      "commands": [
+       {
+        "kind": "setBlock",
+        "cell": 2933,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3683,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3402,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 3131,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 5058,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 6387,
+        "block": 7
+       }
+      ],
+      "expectedEffect": "Less standing water near these sites, fewer stalled vehicles and road closures there. A hypothesis until verified.",
+      "cost": 12
+     },
+     {
+      "id": "helipad-cutoff",
+      "addresses": [
+       "isolated-1"
+      ],
+      "title": "Add a helipad in Mid-West Residential Slope",
+      "rationale": "Mid-East Commercial District was cut off from every hospital and shelter. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "commands": [
+       {
+        "kind": "placeBuilding",
+        "def": {
+         "type": 19,
+         "cells": [
+          2062,
+          2063,
+          2158,
+          2159
+         ],
+         "entrance": 2062
+        }
+       }
+      ],
+      "expectedEffect": "Faster rooftop rescues and fewer people left stranded in this area. A hypothesis until verified.",
+      "cost": 60
+     },
+     {
+      "id": "helipad-rooftops",
+      "addresses": [
+       "rooftops-1",
+       "rooftops-2"
+      ],
+      "title": "Add a helipad in Mid-East Commercial District",
+      "rationale": "27 people still stranded in Central Basin Floodplain. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "commands": [
+       {
+        "kind": "placeBuilding",
+        "def": {
+         "type": 19,
+         "cells": [
+          2649,
+          2650,
+          2745,
+          2746
+         ],
+         "entrance": 2649
+        }
+       }
+      ],
+      "expectedEffect": "Faster rooftop rescues and fewer people left stranded in this area. A hypothesis until verified.",
+      "cost": 60
+     }
+    ],
+    "limitations": [
+     "Synthetic city and synthetic people; no real map, population or live feed is used.",
+     "Simplified flood, traffic and power physics; magnitudes are indicative, not calibrated.",
+     "Simulation output; not an emergency-planning authority.",
+     "Proposals are hypotheses until re-simulation verifies them, and even then only inside this model.",
+     "Written from rule-based analysers without a language model."
+    ]
+   },
+   "notice": "Pre-generated offline by the rule-based analysers on the preview model (seed 99, 30 simulated minutes from 08:00). Run the storm and critique it for a report on your own run."
+  },
+  "verifications": {
+   "substation-levee": {
+    "engine": "preview",
+    "seeds": [
+     99,
+     100
+    ],
+    "ticks": 900,
+    "metrics": [
+     {
+      "key": "score",
+      "label": "City resilience score",
+      "unit": "pts",
+      "better": "higher",
+      "baseline": {
+       "mean": 62,
+       "min": 60,
+       "max": 64
+      },
+      "patched": {
+       "mean": 62.5,
+       "min": 61,
+       "max": 64
+      },
+      "delta": {
+       "mean": 0.5,
+       "min": 0,
+       "max": 1
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "residentsAffected",
+      "label": "Residents whose homes flooded",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "patched": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "ttsP90",
+      "label": "Slowest 10% wait for help",
+      "unit": "s",
+      "better": "lower",
+      "baseline": {
+       "mean": 206,
+       "min": 81,
+       "max": 331
+      },
+      "patched": {
+       "mean": 206,
+       "min": 81,
+       "max": 331
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "unmetPct",
+      "label": "Calls never answered",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 67.33333333333333,
+       "min": 66.66666666666666,
+       "max": 68
+      },
+      "patched": {
+       "mean": 67.42424242424241,
+       "min": 66.66666666666666,
+       "max": 68.18181818181817
+      },
+      "delta": {
+       "mean": 0.09090909090908639,
+       "min": 0,
+       "max": 0.18181818181817277
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "stranded",
+      "label": "People stranded at the end",
+      "unit": "",
+      "better": "lower",
+      "baseline": {
+       "mean": 32,
+       "min": 30,
+       "max": 34
+      },
+      "patched": {
+       "mean": 30,
+       "min": 30,
+       "max": 30
+      },
+      "delta": {
+       "mean": -2,
+       "min": -4,
+       "max": 0
+      },
+      "verdict": "improved"
+     },
+     {
+      "key": "gridlockMin",
+      "label": "Minutes with gridlock",
+      "unit": "min",
+      "better": "lower",
+      "baseline": {
+       "mean": 14.666666666666666,
+       "min": 14.666666666666666,
+       "max": 14.666666666666666
+      },
+      "patched": {
+       "mean": 14.666666666666666,
+       "min": 14.666666666666666,
+       "max": 14.666666666666666
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "hospitalSpread",
+      "label": "Hospital load imbalance",
+      "unit": "pts",
+      "better": "lower",
+      "baseline": {
+       "mean": 8,
+       "min": 8,
+       "max": 8
+      },
+      "patched": {
+       "mean": 8,
+       "min": 8,
+       "max": 8
+      },
+      "delta": {
+       "mean": 0,
+       "min": 0,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "unpoweredPeak",
+      "label": "Peak residents without power",
+      "unit": "%",
+      "better": "lower",
+      "baseline": {
+       "mean": 74.26,
+       "min": 73.84,
+       "max": 74.68
+      },
+      "patched": {
+       "mean": 73.84,
+       "min": 73,
+       "max": 74.68
+      },
+      "delta": {
+       "mean": -0.4200000000000017,
+       "min": -0.8400000000000034,
+       "max": 0
+      },
+      "verdict": "no_clear_effect"
+     },
+     {
+      "key": "floodedCells",
+      "label": "Flooded cells at the end",
+      "unit": "cells",
+      "better": "lower",
+      "baseline": {
+       "mean": 381,
+       "min": 381,
+       "max": 381
+      },
+      "patched": {
+       "mean": 372,
+       "min": 372,
+       "max": 372
+      },
+      "delta": {
+       "mean": -9,
+       "min": -9,
+       "max": -9
+      },
+      "verdict": "improved"
+     }
+    ],
+    "verdict": "improved"
+   }
+  }
+ }
+}

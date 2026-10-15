@@ -308,7 +308,7 @@ export const mockScenario = (seed = 7): Scenario => {
       owner[c] = buildings.length;
     }
     buildings.push({
-      id: asBuildingId(buildings.length),
+      id: asBuildingId(buildings.length + 1),
       type,
       cells,
       entrance: touchesRoad(x, z, w, d),

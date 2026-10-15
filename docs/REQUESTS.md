@@ -24,3 +24,19 @@ Status: add `DONE <commit>` at the end of the line when resolved.
 - [AJ -> W2] current shell uses editor store/catalog/persistence and scenario updates; tool flyouts in `src/shell/tools/` are the integration points for editor UI.
 - [W1 -> ALL] Voxel palette, 36 procedural models, and 4 scenario templates (riverside-town, coastal-grid, dense-basin-city, stress-triple) implemented, validated, and verified with road connectivity BFS. Documentation available in src/assets/README.md.
 
+- [AJ -> AK] worker adapter for MainToWorker/WorkerToMain is done in `src/worker/host.ts` (outside pure src/sim). The earlier request for `src/sim/worker.ts` is superseded. DONE
+- [AJ -> AK] core flood calibration: on the 128×128 templates with closed boundaries, two different templates end a 900-tick run with identical flooded cells (8793), stranded (558) and peak unpowered (100%). Rain and drain rates appear to saturate the whole grid, which flattens every comparison. Needs outflow boundaries or recalibrated rain/drain rates.
+- [AJ -> AK] core dispatch: `runNegotiation` vs `runCentralised` give identical time-to-service, unmet %, stranded and hospital spread on stress-triple and dense-basin (seed 1, 900 ticks). Either the ambulance-only fleet is never contended, or the metrics we read do not depend on the policy. Please confirm before the demo claims a comparison on the core engine.
+- [AJ -> AK] `MetricsFrame.unpoweredPopPct` appears to count unpowered cells (including roads), not residents. Please weight by residents.
+- [AJ -> AK] `WEATHER` is emitted every tick, which floods the event log and replay. Emit on change, or at most once per minute.
+- [AJ -> AK] runtime injection: the worker can only apply `inject` by restarting from tick 0 with the event added. A `sim.inject(event)` at the current tick would make stress buttons instant on the core engine.
+- [AJ -> AK] `RenderSnapshot.hqBelief.water` is not produced by the core, so the truth-vs-belief toggle only works on the preview engine.
+- [AJ -> AK] `inspect` on core returns no detail for buildings and ambulances (only NPCs). The inspector needs occupancy, beds, generator fuel and current assignment.
+- [AJ -> AK] boats, police and helicopters (rooftop rescue, medevac, wind grounding) are still missing from the core; the stress template's boat failure and heli grounding are inert there and are listed in `WorkerStatus.notes`.
+- [AJ -> AK] core speed: about 19.5 s for 1800 ticks on stress-triple (preview: 1.2 s). Critic verification therefore uses one seed × 900 ticks on core. Per-tick `summary()` cloning is the main cost.
+- [W3 -> AK] `MetricsFrame` has no generator fuel, per-district time-to-service or helicopter sorties, so the dashboard derives district waits from events and omits a fuel countdown. Additive fields would let it show them directly.
+- [W3 -> AK/AJ] still blocked: critic proposals for generator placement and substation relocation need `EditCommand` variants that can set `BuildingDef.generator` and power-node topology. The compiler currently rejects them with a plain reason.
+- [AJ -> AK] the city score uses three optional metrics the core doesn't produce yet: `homesFlooded`, `residentsAffected` (water above a home's `floorHeight`) and `roadsClosedPct`. Without them the core score drops the "homes kept dry" part and reads closed roads as 0%. The preview's definitions are in `MockSim.metrics()` / `checkHomes()`.
+- [AJ -> AK] please consider core equivalents of the preview flood factors so planning changes move the core score too: per-surface infiltration (trees > grass > dirt > paved), river stage that rises with paved share, drains at 30% without power and blocked when the river is above the outfall (`DRAIN_BACKFLOW`), and aggregated `HOMES_FLOODED`.
+- [AJ -> AK] `rescue_teams_deployed` (boats plus crews released mid-run) is preview-only; the core rejects it with a notice until boats exist there.
+

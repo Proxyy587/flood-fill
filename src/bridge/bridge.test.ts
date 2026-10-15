@@ -20,11 +20,11 @@ const inProcessWorker = async (): Promise<WorkerLike> => {
     terminate: () => {},
   };
   g.postMessage = (msg) => fake.onmessage?.({ data: msg } as MessageEvent<WorkerToMain>);
-  await import('./mockSim.worker');
+  await import('../worker/sim.worker');
   return fake;
 };
 
-describe('SimBridge + mock worker', () => {
+describe('SimBridge + sim worker', () => {
   it('loads, steps, inspects and routes edits through the editor bus', async () => {
     const bridge = new SimBridge(await inProcessWorker());
     const disconnect = connectBridge(bridge);
@@ -58,9 +58,20 @@ describe('SimBridge + mock worker', () => {
 
     bridge.load(mockScenario(), 7, { maxTicks:100 });
     bridge.step(20);
-    bridge.seek(5);
-    expect(bridge.snapshot?.tick).toBe(5);
+    bridge.seek(10);
+    expect(bridge.snapshot?.tick).toBe(10);
+    expect(useSceneStore.getState()).toMatchObject({ tick: 10, liveTick: 20 });
     expect(useSimFeedStore.getState().events.every((e, i, all) => i === 0 || all[i - 1].tick <= e.tick)).toBe(true);
+
+    bridge.load(mockScenario(), 7, { maxTicks: 100, engine: 'core' });
+    expect(useSceneStore.getState().engine).toBe('core');
+    bridge.step(30);
+    expect(bridge.snapshot?.tick).toBe(30);
+    const coreNpc = bridge.snapshot?.npcs.id[0] ?? -1;
+    expect((await bridge.inspect({ kind: 'npc', id: coreNpc }))?.kind).toBe('npc');
+    bridge.inject({ kind: 'boat_failure', t: 0 });
+    expect(useSceneStore.getState()).toMatchObject({ connection: 'ready' });
+    expect(useSceneStore.getState().error).toMatch(/not modelled/);
 
     disconnect();
   });

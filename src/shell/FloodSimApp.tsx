@@ -1,17 +1,23 @@
 'use client';
 
-import { FolderOpen, Hammer, Layers, Mountain, MousePointer2, ScrollText, SlidersHorizontal, Zap, type LucideIcon } from 'lucide-react';
+import { BarChart3, FolderOpen, Hammer, Layers, Mountain, MousePointer2, ScrollText, SlidersHorizontal, Zap, type LucideIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
+import { editorBus } from '../bridge/buses';
 import { connectBridge } from '../bridge/connect';
 import { createSimWorker } from '../bridge/createSimWorker';
 import { useSceneStore } from '../bridge/sceneStore';
 import { SimBridge } from '../bridge/SimBridge';
 import { useSimFeedStore } from '../bridge/simFeedStore';
-import { BlockType } from '../contracts';
+import { BlockType, type ScenarioPatch } from '../contracts';
 import { mockScenario } from '../contracts/mocks';
 import { ScenarioSchema } from '../contracts/schemas';
+import { startAutosave } from '../editor/autosave';
 import { BLOCK_META } from '../editor/catalog';
+import { daylightAt } from '../render/effects/daylight';
+import { SoundDirector } from '../ui/audio/SoundDirector';
+import { NewsTicker } from '../ui/news/NewsTicker';
+import { ScoreRecorder } from '../ui/score/ScoreCard';
 import { useEditorStore, type EditorTool } from '../ui/store/editorStore';
 import { describeCity, useCityStore } from './city';
 import { Compass, Footer, HoverTip, Identity, Inspector, LensCard, Toasts, Vitals } from './Hud';
@@ -19,8 +25,10 @@ import { BuildTool, Hotbar, TerrainTool } from './tools/BuildTool';
 import { FilesTool } from './tools/FilesTool';
 import { LensTool } from './tools/LensTool';
 import { LogTool } from './tools/LogTool';
+import { ReportTool } from './tools/ReportTool';
 import { ScenarioTool } from './tools/ScenarioTool';
 import { StressTool } from './tools/StressTool';
+import { RecoveryPrompt } from './Recovery';
 import { Transport } from './Transport';
 import styles from './shell.module.css';
 
@@ -29,7 +37,7 @@ const SceneCanvas = dynamic(() => import('../render/SceneCanvas').then((m) => m.
   loading: () => <p className={styles.loading}>Drawing the city…</p>,
 });
 
-type RailTool = 'inspect' | 'build' | 'terrain' | 'lens' | 'stress' | 'scenario' | 'log' | 'files';
+type RailTool = 'inspect' | 'build' | 'terrain' | 'lens' | 'stress' | 'scenario' | 'log' | 'report' | 'files';
 
 const RAIL: ({ id: RailTool; label: string; key: string; icon: LucideIcon } | 'gap')[] = [
   { id: 'inspect', label: 'Inspect', key: 'V', icon: MousePointer2 },
@@ -39,6 +47,7 @@ const RAIL: ({ id: RailTool; label: string; key: string; icon: LucideIcon } | 'g
   { id: 'lens', label: 'Lenses', key: 'L', icon: Layers },
   { id: 'stress', label: 'Stress events', key: 'X', icon: Zap },
   { id: 'log', label: 'What happened', key: 'G', icon: ScrollText },
+  { id: 'report', label: 'Report and critic', key: 'R', icon: BarChart3 },
   'gap',
   { id: 'scenario', label: 'Scenario', key: 'P', icon: SlidersHorizontal },
   { id: 'files', label: 'Files', key: 'O', icon: FolderOpen },
@@ -54,6 +63,18 @@ const editorToolFor = (tool: RailTool): EditorTool => {
   return 'select';
 };
 
+/** Load options shared by edit previews, runs and restarts. */
+const loadOptions = (mode: 'edit' | 'run') => {
+  const scene = useSceneStore.getState();
+  return {
+    mode,
+    npcParams: useEditorStore.getState().params,
+    speed: scene.speed,
+    engine: scene.runSettings.engine,
+    startTimeSeconds: scene.runSettings.startSeconds,
+  };
+};
+
 /** Worker lifetime, editor ↔ simulation sync, and the tool-based shell. */
 export function FloodSimApp() {
   const [bridge, setBridge] = useState<SimBridge | null>(null);
@@ -61,6 +82,7 @@ export function FloodSimApp() {
   const [branch, setBranch] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const error = useSceneStore((s) => s.error);
+  const dark = useSceneStore((s) => daylightAt(s.startSeconds + s.tick).day < 0.4);
   const scenario = useEditorStore((s) => s.scenario);
   const mode = useEditorStore((s) => s.mode);
   const events = useSimFeedStore((s) => s.events.length);
@@ -83,9 +105,10 @@ export function FloodSimApp() {
       if (!s.scenario) return;
       useSimFeedStore.getState().reset();
       useSceneStore.setState({ connection: 'loading', selected: null, inspector: null });
-      b.load(s.scenario, s.scenario.defaults.seed, { mode: 'edit', npcParams: s.params, speed: useSceneStore.getState().speed });
+      b.load(s.scenario, s.scenario.defaults.seed, loadOptions('edit'));
     };
     loadEditor();
+    const stopAutosave = startAutosave();
     const offEditor = useEditorStore.subscribe((s, prev) => {
       if (s.revision === prev.revision || s.mode !== 'edit') return;
       // Fresh commands go through editorBus; undo and configuration use checkpoints.
@@ -93,9 +116,14 @@ export function FloodSimApp() {
       const newCommand = command !== prev.past.at(-1) && command !== prev.future.at(-1) && s.future.length === 0 && command?.before === prev.scenario;
       if (!newCommand) loadEditor();
     });
+    const offSettings = useSceneStore.subscribe((s, prev) => {
+      if (s.runSettings !== prev.runSettings && useEditorStore.getState().mode === 'edit') loadEditor();
+    });
     return () => {
       offReady();
       offEditor();
+      offSettings();
+      stopAutosave();
       disconnect();
       b.dispose();
     };
@@ -130,7 +158,7 @@ export function FloodSimApp() {
       useEditorStore.setState({ mode: 'run', preview: [] });
       if (tool === 'build' || tool === 'terrain') setTool('inspect');
       useSimFeedStore.getState().reset();
-      bridge.load(s.scenario, s.scenario.defaults.seed, { mode: 'run', npcParams: s.params, speed: scene.speed });
+      bridge.load(s.scenario, s.scenario.defaults.seed, loadOptions('run'));
     }
     bridge.play();
   };
@@ -138,7 +166,7 @@ export function FloodSimApp() {
     const s = useEditorStore.getState();
     if (!bridge || !s.scenario) return;
     useSimFeedStore.getState().reset();
-    bridge.load(s.scenario, s.scenario.defaults.seed, { mode: 'run', npcParams: s.params, speed: useSceneStore.getState().speed });
+    bridge.load(s.scenario, s.scenario.defaults.seed, loadOptions('run'));
   };
   const askBranch = () => {
     bridge?.pause();
@@ -150,6 +178,17 @@ export function FloodSimApp() {
     s.load({ ...s.scenario, name: `${s.scenario.name.replace(/ · branch$/, '')} · branch` });
     setBranch(false);
     setTool('build');
+  };
+  /** Critic proposals land in a branch of the city as one undoable edit. */
+  const applyPatch = (patch: ScenarioPatch) => {
+    bridge?.pause();
+    const s = useEditorStore.getState();
+    if (!s.scenario) return;
+    if (s.mode !== 'edit') s.load({ ...s.scenario, name: `${s.scenario.name.replace(/ · branch$/, '')} · branch` });
+    const cmd = { kind: 'applyPatch' as const, patch };
+    useEditorStore.getState().commit([cmd]);
+    editorBus.dispatch(cmd);
+    useEditorStore.setState({ notice: `Applied “${patch.title}”. Undo with ⌘Z; start the storm to test it.` });
   };
   useEffect(() => {
     if (branch) dialog.current?.showModal();
@@ -217,7 +256,7 @@ export function FloodSimApp() {
   const unseen = tool !== 'log' && events > seenEvents && mode === 'run';
 
   return (
-    <main className={styles.app}>
+    <main className={styles.app} data-night={dark}>
       <section className={styles.stage} aria-label="City map">
         {bridge ? <SceneCanvas bridge={bridge} /> : <p className={styles.loading}>Starting the simulation…</p>}
       </section>
@@ -248,13 +287,18 @@ export function FloodSimApp() {
       {tool === 'log' && bridge && <LogTool bridge={bridge} onClose={close} />}
       {tool === 'scenario' && <ScenarioTool onClose={close} />}
       {tool === 'files' && <FilesTool onClose={close} onTemplate={template} />}
+      {tool === 'report' && <ReportTool onClose={close} onApply={applyPatch} />}
 
       <div className={styles.right}>
-        <Vitals />
+        <Vitals onScore={() => setTool('report')} />
         <Inspector />
       </div>
 
       <Toasts />
+      <ScoreRecorder />
+      <SoundDirector />
+      <NewsTicker />
+      <RecoveryPrompt />
       {tool === 'build' && mode === 'edit' && <Hotbar />}
       {bridge && <Transport bridge={bridge} onPlay={play} onRestart={restart} onBranch={askBranch} />}
       <Compass />

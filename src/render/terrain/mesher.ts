@@ -160,8 +160,20 @@ export const structureHeights = (world: WorldSnapshot): Float32Array => {
   return out;
 };
 
-/** Column top in voxels (ground + structure). */
-export const columnTop = (world: WorldSnapshot, c: number): number => world.ground[c] + structureHeights(world)[c];
+/**
+ * Blocks drawn by a separate model layer (a GLB) over a low plinth. The value
+ * is the model's height in voxels, used for labels, picking boxes and the
+ * camera; the chunk mesher only draws the plinth.
+ */
+export const PROP_HEIGHT: Partial<Record<BlockType, number>> = {
+  [BlockType.PoliceStation]: 5,
+};
+
+/** Top of what the chunk mesher draws, in voxels. */
+const drawnTop = (world: WorldSnapshot, c: number): number => world.ground[c] + structureHeights(world)[c];
+
+/** Column top in voxels (ground + structure, or the model standing on it). */
+export const columnTop = (world: WorldSnapshot, c: number): number => drawnTop(world, c) + (PROP_HEIGHT[world.blocks[c] as BlockType] ?? 0);
 
 /**
  * Builds the solid and window meshes for one 16×16 chunk. Faces between
@@ -203,7 +215,7 @@ export const buildChunk = (world: WorldSnapshot, deck: Int16Array, chunkX: numbe
         ['nz', at(x, z - 1)],
       ];
       for (const [dir, nb] of sides) {
-        const nTop = nb < 0 ? -1 : columnTop(world, nb);
+        const nTop = nb < 0 ? -1 : drawnTop(world, nb);
         if (nTop < g) solid.face(dir, x, x + 1, Math.max(nTop, -1) * Y, g * Y, z, z + 1, groundSide, ROLE_STATIC, c);
         if (top > g && nTop < top && !sameBuilding(c, nb)) {
           const from = Math.max(nTop, g);

@@ -18,7 +18,18 @@ export const connectBridge = (bridge: SimBridge): (() => void) => {
       scene.setState({ connection: 'ready', error: null, scenario: st.scenario, seed: st.seed, maxTicks: st.maxTicks });
     }),
     bridge.on('status', (st) =>
-      scene.setState({ tick: st.tick, playing: st.playing, speed: st.speed, dispatchMode: st.dispatchMode, maxTicks: st.maxTicks }),
+      scene.setState({
+        tick: st.tick,
+        liveTick: st.liveTick ?? st.tick,
+        playing: st.playing,
+        speed: st.speed,
+        dispatchMode: st.dispatchMode,
+        maxTicks: st.maxTicks,
+        busy: st.busy ?? null,
+        ...(st.engine ? { engine: st.engine } : {}),
+        ...(st.startTimeSeconds !== undefined ? { startSeconds: st.startTimeSeconds } : {}),
+        notes: st.notes ?? [],
+      }),
     ),
     bridge.on('snapshot', (snap) => {
       const s = scene.getState();
@@ -29,7 +40,8 @@ export const connectBridge = (bridge: SimBridge): (() => void) => {
     bridge.on('events', (events) => feed.getState().append(events)),
     bridge.on('metrics', (frame) => feed.getState().pushMetrics(frame)),
     bridge.on('done', (summary) => feed.getState().finish(summary)),
-    bridge.on('error', (message) => scene.setState({ connection: 'error', error: message })),
+    // Once a city is loaded, a refused command is a notice, not a lost connection.
+    bridge.on('error', (message) => scene.setState((s) => (s.connection === 'ready' ? { error: message } : { connection: 'error', error: message }))),
   );
 
   offs.push(

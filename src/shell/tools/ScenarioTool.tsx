@@ -5,6 +5,8 @@ import { useRef, useState } from 'react';
 import type { FleetDef, NpcParams, Scenario } from '../../contracts';
 import { RAIN_MM_PER_HOUR_AT_FULL } from '../../contracts/mocks';
 import { NpcParamsSchema } from '../../contracts/schemas';
+import { useSceneStore } from '../../bridge/sceneStore';
+import { formatTimeOfDay } from '../city';
 import { updateScenario } from '../../ui/panels/ParamsPanel';
 import { useEditorStore } from '../../ui/store/editorStore';
 import { Flyout, Segmented, Slider, Stepper } from '../primitives';
@@ -40,6 +42,47 @@ const STORMS: { id: string; label: string; apply: (s: Scenario) => void }[] = [
   },
 ];
 
+const STARTS = [
+  { id: String(8 * 3600), label: 'Morning', title: 'Starts 08:00, commute under way' },
+  { id: String(18 * 3600 + 30 * 60), label: 'Dusk', title: 'Starts 18:30, sunset during the storm' },
+  { id: String(23 * 3600), label: 'Night', title: 'Starts 23:00, a blackout leaves streets dark' },
+];
+
+const ENGINE_HELP = {
+  core: 'AK’s validated simulator: flood, power, traffic, reports, ambulances and hospital beds. No boats, police or helicopters yet.',
+  preview: 'The fuller preview model with every responder type. Useful for the demo; its numbers are not the validated ones.',
+} as const;
+
+function SimulationGroup({ disabled }: { disabled: boolean }) {
+  const settings = useSceneStore((s) => s.runSettings);
+  const setRunSettings = useSceneStore((s) => s.setRunSettings);
+  return (
+    <div className={styles.group}>
+      <div className={styles.groupTitle}>
+        Simulation <span>starts {formatTimeOfDay(settings.startSeconds)}</span>
+      </div>
+      <Segmented
+        label="Simulator"
+        value={settings.engine}
+        disabled={disabled}
+        onChange={(engine) => setRunSettings({ engine })}
+        options={[
+          { id: 'core', label: 'Core', title: ENGINE_HELP.core },
+          { id: 'preview', label: 'Preview', title: ENGINE_HELP.preview },
+        ]}
+      />
+      <p className={styles.hint}>{ENGINE_HELP[settings.engine]}</p>
+      <Segmented
+        label="Start time"
+        value={String(settings.startSeconds)}
+        disabled={disabled}
+        onChange={(v) => setRunSettings({ startSeconds: Number(v) })}
+        options={STARTS}
+      />
+    </div>
+  );
+}
+
 const BEHAVIOUR: { key: keyof NpcParams; label: string; help: string }[] = [
   { key: 'complianceMean', label: 'Follow orders', help: 'Share who act on evacuation and police instructions.' },
   { key: 'awarenessMean', label: 'Awareness', help: 'How quickly people notice water and warnings.' },
@@ -48,11 +91,40 @@ const BEHAVIOUR: { key: keyof NpcParams; label: string; help: string }[] = [
   { key: 'altruismMean', label: 'Helping others', help: 'Likelihood of waiting for or guiding neighbours.' },
 ];
 
-const PRESETS: Record<string, Partial<NpcParams>> = {
-  'Calm and prepared': { panicMean: 0.1, complianceMean: 0.95, riskToleranceMean: 0.15, awarenessMean: 0.9, falseReportRate: 0.02, commsDelay: 5, warningDelay: 30 },
-  Typical: { panicMean: 0.3, complianceMean: 0.7, riskToleranceMean: 0.4, awarenessMean: 0.6, falseReportRate: 0.1, commsDelay: 20, warningDelay: 120 },
-  'Caught off guard': { panicMean: 0.85, complianceMean: 0.3, awarenessMean: 0.25, riskToleranceMean: 0.8, warningDelay: 360, commsDelay: 120, falseReportRate: 0.35 },
-};
+interface Preset {
+  name: string;
+  help: string;
+  params: Partial<NpcParams>;
+  /** Multiplies doctors, nurses, officers and boat crew. */
+  staff?: number;
+}
+
+const PRESETS: Preset[] = [
+  {
+    name: 'Calm and compliant',
+    help: 'Prepared residents who follow orders; early warning.',
+    params: { panicMean: 0.1, complianceMean: 0.95, riskToleranceMean: 0.15, awarenessMean: 0.9, falseReportRate: 0.02, commsDelay: 5, warningDelay: 30, staffFatigueRate: 0.01 },
+  },
+  {
+    name: 'Panicky',
+    help: 'People notice late, wade into water and flood HQ with calls.',
+    params: { panicMean: 0.75, complianceMean: 0.45, riskToleranceMean: 0.7, awarenessMean: 0.4, falseReportRate: 0.25, commsDelay: 40 },
+  },
+  {
+    name: 'Understaffed',
+    help: 'Half the doctors, nurses, officers and boat crew; fatigue sets in faster.',
+    params: { staffFatigueRate: 0.08 },
+    staff: 0.5,
+  },
+  {
+    name: 'Worst night',
+    help: 'Late warning, slow radio, false reports and a thin response.',
+    params: { panicMean: 0.85, complianceMean: 0.25, awarenessMean: 0.2, riskToleranceMean: 0.8, warningDelay: 360, commsDelay: 120, falseReportRate: 0.4, staffFatigueRate: 0.15 },
+    staff: 0.5,
+  },
+];
+
+const STAFF: (keyof FleetDef)[] = ['doctors', 'nurses', 'policeOfficers', 'boatOperators'];
 
 const FLEET: [keyof FleetDef, string][] = [
   ['ambulances', 'Ambulances'],
@@ -159,17 +231,20 @@ export function ScenarioTool({ onClose }: { onClose: () => void }) {
   const disabled = mode !== 'edit';
   if (!scenario) return null;
   const wind = scenario.weather.wind.reduce((m, p) => Math.max(m, p.speed), 0);
-  const applyPreset = (name: string) => {
-    const next = NpcParamsSchema.parse({ ...useEditorStore.getState().params, ...PRESETS[name] });
+  const applyPreset = (preset: Preset) => {
+    const next = NpcParamsSchema.parse({ ...useEditorStore.getState().params, ...preset.params });
     useEditorStore.setState({ params: next });
     updateScenario((s) => {
       s.population.mix.carOwners = next.carOwnership;
       s.weather.warningDelay = next.warningDelay;
+      if (preset.staff) for (const k of STAFF) s.fleet[k] = Math.max(1, Math.round(s.fleet[k] * preset.staff));
     });
   };
   return (
     <Flyout title="Scenario" subtitle="The storm, the people and the responders." onClose={onClose}>
       {disabled && <p className={styles.note}>Settings are locked while the storm runs. Branch the city to change them.</p>}
+
+      <SimulationGroup disabled={disabled} />
 
       <div className={styles.group}>
         <div className={styles.groupTitle}>Storm</div>
@@ -208,9 +283,9 @@ export function ScenarioTool({ onClose }: { onClose: () => void }) {
       <div className={styles.group}>
         <div className={styles.groupTitle}>People</div>
         <div className={styles.chips}>
-          {Object.keys(PRESETS).map((p) => (
-            <button key={p} type="button" disabled={disabled} onClick={() => applyPreset(p)}>
-              {p}
+          {PRESETS.map((p) => (
+            <button key={p.name} type="button" disabled={disabled} title={p.help} onClick={() => applyPreset(p)}>
+              {p.name}
             </button>
           ))}
         </div>

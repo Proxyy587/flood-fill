@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDownToLine, ArrowUpToLine, Building2, Cable, Eraser, GitBranch, Move, Paintbrush, PenLine, Pipette, Redo2, SquareDashed, Undo2 } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpToLine, Building2, Cable, Eraser, GitBranch, Move, Paintbrush, PenLine, Pipette, Redo2, SquareDashed, Undo2, Waves } from 'lucide-react';
 import { useMemo, useState, type ComponentType } from 'react';
 import type { BlockType } from '../../contracts';
 import { BLOCK_META, CATEGORIES } from '../../editor/catalog';
@@ -48,6 +48,13 @@ function UndoRow() {
       </button>
     </div>
   );
+}
+
+function blockTip(type: BlockType): string {
+  const m = BLOCK_META[type];
+  const size = `${m.footprint * 4} × ${m.footprint * 4} m`;
+  const stats = m.building && m.capacity ? ` · holds ${m.capacity}` : '';
+  return `${m.name} (${size}${stats})\n${m.description}${m.floodEffect ? `\nIn a flood: ${m.floodEffect}` : ''}`;
 }
 
 export function BuildTool({ onClose, onBranch }: { onClose: () => void; onBranch: () => void }) {
@@ -99,7 +106,7 @@ export function BuildTool({ onClose, onBranch }: { onClose: () => void; onBranch
               {Object.values(BLOCK_META)
                 .filter((m) => m.category === category)
                 .map((m) => (
-                  <button key={m.type} type="button" aria-pressed={m.type === state.block} onClick={() => choose(m.type)} title={m.description}>
+                  <button key={m.type} type="button" aria-pressed={m.type === state.block} onClick={() => choose(m.type)} title={blockTip(m.type)}>
                     <span className={styles.swatch} style={{ background: blockColor(m.type) }} />
                     {m.name}
                   </button>
@@ -108,6 +115,11 @@ export function BuildTool({ onClose, onBranch }: { onClose: () => void; onBranch
             <p className={styles.hint}>
               <strong style={{ color: 'var(--ink)' }}>{active.name}</strong>, {active.footprint * 4} × {active.footprint * 4} m. {active.description}
             </p>
+            {active.floodEffect && (
+              <p className={styles.floodEffect}>
+                <Waves size={14} aria-hidden /> <span><strong>In a flood:</strong> {active.floodEffect}</span>
+              </p>
+            )}
           </div>
 
           {(state.tool === 'place' || state.tool === 'erase') && (
@@ -163,7 +175,7 @@ export function TerrainTool({ onClose, onBranch }: { onClose: () => void; onBran
           <Slider label="Brush" value={state.brush} display={`${state.brush * 4} m`} min={1} max={9} step={2} onChange={(v) => useEditorStore.setState({ brush: v })} />
           <UndoRow />
           <p className={styles.hint}>
-            A raised levee keeps the river out; a lowered underpass collects rain. Run the storm again to see how water moves on the new ground.
+            A raised bank keeps the river out; a lowered underpass collects rain. Digging a hollow in a park makes a retention pond that stores rain before it reaches homes. Run the storm again to see how water moves on the new ground.
           </p>
         </>
       )}
@@ -176,7 +188,7 @@ export function Hotbar() {
   return (
     <nav className={`${styles.panel} ${styles.hotbar}`} aria-label="Block hotbar">
       {hotbar.map((b, i) => (
-        <button key={i} type="button" aria-pressed={i === slot} aria-label={`Slot ${i + 1}: ${BLOCK_META[b].name}`} title={`${i + 1} · ${BLOCK_META[b].name}`} onClick={() => pickSlot(i)}>
+        <button key={i} type="button" aria-pressed={i === slot} aria-label={`Slot ${i + 1}: ${BLOCK_META[b].name}`} title={`${i + 1} · ${blockTip(b)}`} onClick={() => pickSlot(i)}>
           <small>{i + 1}</small>
           <span style={{ background: blockColor(b) }} />
         </button>

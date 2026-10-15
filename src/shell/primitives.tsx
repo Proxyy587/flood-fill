@@ -4,9 +4,9 @@ import { Minus, Plus, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import styles from './shell.module.css';
 
-export function Flyout({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
+export function Flyout({ title, subtitle, onClose, children, wide }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   return (
-    <section className={`${styles.panel} ${styles.flyout}`} aria-label={title}>
+    <section className={`${styles.panel} ${styles.flyout} ${wide ? styles.flyoutWide : ''}`} aria-label={title}>
       <header className={styles.flyoutHead}>
         <div>
           <h2>{title}</h2>

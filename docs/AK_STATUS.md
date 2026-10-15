@@ -1,5 +1,7 @@
 # AK execution checkpoints
 
+> **Integration note (AJ, 2026-10-15):** the browser now runs this core through `src/worker/host.ts`, and W1 templates load through `src/worker/scenarioAdapter.ts`. "Browser/template integration pending" below is historical. Open core items found during integration are listed under `[AJ -> AK]` in REQUESTS.md.
+
 ## M1/M2 checkpoints; active M3A reports slice (2026-10-15)
 
 Local source checkpoint: **b5ad965** on codex/ak-foundation. Source, tests and stage

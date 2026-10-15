@@ -4,12 +4,16 @@ import type { SimBridge } from '../bridge/SimBridge';
 import { useSceneStore, type SceneState } from '../bridge/sceneStore';
 import { CameraRig } from './camera/CameraRig';
 import { Rain } from './effects/Rain';
+import { daylightAt } from './effects/daylight';
+import { lightningFlash } from './effects/lightning';
+import { StreetLights } from './effects/StreetLights';
+import { PoliceStations } from './props/PoliceStations';
 import { EntityLayer } from './entities/EntityLayer';
 import { Markers } from './overlays/Markers';
 import { ReportRings } from './overlays/ReportRings';
 import { RouteOverlay } from './overlays/RouteOverlay';
 import { SignalLayer } from './overlays/SignalLayer';
-import { SKY } from './palette';
+import { DAYLIGHT, SKY } from './palette';
 import { columnTop } from './terrain/mesher';
 import { TerrainLayer } from './terrain/TerrainLayer';
 import { cellAt, Y_SCALE } from './units';
@@ -34,6 +38,14 @@ export class SceneRenderer {
   private rig: CameraRig;
   private sun = new THREE.DirectionalLight(0xfff4e0, 1.7);
   private hemi = new THREE.HemisphereLight(0xcfe6ff, 0x5a4a3a, 1.15);
+  private moon = new THREE.DirectionalLight(DAYLIGHT.moon, 0);
+  private police = new PoliceStations();
+  private streetLights = new StreetLights();
+  private centre = new THREE.Vector3();
+  private sunRadius = 60;
+  private snapshotAt = 0;
+  private c1 = new THREE.Color();
+  private c2 = new THREE.Color();
   private terrain = new TerrainLayer();
   private water = new WaterLayer();
   private entities = new EntityLayer();
@@ -97,6 +109,9 @@ export class SceneRenderer {
       this.hemi,
       this.sun,
       this.sun.target,
+      this.moon,
+      this.police.group,
+      this.streetLights.group,
       this.terrain.group,
       this.water.mesh,
       this.entities.group,
@@ -133,6 +148,8 @@ export class SceneRenderer {
     this.editPreview.dispose();
     this.lens.dispose();
     this.halos.dispose();
+    this.police.dispose();
+    this.streetLights.dispose();
     this.labels.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
@@ -178,6 +195,8 @@ export class SceneRenderer {
     if (!first && w.dirtyChunks.length === 0) this.entities.reset();
     this.world = w;
     this.terrain.setWorld(w);
+    this.police.setWorld(w);
+    this.streetLights.setWorld(w, this.terrain.deckHeights);
     this.water.setWorld(w);
     this.signals.setWorld(w);
     this.lens.setWorld(w);
@@ -187,6 +206,7 @@ export class SceneRenderer {
     if (this.snapshot) {
       this.terrain.setPower(this.snapshot.powered);
       this.signals.setPower(this.snapshot.powered);
+      this.streetLights.setPower(this.snapshot.powered);
       this.applyWater(this.snapshot);
     }
     if (first) {
@@ -200,10 +220,12 @@ export class SceneRenderer {
   private setSnapshot(s: RenderSnapshot): void {
     if (this.snapshot && (s.tick < this.snapshot.tick || s.tick === 0)) this.entities.reset();
     this.snapshot = s;
+    this.snapshotAt = performance.now();
     if (!this.world) return;
     this.entities.setSnapshot(s, performance.now());
     this.terrain.setPower(s.powered);
     this.signals.setPower(s.powered);
+    this.streetLights.setPower(s.powered);
     this.rings.setReports(s.reports);
     this.applyWater(s);
     this.lens.setSnapshot(s);
@@ -222,7 +244,6 @@ export class SceneRenderer {
   private applyOverlays(s: SceneState): void {
     this.rings.mesh.visible = s.overlays.reports;
     this.signals.group.visible = s.overlays.signals;
-    this.sun.castShadow = s.overlays.shadows;
     this.labels.setEnabled(s.overlays.labels);
     this.applyRoute(s);
   }
@@ -293,8 +314,11 @@ export class SceneRenderer {
     const cx = w.w / 2;
     const cz = w.h / 2;
     const r = Math.hypot(w.w, w.h) / 2 + 4;
-    this.sun.position.set(cx - r * 0.6, r * 1.4, cz - r * 0.35);
+    this.centre.set(cx, 0, cz);
+    this.sunRadius = r;
     this.sun.target.position.set(cx, 0, cz);
+    this.moon.target.position.set(cx, 0, cz);
+    this.moon.position.set(cx + r * 0.4, r * 1.6, cz - r * 0.5);
     const cam = this.sun.shadow.camera;
     cam.left = -r;
     cam.right = r;
@@ -306,6 +330,47 @@ export class SceneRenderer {
     const fog = this.scene.fog as THREE.Fog;
     fog.near = r * 2.2;
     fog.far = r * 6;
+  }
+
+  /** Sun, sky, moon and night lighting from the simulated clock (render-only). */
+  /** Sim time for this frame: the last snapshot's tick advanced by wall time at the run speed. */
+  private simTickAt(st: SceneState, now: number): number {
+    const running = st.playing && this.snapshot ? Math.min(1, (now - this.snapshotAt) / 1000) * st.speed : 0;
+    return (this.snapshot?.tick ?? st.tick) + running;
+  }
+
+  private applyDaylight(st: SceneState, now: number, storm: number): void {
+    const light = daylightAt(st.startSeconds + this.simTickAt(st, now));
+    const day = light.day;
+    const night = 1 - day;
+    const r = this.sunRadius;
+    this.sun.position.set(this.centre.x + light.sun.x * r * 1.6, Math.max(0.15, light.sun.y) * r * 1.6, this.centre.z + light.sun.z * r * 1.6);
+    this.sun.color.setHex(DAYLIGHT.sun).lerp(this.c1.setHex(DAYLIGHT.sunLow), light.golden);
+    this.sun.intensity = (1.7 - storm * 0.9) * day;
+    this.sun.castShadow = st.overlays.shadows && day > 0.15;
+    this.moon.intensity = 0.55 * night * (1 - storm * 0.5);
+    this.hemi.color.setHex(DAYLIGHT.hemiSkyNight).lerp(this.c1.setHex(DAYLIGHT.hemiSkyDay), day);
+    this.hemi.groundColor.setHex(DAYLIGHT.hemiGroundNight).lerp(this.c1.setHex(DAYLIGHT.hemiGroundDay), day);
+    this.hemi.intensity = 0.7 + (0.45 - storm * 0.35) * day;
+    // Sky: night → day, warmed near the horizon, greyed by the storm.
+    this.c1.setHex(SKY.clear).lerp(this.c2.setHex(SKY.golden), light.golden * 0.7).lerp(this.stormSky, storm);
+    this.c2.setHex(SKY.night).lerp(this.sky.setHex(SKY.nightStorm), storm);
+    this.sky.copy(this.c2).lerp(this.c1, day);
+    (this.scene.fog as THREE.Fog).color.copy(this.sky);
+    this.renderer.toneMappingExposure = 0.95 + 0.17 * day;
+    this.terrain.setNight(night, this.c1.setHex(DAYLIGHT.windowsNight));
+    this.streetLights.update(night);
+    this.entities.setNight(Math.max(night, storm * 0.7));
+    this.police.setLighting(night, this.snapshot?.powered ?? null);
+  }
+
+  private applyLightning(flash: number): void {
+    if (flash <= 0) return;
+    this.hemi.intensity += flash * 2.2;
+    this.hemi.color.lerp(this.c1.setHex(0xe8eeff), flash);
+    this.sky.lerp(this.c1.setHex(0xd6defa), flash * 0.75);
+    (this.scene.fog as THREE.Fog).color.copy(this.sky);
+    this.renderer.toneMappingExposure += flash * 0.35;
   }
 
   // ---------- heights ----------
@@ -506,7 +571,7 @@ export class SceneRenderer {
     const st = this.store.getState();
 
     this.entities.update(now, dt, this.groundY, this.waterY);
-    this.signals.update(now);
+    this.signals.update(this.simTickAt(st, now));
     this.rings.update(now, this.surfaceY);
     this.markers.update(now);
     this.rig.update(dt);
@@ -523,11 +588,8 @@ export class SceneRenderer {
 
     const weather = this.snapshot?.weather ?? { rain: 0, wind: 0 };
     this.rain.update(dt, this.rig.target, weather.rain, weather.wind, st.overlays.rain);
-    const storm = Math.min(1, weather.rain * 0.9);
-    this.sky.setHex(SKY.clear).lerp(this.stormSky, storm);
-    (this.scene.fog as THREE.Fog).color.copy(this.sky);
-    this.sun.intensity = 1.7 - storm * 0.9;
-    this.hemi.intensity = 1.15 - storm * 0.35;
+    this.applyDaylight(st, now, Math.min(1, weather.rain * 0.9));
+    this.applyLightning(st.playing ? lightningFlash(now, weather.rain) : 0);
 
     this.renderer.render(this.scene, this.rig.camera);
     const el = this.renderer.domElement;

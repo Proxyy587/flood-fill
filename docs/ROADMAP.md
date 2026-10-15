@@ -19,6 +19,13 @@ Both dispatch policies can be compared on identical seeds; no universal
 performance/response winner is claimed. W1 templates are
 missing and the strict release-validation command correctly fails.
 
+## AJ integration status (2026-10-15)
+
+- M0 done: the real worker (`src/worker/`) runs AK's core or the preview model behind the frozen message protocol; all four W1 templates load through the AK ⇄ UI adapter.
+- M1–M3 render: W1 palette and models, police GLB, day/night with blackout-dark streets, reports, ambulances, boats and helicopters (preview engine) are visible.
+- M4 thin critic loop done: analysers, evidence pack, server-only critic with fallback, whitelisted patches, multi-seed verification, offline cache.
+- Open on AK's side: boats, police and helicopters in core; flood calibration; core speed; see REQUESTS.md.
+
 ## Team
 
 | Who | Role |
