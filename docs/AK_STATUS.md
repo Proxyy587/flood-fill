@@ -109,8 +109,9 @@ building cells are represented by their nearest safe adjacent road cell for
 ambulance staging. The frozen summary schema has no ambulance-hot-zone kind, so
 staging is exposed via assignments and reroute events while the legacy hotspots
 array remains empty. No shared-contract changes. Full health, scale, production,
-verification: `pnpm health` passes lint, strict types and 407 tests; schema validation
-remains explicitly schema-only (`releaseReady:false`) because W1 templates are absent.
+verification: `pnpm health` passes lint, strict types and 407 tests; at that M3B
+checkpoint, schema validation remained schema-only (`releaseReady:false`) because W1
+templates had not yet landed.
 `pnpm build`, three-seed `pnpm sim:batch`, three-seed `pnpm sim:compare`,
 `pnpm exec tsx scripts/health-living.ts`, and `git diff --check` pass. The living-city
 smoke covers 12/1,000/10,000 civilians, seven configured ambulances at the 10,000
