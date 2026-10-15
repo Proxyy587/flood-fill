@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FloodSim
 
-## Getting Started
+Synthetic 2.5D city/flood sandbox for Code-E-Manipal 2.0, PS27. The target is a
+living city with uncertain reports, constrained rescue dispatch, replay and an AI
+critic whose proposals are verified by simulation. Simulation output is not an
+emergency-planning authority.
 
-First, run the development server:
+## Current state
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
+AK foundation: frozen contracts/mocks, seeded RNG, grid loading, weighted A*/flow
+fields, weather, virtual-pipe flood, power cascade/generators, pure headless runner.
+The browser still displays the Next.js starter page. Agents, dispatch, aircraft,
+editor, renderer, replay and critic integration are pending. See docs/AK_STATUS.md.
+
+## Setup and verification
+
+Node 24+ and pnpm 10.28.0. Run `pnpm install --frozen-lockfile`.
+The repository uses ESM and pnpm-lock.yaml; the former Bun lockfile is retired.
+
+```powershell
 pnpm dev
-# or
-bun dev
+pnpm health  # lint, Next route typegen + strict tsc, tests, fixture/template validation
+pnpm build
+pnpm validate --require-templates  # schema/presence gate: fails until templates exist
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Headless API and smoke commands
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```ts
+import { runBatch, createSimulation } from "./src/sim";
+import { mockScenario } from "./src/contracts/mocks";
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+const runs = runBatch(mockScenario(), [0, 42, 77], "negotiation", { durationTicks: 600 });
+const simulation = createSimulation(mockScenario(), 42, "centralised");
+simulation.step(); // one simulated second; no wall-clock dependency
+const snapshot = simulation.snapshot(); // owns all buffers, safe to transfer
+```
 
-## Learn More
+```powershell
+pnpm sim:batch --ticks 600 --seeds '0,42,77' --out out/batch.json
+pnpm sim:compare --ticks 600 --seeds '0,42,77' --out out/compare.json
+pnpm sim:batch --scenario scenarios/riverside-town.json --ticks 1200 --out out/town.json
+```
 
-To learn more about Next.js, take a look at the following resources:
+Quote comma-separated seeds in PowerShell. Without --scenario, commands use
+MOCK foundation town; output includes implemented capabilities. Comparison runs
+both mode labels but explicitly declares dispatch unavailable. Agent-dependent
+metrics are zero placeholders and idle fractions are empty; only weather, water
+and power are currently measured. unpoweredPopPct estimates homes by capacity.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+No Worker 1 templates exist yet. `pnpm validate` checks the contract fixture and
+all scenario files present, prints their count and reports templatesPresent.
+releaseReady remains false: schema validity alone cannot establish template
+connectivity/quality or full milestone completion. --require-templates fails if
+no scenario files exist. scenarios/index.json is a manifest and excluded from
+individual Scenario validation; W1 must validate its format and references.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Ownership
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Read AGENTS.md and workers/LEADS_AK_AJ.md. AK owns src/sim/headless sim calls;
+AJ owns rendering and the browser worker bridge. Other briefs define worker lanes.
+Import shared types from src/contracts. Record contract decisions in CHANGELOG.md
+and cross-lane requests in docs/REQUESTS.md.

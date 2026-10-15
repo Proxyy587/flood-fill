@@ -73,7 +73,8 @@ floodsim/
 │  │  ├─ aircraft/        helicopters
 │  │  ├─ reports/         uncertain incident reports
 │  │  ├─ metrics/ invariants/ events/
-│  │  └─ worker.ts        Web Worker entry
+│  │  └─ index.ts         pure API shared by headless and browser adapters
+│  ├─ worker/             browser timing/postMessage adapter (AJ, outside pure sim)
 │  ├─ render/             three.js scene, chunks, water, instanced entities (AJ)
 │  ├─ editor/             tools, hotbar, undo/redo, save/load (Worker 2)
 │  ├─ ui/                 panels: NPC sliders, inspector, replay, dashboard (Workers 2, 3)

@@ -11,5 +11,5 @@ Order of work: M0 fake-snapshot renderer -> chunked terrain + instanced entities
 
 ## Both
 - Hour 0-2: freeze `src/contracts` from docs/CONTRACTS.md, write Zod schemas and mocks, push, then release workers.
-- Every 4 hours: merge window. Run `pnpm lint test validate`. Keep `main` demoable.
+- Every 4 hours: merge window. Run `pnpm health` (lint, strict types, tests, schema validation). Once W1 templates land, also run `pnpm validate --require-templates` as the schema/presence gate; template quality and full release readiness require separate tests. Keep `main` demoable.
 - Review worker PRs against the lane rules in their briefs.

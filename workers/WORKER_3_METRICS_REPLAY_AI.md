@@ -9,6 +9,7 @@ Read `AGENTS.md`, `docs/CONTRACTS.md` (esp. `SimEvent`, `MetricsFrame`, `RunSumm
 - `app/api/critic/**`
 - `scripts/compare.ts`, `scripts/batch.ts` (**only** the reporting and aggregation parts; AK owns the sim calls inside them)
 - `docs/REQUESTS.md` (append only)
+- `docs/CHANGELOG.md` (append only)
 
 Do **not** touch `src/sim`, `src/render`, `src/editor`, `src/contracts` (read only).
 
@@ -43,6 +44,10 @@ Use `src/contracts/mocks` (`mockRunSummary`, `mockEvents`). Also write your own 
 - `app/api/critic/route.ts`: POST an evidence pack, call the Anthropic API using `process.env.ANTHROPIC_API_KEY`, validate the response against the `CriticReport` Zod schema, retry once with the validation error, rate-limit, and **never log the key**. Return a 200 with `source: 'llm' | 'fallback'`.
 - **Fallback:** if there's no key, a network failure or invalid JSON twice, build a `CriticReport` from the analysers alone (templated sentences). The demo must work offline.
 - `src/ai/patchCompiler.ts`: converts proposals to `ScenarioPatch`. Whitelist command kinds (drainage, roads, levees, backup generators, substation relocation, helipads), clamp to the grid, cap cost to the budget, reject anything else (test with hostile input).
+  Initial executable whitelist: road/bridge/drainage/levee block changes and helipad
+  BuildingDef placement only. Generator/substation relocation proposals are blocked
+  until matching contract commands are approved (see REQUESTS.md). Wider buildings
+  and policy changes in AI_CRITIC.md are deferred extensions, not initial permissions.
 - `src/ui/critic/`: report panel with findings (severity, confidence, evidence links that jump the replay and highlight cells via `selectBus`), proposals with **Preview / Apply / Verify** buttons, a before/after chart, and the "AI hypothesis, verified by simulation" label.
 - **Verify** calls `verifyPatch(scenario, patch, seeds)`, which uses AK's headless runner API (`runBatch`) and returns the metrics delta. Until it exists, mock it with fixture numbers marked "MOCK".
 

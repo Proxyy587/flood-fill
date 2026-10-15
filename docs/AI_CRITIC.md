@@ -29,6 +29,13 @@ RunSummary (metrics + events + hotspots)
 
 ## 2. What it may propose (whitelist)
 
+The initial executable whitelist matches Worker 3: road/bridge/drainage/levee block
+changes and helipad building placement, subject to bounds, ownership and budget.
+Backup generator changes and substation relocation remain planned initial goals,
+but execution must reject them until corresponding contract commands are approved;
+see REQUESTS.md. The broader options below are deferred extensions requiring
+explicit whitelist and contract approval, not current compiler permissions.
+
 - Add/move: road segment, bridge, drainage block, levee/sandbag line, helipad, shelter, hospital, boat depot, police post, substation relocation, generator.
 - Add traffic control posts at named intersections.
 - Change policy knobs: evacuation warning timing, contraflow on a named road, hospital diversion threshold.

@@ -8,6 +8,8 @@ Read `AGENTS.md`, `docs/CONTRACTS.md` (esp. `EditCommand`, `NpcParams`, `Inspect
 - `src/ui/panels/**`, `src/ui/hud/**`, `src/ui/store/**`
 - `app/page.tsx` and `app/layout.tsx` (layout only; the AJ-owned `<FloodSimApp/>` mounts the canvas)
 - `docs/REQUESTS.md` (append only)
+- `docs/CHANGELOG.md` (append only)
+- `app/editor-playground/**` (lead-approved isolated mock harness)
 
 Do **not** touch `src/sim`, `src/render`, `src/contracts` (read only), `src/ai`, `src/ui/replay`, `src/ui/dashboard`.
 

@@ -2,6 +2,37 @@
 
 Everything here is the **intended behaviour**. Build the numbered milestone in `docs/ROADMAP.md` first, then extend.
 
+## Implemented foundation (2026-10-15)
+
+- Seeded Mulberry32 RNG; schema-validated independent typed-array grid state.
+- Deterministic weighted A* and reverse multi-target Dijkstra flow fields, 4-connected.
+- Navigation costs use fixed-point 1/1024 increments in [1/1024,65536] on at most
+  128x128 cells; Float64 path sums remain exact. Cost producers must quantize
+  their BPR/uncertainty terms with Math.round(cost*1024)/1024 before search.
+- Piecewise-linear rain/wind. Headless rain adds 0.002m/tick at intensity 1;
+  grass/sand receive 80% of that and soak 0.00001m/tick (dirt also soaks).
+- Closed-boundary virtual pipes with momentum damping 0.9 and coefficient 0.08;
+  outgoing volume capped by cell water. Drainage removes at most 0.02m/tick.
+  Sources use [startT,endT). Foundation solver supports optional powered pumps;
+  headless scenario schema does not yet mark which drains require power.
+- Ground+foundation barriers protect buildings; levees add a synthetic 1m sill.
+  Pipe momentum stops at inaccessible sills; outflows satisfy accessible-volume
+  limits for every sill tier so multiple pipes cannot drain below a barrier.
+  Interiors are simplified per-cell depths, not a separate volume system.
+- Plant/substation depth >0.5m causes a latched trip. Reachability is BFS from all
+  live plants. Hospitals use fuel-counted generators, enter diversion on interior
+  flood or no power. Hospital loads/capacity allocation wait for agents/dispatch.
+- Road/car closure thresholds emit events and increment navVersion. Actual agent
+  replanning, bridges with separate deck geometry and traffic capacities are pending.
+- runBatch emits measured water/power plus clearly unavailable agent metrics.
+  Only substation_flooded injection is supported; other injected actions explicitly
+  reject instead of silently doing nothing. Aircraft/weather safety follows in M3.
+- Injected faults apply at the named state boundary, including tick 0, before
+  power propagation. Generator activation, blackout state and event timestamps agree.
+
+Full milestone requirements below remain in force; these primitives do not mean
+the living city, complete flood/power integration or dispatch milestones are done.
+
 ## 1. Blocks
 
 | Block | Notes |
@@ -165,4 +196,4 @@ See `AGENTS.md` §7. Each is a pure function `(prevState, state) → Violation[]
 1. `riverside-town` (small, teaching example): one river, 2 hospitals, 1 bridge.
 2. `coastal-grid` (flash flood plus bad drainage): flat, storm-surge style.
 3. `dense-basin-city` (large, compound): bowl-shaped, a power-critical substation, 3 hospitals, helipads.
-4. `stress-triple` (PS stress test): bridge closure + boat failure + shelter overflow at the same time.
+4. `stress-triple` (legacy name, full PS stress test): simultaneous bridge closure + boat failure + shelter overflow + flooded substation/cascading blackout + gale-wind helicopter grounding. All five failures are MUST scope.

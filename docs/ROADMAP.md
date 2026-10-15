@@ -2,6 +2,17 @@
 
 Ambition is high, so this roadmap is built around **vertical slices** and **explicit cut lines**. At every milestone the project must be demoable. If we're behind, cut from the bottom of the list, never from the top.
 
+## AK checkpoint status (2026-10-15)
+
+Tooling repaired after syncing main 181ea06. Contracts, schemas/mocks, deterministic
+grid/navigation, flood/power primitives and headless API/CLI are implemented with
+health tests. See AK_STATUS.md for exact gates and local checkpoint commits.
+M0 remains partial until AJ's mock-snapshot renderer/bridge exists. M1 lacks living
+agents/traffic and browser integration. M2 lacks full mode passability, pumps/signals
+and evacuation integration. M3-M6 remain pending. Dispatch comparison is labelled
+unavailable; no performance/response benefit has been measured. W1 templates are
+missing and the strict release-validation command correctly fails.
+
 ## Team
 
 | Who | Role |
@@ -77,7 +88,7 @@ Ambition is high, so this roadmap is built around **vertical slices** and **expl
 **Never cut:** flood with pooling, dispatch comparison (negotiation vs centralised), power grid trips & cascading blackouts, helicopter rooftop/medevac rescues, metrics, event log with reasons, replay, critic with verified delta, invariants.
 
 ## Daily rhythm
-- Every 4 hours: **merge window**. Workers push; AK/AJ merge, run `pnpm lint test validate`, fix contracts, rebroadcast.
+- Every 4 hours: **merge window**. Workers push; AK/AJ merge, run `pnpm health`, fix contracts, rebroadcast. Once templates exist, also run `pnpm validate --require-templates`; schema/presence validation does not replace template connectivity or full-release gates.
 - Workers post blockers in `docs/REQUESTS.md`, not in chat threads.
 - Always keep `main` runnable. Workers branch as `w1/...`, `w2/...`, `w3/...`.
 

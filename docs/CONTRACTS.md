@@ -1,6 +1,54 @@
 # CONTRACTS
 
-These are the **draft** shared types. AK and AJ finalise them in hour 0–2 and freeze them into `src/contracts/*.ts` (with Zod schemas alongside). Everyone else codes against them, using mocks until the sim exists.
+## Frozen M0 surface (2026-10-15, AK approval)
+
+`src/contracts/types.ts` and `src/contracts/schemas.ts` are authoritative.
+Import from `src/contracts` (or `src/contracts/messages` for worker messages).
+Use `src/contracts/mocks` for explicitly labelled synthetic consumer fixtures.
+The original draft below is retained as design history, not as a second type source.
+
+Decisions frozen by AK:
+
+- IDs are branded positive Int32-compatible numbers; cell indices may be zero.
+  Integer snapshot IDs must be unique within their entity table. `EntitySelection`
+  and inspector responses distinguish entity IDs from cell indices.
+- BlockType retains the draft ordinal order. NpcRole, NpcState, VehicleKind,
+  VehicleState and ReportStatus define snapshot integer encodings.
+- `InjectedEvent` uses kind, tick and concrete targets. Weather sources use
+  half-open `[startT,endT)` intervals. Power edges are undirected.
+- Worker envelopes use `kind` and named payloads (`scenario`, `snapshot`, `metrics`,
+  `summary`, `command`, `event`, `params`). MainToWorker includes step and inspect.
+  WorkerToMain includes inspector and error responses. AJ owns the browser adapter.
+- RunOptions has durationTicks (runner default 600; max 86400) and metricsEvery
+  (default 10). One simulation tick is one second; speed is wall-time only.
+- Patches contain only PatchCommand, excluding recursive applyPatch. Context-free
+  command validation checks shape, building kind, unique footprint and entrance;
+  command application must also check bounds, overlap, adjacency, cost and the
+  critic whitelist against the current scenario.
+- Scenario validation rejects wrong lengths, invalid ranges/versions, overlapping
+  buildings/districts, unresolved power references and bad weather order. An entrance
+  is inside its footprint; blocks agree with footprints. Optional building.powerNode
+  references a node pointing back to that building.
+- HELI_GROUNDED_WIND is included, matching the earlier changelog promise.
+- RUN_STARTED/RUN_FINISHED delimit headless logs. The start event declares implemented
+  capabilities so foundation metrics cannot be mistaken for dispatch evidence.
+- Fleet IDs allocate contiguous positive ranges: ambulances, police cars, boats,
+  helicopters, then civilian cars. A boat_failure target must be inside the boat
+  range. The current foundation runner rejects unimplemented injected actions.
+- Fleet allocation includes Math.round(population.count * mix.carOwners) civilian
+  cars; total vehicles are capped at 10000 and total fleet staff at 10000. This
+  bounds allocation and keeps every generated ID representable. Population.count
+  counts civilians; staff are additional NPCs. runBatch accepts up to 1000 seeds
+  and validates every entry, including sparse arrays, before any run starts.
+- Existing Scenario/RenderSnapshot/MetricsFrame/RunSummary fields remain. Missing
+  district TTS/recovery and UI metric data are tracked in REQUESTS.md.
+- Building-type tiles require matching BuildingDef records (both directions).
+  Floor heights are 0..255m. Source rates are 0..1000m/tick with at most 16384
+  sources; these synthetic bounds preserve Float32 headroom over supported runs.
+
+Health gate: `pnpm test src/contracts/contracts.test.ts`, `pnpm typecheck`, `pnpm lint`.
+
+## Historical draft
 
 ```ts
 // ---------- ids ----------

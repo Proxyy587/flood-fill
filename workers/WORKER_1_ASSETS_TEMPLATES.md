@@ -8,6 +8,8 @@ Read `AGENTS.md`, `docs/CONTRACTS.md` and `docs/SIM_SPEC.md` §1, §2, §12 firs
 - `scenarios/**`
 - `scripts/validate-scenarios.ts`
 - `docs/REQUESTS.md` (append only)
+- `docs/CHANGELOG.md` (append only)
+- `scripts/gen-scenarios.ts` (lead-approved generator for Task C)
 
 Do **not** touch `src/sim`, `src/render`, `src/editor`, `src/ui`, `src/contracts` (read only).
 

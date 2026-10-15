@@ -1,5 +1,30 @@
 # ARCHITECTURE
 
+## Implementation status (AK, 2026-10-15)
+
+The architecture below is the target. src/contracts now contains frozen types,
+schemas and labelled mocks; src/sim contains a pure grid, RNG, navigation, weather,
+flood/power and headless runner. Browser timing, transfer, rendering, UI, agents,
+dispatch, replay and critic integration are pending.
+
+`createSimulation(scenario,seed,mode,options)` exposes tick/done/navVersion, step,
+snapshot and summary. `runBatch(scenario,seeds,mode,options?)` runs the same core.
+Snapshots own copied buffers; transfer cannot detach the world. The worker adapter
+will live outside src/sim so the pure core never imports host APIs.
+
+State 0 applies any tick-0 faults before initial power propagation. Step samples
+weather/sources on [tick,tick+1), applies flood, scheduled faults and power at
+boundary tick+1, then derives closures. Metrics include 0,
+every 10 ticks and the final state. RUN_STARTED declares dispatchImplemented:false.
+Mode labels do not select policies yet. The run RNG is reserved for agent work.
+
+Power edges are undirected; trips latch until a future repair action. Hospitals
+use generators until fuel exhaustion or interior flooding. Physics is synthetic;
+see SIM_SPEC.md for current constants and limitations.
+
+Static ESLint guards reject host imports/APIs, clocks, randomness and runtime
+import escapes in src/sim. They do not audit transitive third-party dependencies.
+
 ## 1. Big picture
 
 ```
@@ -31,7 +56,7 @@ Main → Worker: `load(scenario, seed, options)`, `play`, `pause`, `setSpeed(n)`
 
 Worker → Main: `snapshot(RenderSnapshot)` at up to 20 Hz, `events(SimEvent[])` batched, `metrics(MetricsFrame)` once per 10 ticks, `done(RunSummary)`.
 
-Snapshots use **transferable typed arrays** (positions, headings, states, water depth) to avoid copies. Entity metadata (names, assignments, reasons) is fetched on demand when the inspector selects something: `inspect(id) → InspectorData`.
+Snapshots use **transferable typed arrays** (positions, headings, states, water depth) to avoid worker-message cloning. They must own their buffers; the current core copies world data before transfer. Entity metadata (names, assignments, reasons) is fetched on demand: `inspect({entityKind,id}) → InspectorData`.
 
 ## 3. Tick pipeline (fixed order, every tick)
 
@@ -55,7 +80,7 @@ Structure-of-arrays over `W × H` cells:
 |---|---|---|
 | `ground` | `Uint8Array` | terrain height in voxels |
 | `block` | `Uint8Array` | `BlockType` enum |
-| `buildingId` | `Uint16Array` | 0 = none, else index into building table |
+| `buildingId` | `Int32Array` | 0 = none, else branded BuildingId (not a table offset) |
 | `water` | `Float32Array` | water depth above ground (voxels, fractional) |
 | `flow` | `Float32Array ×4` | outflow to N/E/S/W (virtual-pipe solver state) |
 | `power` | `Uint8Array` | 0 unpowered, 1 powered, 2 generator |
