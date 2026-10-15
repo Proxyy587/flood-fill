@@ -39,6 +39,7 @@ export interface HospitalSystem {
   reserved: Int32Array;
   patientReservation: Int32Array;
   patientAdmitted: Uint8Array;
+  patientAdmittedTick: Int32Array;
 }
 
 export interface HospitalDestination {
@@ -62,6 +63,7 @@ export function createHospitalSystem(scenario: Scenario, patientCapacity: number
     reserved: new Int32Array(hospitals.length),
     patientReservation: new Int32Array(patientCapacity).fill(-1),
     patientAdmitted: new Uint8Array(patientCapacity),
+    patientAdmittedTick: new Int32Array(patientCapacity).fill(-1),
   };
 }
 
@@ -137,7 +139,7 @@ export function reserveHospitalBed(system: HospitalSystem, patient: number, heal
   return selected;
 }
 
-export function admitPatientToHospital(system: HospitalSystem, patient: number): boolean {
+export function admitPatientToHospital(system: HospitalSystem, patient: number, tick = 0): boolean {
   if (!Number.isInteger(patient) || patient < 0 || patient >= system.patientCapacity) throw new RangeError("Patient index is outside the hospital reservation table");
   const hospital = system.patientReservation[patient];
   if (hospital < 0 || system.patientAdmitted[patient]) return false;
@@ -145,5 +147,6 @@ export function admitPatientToHospital(system: HospitalSystem, patient: number):
   system.occupied[hospital]++;
   system.patientReservation[patient] = -1;
   system.patientAdmitted[patient] = 1;
+  system.patientAdmittedTick[patient] = tick;
   return true;
 }

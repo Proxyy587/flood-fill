@@ -136,7 +136,7 @@ export function stageIdleAmbulances(system: HotspotSystem, ambulances: Ambulance
   }
   if (!selected) return;
   for (let unit = 0; unit < ambulances.count; unit++) {
-    if (!ambulances.available[unit] || ambulances.state[unit] !== VehicleState.Idle || ambulances.assignment[unit] >= 0) continue;
+    if (!ambulances.available[unit] || ambulances.state[unit] !== VehicleState.Idle || ambulances.assignment[unit] >= 0 || ambulances.patientAssignment[unit] >= 0) continue;
     if (ambulances.cell[unit] === selected.accessCell) continue;
     planAmbulanceRoute(ambulances, unit, selected.accessCell, world, scenario, blocked, navVersion);
   }

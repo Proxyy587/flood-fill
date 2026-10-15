@@ -6,7 +6,7 @@ import { livingFixture } from "./living-fixture";
 it("exposes seeded live entities and detached inspector data through the runner", () => {
   const s = livingFixture(); s.population.schedule = "custom"; s.population.customSchedule = { departAt: 0, workTicks: 10 };
   const sim = createSimulation(s, 42, "centralised", { durationTicks: 60 });
-  const first = sim.snapshot(); expect(first.npcs.id.length).toBe(12); expect(first.vehicles.id.length).toBe(2);
+  const first = sim.snapshot(); expect(first.npcs.id.length).toBe(12); expect(first.vehicles.id.length).toBe(3);
   sim.step();
   expect(sim.snapshot().npcs.state[0]).toBe(NpcState.Commute);
   expect(RenderSnapshotSchema.safeParse(sim.snapshot()).success).toBe(true);
@@ -17,7 +17,7 @@ it("exposes seeded live entities and detached inspector data through the runner"
   while (!sim.done) sim.step();
   expect(sim.summary().events.some((e) => e.type === "ARRIVED")).toBe(true);
   expect(sim.summary().events[0].data?.agentsImplemented).toBe(true);
-  expect(sim.summary().events[0].data?.dispatchImplemented).toBe(false);
+  expect(sim.summary().events[0].data?.dispatchImplemented).toBe(true);
 });
 it("replays living-city multi-seed runs exactly while different seeds change NPC creation", () => {
   const s = livingFixture();

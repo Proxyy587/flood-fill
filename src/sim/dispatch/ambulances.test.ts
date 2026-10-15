@@ -4,7 +4,7 @@ import type { BuildingId } from "../../contracts/types";
 import { createPopulation } from "../agents/population";
 import { livingFixture } from "../agents/living-fixture";
 import { createWorld } from "../world/grid";
-import { createAmbulances, planAmbulanceRoute, stepAmbulances, ambulanceSnapshot } from "./ambulances";
+import { createAmbulances, nearestSafeRoadRoute, planAmbulanceRoute, stepAmbulances, ambulanceSnapshot } from "./ambulances";
 
 function setup(count = 2) {
   const scenario = livingFixture();
@@ -50,7 +50,7 @@ it("starts at the safe road access cell adjacent to a powered operational hospit
 });
 
 it("keeps configured units unavailable when the map contains no safe road cell", () => {
-  const { scenario, world, population } = setup(1);
+  const { scenario } = setup(1);
   const buildingCells = new Set(scenario.buildings.flatMap((building) => building.cells));
   for (let cell = 0; cell < scenario.blocks.length; cell++) if (!buildingCells.has(cell)) scenario.blocks[cell] = BlockType.Grass;
   const emptyWorld = createWorld(scenario);
@@ -102,4 +102,12 @@ it("replans deterministically after a blocked route cell changes the navigation 
   expect(first.ambulances.cell[0]).toBe(21);
   expect(first.ambulances.routes[0]?.cells).toEqual(second.ambulances.routes[0]?.cells);
   expect(first.ambulances.routes[0]?.cells[1]).toBe(21);
+});
+
+it("routes an off-road incident to the nearest reachable safe road approach", () => {
+  const { scenario, world, blocked, ambulances } = setup(1);
+  expect(nearestSafeRoadRoute(ambulances.cell[0], 14, world, scenario, blocked)).toMatchObject({ accessCell: 13 });
+  expect(nearestSafeRoadRoute(ambulances.cell[0], 14, world, scenario, blocked)?.route).toEqual(new Int32Array([13]));
+  blocked[13] = 1;
+  expect(nearestSafeRoadRoute(12, 14, world, scenario, blocked)?.accessCell).toBe(22);
 });

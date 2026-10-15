@@ -22,8 +22,11 @@ export interface IncidentSystem {
   discovered: Uint8Array;
   patientCount: number;
   patientNpc: Int32Array;
+  patientCell: Int32Array;
   patientIncident: Int32Array;
   patientIncidentByNpc: Int32Array;
+  patientAssignedUnit: Int32Array;
+  patientLoaded: Uint8Array;
   patientHealth: Float32Array;
   patientSeverity: Uint8Array;
 }
@@ -47,8 +50,11 @@ export function createIncidentSystem(reports: ReportSystem): IncidentSystem {
     discovered: new Uint8Array(capacity),
     patientCount: 0,
     patientNpc: new Int32Array(reports.inDistress.length).fill(-1),
+    patientCell: new Int32Array(reports.inDistress.length).fill(-1),
     patientIncident: new Int32Array(reports.inDistress.length).fill(-1),
     patientIncidentByNpc: new Int32Array(reports.inDistress.length).fill(-1),
+    patientAssignedUnit: new Int32Array(reports.inDistress.length).fill(-1),
+    patientLoaded: new Uint8Array(reports.inDistress.length),
     patientHealth: new Float32Array(reports.inDistress.length),
     patientSeverity: new Uint8Array(reports.inDistress.length),
   };
@@ -167,6 +173,7 @@ export function discoverIncidentAtScene(system: IncidentSystem, reports: ReportS
       if (system.patientCount >= system.patientCapacity) throw new Error("Discovered casualty count exceeded its civilian bound");
       const patient = system.patientCount++;
       system.patientNpc[patient] = npc;
+      system.patientCell[patient] = cell;
       system.patientIncident[patient] = incident;
       system.patientIncidentByNpc[npc] = patient;
       system.patientHealth[patient] = population.npcs.health[npc];

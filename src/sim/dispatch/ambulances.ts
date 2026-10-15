@@ -22,6 +22,7 @@ export interface AmbulanceSystem {
   z: Float32Array;
   heading: Float32Array;
   assignment: Int32Array;
+  patientAssignment: Int32Array;
   target: Int32Array;
   routes: (AmbulanceRoute | null)[];
 }
@@ -36,6 +37,24 @@ function safeRoadCells(world: World, scenario: Scenario, blocked: Uint8Array): n
 
 function distance(a: number, b: number, width: number): number {
   return Math.abs(a % width - b % width) + Math.abs(Math.floor(a / width) - Math.floor(b / width));
+}
+
+export function nearestSafeRoadRoute(fromCell: number, targetCell: number, world: World, scenario: Scenario, blocked: Uint8Array): { accessCell: number; route: Int32Array } | undefined {
+  if (!Number.isInteger(targetCell) || targetCell < 0 || targetCell >= world.width * world.height) throw new RangeError("Target cell is outside the ambulance map");
+  const grid = buildHazardGrid(world, scenario, "car", blocked);
+  const roads = safeRoadCells(world, scenario, blocked).sort((a, b) => distance(a, targetCell, world.width) - distance(b, targetCell, world.width) || a - b);
+  let best: { accessCell: number; route: Int32Array; distance: number; eta: number } | undefined;
+  for (const accessCell of roads) {
+    const geometricDistance = distance(accessCell, targetCell, world.width);
+    if (best && geometricDistance > best.distance) break;
+    const path = findPath(grid, fromCell, accessCell);
+    if (!path) continue;
+    if (!best || path.length < best.eta || path.length === best.eta && accessCell < best.accessCell) {
+      best = { accessCell, route: Int32Array.from(path), distance: geometricDistance, eta: path.length };
+    }
+  }
+  if (!best) return undefined;
+  return { accessCell: best.accessCell, route: best.route };
 }
 
 function safeHospitalAccess(world: World, scenario: Scenario, blocked: Uint8Array, roads: readonly number[]): number[] {
@@ -88,6 +107,7 @@ export function createAmbulances(scenario: Scenario, world: World, blocked: Uint
     z,
     heading: new Float32Array(count),
     assignment: new Int32Array(count).fill(-1),
+    patientAssignment: new Int32Array(count).fill(-1),
     target: new Int32Array(count).fill(-1),
     routes: Array.from({ length: count }, () => null),
   };

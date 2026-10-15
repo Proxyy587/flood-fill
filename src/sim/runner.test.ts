@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { mockScenario } from "../contracts/mocks";
-import { RenderSnapshotSchema, RunSummarySchema } from "../contracts";
+import { BlockType, RenderSnapshotSchema, RunSummarySchema, VehicleKind } from "../contracts";
 import { createSimulation, runBatch } from "./runner";
 import { defaultNpcParams } from "./agents/population";
 
@@ -39,12 +39,12 @@ it("snapshots and summaries own arrays and never detach or mutate live state", (
   const summary = sim.summary(); summary.events[0].reason = "changed";
   expect(sim.summary().events[0].reason).not.toBe("changed");
 });
-it("measures actual flood/power effects and declares unavailable dispatch evidence", () => {
+it("measures actual flood/power effects and reports implemented dispatch capability", () => {
   const s = mockScenario(); s.weather.sources = [{ cell: 6, startT: 0, endT: 5, rate: 2 }];
   const [run] = runBatch(s, [42], "negotiation", { durationTicks: 10 });
   expect(run.metrics.at(-1)!.maxDepth).toBeGreaterThan(0);
   expect(run.events.some((e) => e.type === "POWER_TRIP")).toBe(true);
-  expect(run.events[0].data?.dispatchImplemented).toBe(false);
+  expect(run.events[0].data?.dispatchImplemented).toBe(true);
 });
 it("rejects invalid seeds, duration and mode", () => {
   expect(() => runBatch(mockScenario(), [-1], "negotiation")).toThrow();
@@ -73,4 +73,70 @@ it("delivers tick-zero reports immediately when there is no delay or outage", ()
 });
 it("rejects sparse seed lists instead of returning holes/null summaries", () => {
   expect(() => runBatch(mockScenario(), new Array<number>(1), "centralised", { durationTicks: 1 })).toThrow();
+});
+
+it("reports M3B capabilities and projects the finite ambulance fleet in owned snapshots", () => {
+  const scenario = mockScenario();
+  scenario.fleet.ambulances = 2;
+  const sim = createSimulation(scenario, 42, "negotiation", { durationTicks: 2 });
+  expect(sim.summary().events[0].data).toMatchObject({ reportsImplemented: true, dispatchImplemented: true });
+  expect(sim.summary().events[0].data?.stage).toBe("dispatch");
+  expect(sim.summary().events[0].reason).not.toContain("reports, rescue dispatch");
+  const snapshot = sim.snapshot();
+  expect(Array.from(snapshot.vehicles.kind).filter((kind) => kind === VehicleKind.Ambulance)).toHaveLength(2);
+  expect(RenderSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  snapshot.vehicles.id.fill(-1);
+  expect(sim.snapshot().vehicles.id.some((id) => id === -1)).toBe(false);
+});
+
+it("dispatches a delivered report request and lets field evidence falsify it", () => {
+  const scenario = mockScenario();
+  scenario.fleet.ambulances = 1;
+  scenario.injected = [{ kind: "false_report", tick: 0, cell: 24, confidence: 1 }];
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 2, npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, commsDelay: 0 } });
+  expect(sim.summary().events.some((event) => event.type === "REQUEST_CREATED")).toBe(true);
+  sim.step();
+  const events = sim.summary().events;
+  expect(events.some((event) => event.type === "ASSIGNED" && event.actorKind === "vehicle")).toBe(true);
+  expect(events.some((event) => event.type === "REPORT_FALSE")).toBe(true);
+  expect(events.find((event) => event.type === "REPORT_FALSE")?.data?.reportId).toBe(1);
+  expect(sim.snapshot().vehicles.kind).toContain(VehicleKind.Ambulance);
+});
+
+it("keeps world and delivered report truth identical across dispatch policies", () => {
+  const scenario = mockScenario();
+  scenario.blocks[13] = BlockType.Road;
+  scenario.injected = [{ kind: "false_report", tick: 0, cell: 24, confidence: 0.75 }];
+  const options = { durationTicks: 3, npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, commsDelay: 0 } };
+  const negotiation = createSimulation(scenario, 73, "negotiation", options);
+  const centralised = createSimulation(scenario, 73, "centralised", options);
+  for (let tick = 0; tick < 3; tick++) { negotiation.step(); centralised.step(); }
+
+  expect(negotiation.snapshot().water).toEqual(centralised.snapshot().water);
+  expect(negotiation.snapshot().npcs).toEqual(centralised.snapshot().npcs);
+  expect(negotiation.snapshot().reports).toEqual(centralised.snapshot().reports);
+  expect(negotiation.summary().events.filter((event) => event.type === "REPORT_CREATED")).toEqual(centralised.summary().events.filter((event) => event.type === "REPORT_CREATED"));
+  expect(RunSummarySchema.safeParse(negotiation.summary()).success).toBe(true);
+});
+
+it("triages a flood-stranded civilian, reserves a powered hospital bed and admits them", () => {
+  const scenario = mockScenario();
+  scenario.population.count = 1;
+  scenario.weather.warningDelay = 0;
+  scenario.weather.sources = [{ cell: 9, startT: 0, endT: 30, rate: 0.2 }];
+  scenario.fleet.ambulances = 1;
+  scenario.blocks[13] = BlockType.Road;
+  scenario.blocks[21] = BlockType.Road;
+  scenario.blocks[29] = BlockType.Road;
+  scenario.injected = [{ kind: "false_report", tick: 0, cell: 24, confidence: 0 }];
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 24,
+    npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, awarenessMean: 0, commsDelay: 0 } });
+  for (let tick = 0; tick < 24; tick++) sim.step();
+
+  const events = sim.summary().events;
+  expect(events.some((event) => event.type === "NPC_STRANDED")).toBe(true);
+  expect(events.some((event) => event.type === "REPORT_VERIFIED")).toBe(true);
+  expect(events.some((event) => event.type === "HOSPITAL_ASSIGN")).toBe(true);
+  expect(events.some((event) => event.type === "SERVED")).toBe(true);
+  expect(sim.summary().metrics.at(-1)!.unmet).toBe(0);
 });
