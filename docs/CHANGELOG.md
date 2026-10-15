@@ -1,6 +1,8 @@
 # CHANGELOG
 One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order changes are marked **[ADR]**.
 
+- 2026-10-15 (Worker 1, Assets & Templates): delivered full voxel palette and BLOCK_META in src/assets/palette.ts; implemented 36 procedural voxel models (17 buildings, 9 vehicles including animated rotor, 10 role-colored NPC figures <= 12 voxels) with VoxelBuilder, previewModel visualizer and registry in src/assets/models; authored deterministic generator scripts/gen-scenarios.ts producing riverside-town, coastal-grid, dense-basin-city, stress-triple and scenarios/index.json; verified 100% dry road connectivity from every house, shelter, and hospital to medical centers with BFS tests; full health passes with 370 tests, zero lint warnings and schema validation.
+
 - 2026-10-15 **[ADR]** (AK, M2 stage A): added delayed flood warnings, utility-based civilian evacuation, atomic reachable-shelter reservations, stranded/retry handling, flood and injected-overflow shelter closure at state boundaries, and measured evacDonePct. Mid-journey warnings preserve the active edge. Partial-information reports/rescue dispatch remain M3. TDD RED captured missing behavior; focused tests now pass.
 
 - 2026-10-15 (AK, M2 checkpoint): full health passes 356 tests, lint, strict types and schema-only validation; production build passes. Synthetic 12/1000/10000-resident movement/load probes and deterministic three-seed warning/shelter contention smoke pass. Added coverage and handling for occupied shelters flooding; reservations release and stranded residents retry after water recedes. This is not the full five-failure rescue stress test or release approval.
