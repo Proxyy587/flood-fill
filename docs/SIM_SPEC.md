@@ -166,3 +166,17 @@ See `AGENTS.md` §7. Each is a pure function `(prevState, state) → Violation[]
 2. `coastal-grid` (flash flood plus bad drainage): flat, storm-surge style.
 3. `dense-basin-city` (large, compound): bowl-shaped, a power-critical substation, 3 hospitals, helipads.
 4. `stress-triple` (PS stress test): bridge closure + boat failure + shelter overflow at the same time.
+
+## 13. Proposed Laya decision-policy extension (2026-10-15)
+
+Implementation status and phase gates are in [LAYA_MIGRATION_PLAN.md](LAYA_MIGRATION_PLAN.md); the current runtime has no Laya policy.
+
+- Keep deterministic role state machines, A*/flow fields, flood/power solvers, traffic rules, and resource accounting. Laya may select from feasible high-level actions; it does not compute movement or certify safety.
+- Start with a shortlist of at most five feasible hospitals and a defer/escalate option. Reject hospitals without capacity, a safe route, or active grid/generator power before shortlisting; recheck and reserve at commit time. If all candidates disappear, replan or re-queue rather than route to an invalid destination.
+- Observe through agent beliefs, with report age/confidence and missing information explicit. Do not silently give decentralised agents HQ truth.
+- Preserve two dispatch modes. Rules, shadow, and assisted decision policies are a separate experimental dimension; neither dispatch mode is renamed or removed.
+- Keep pedestrian decisions above a real footpath/crossing graph. Enforce physically valid spawns, entrance access, crossing permissions, and vehicle queues in the simulator, independently of the selected policy.
+- Use event-triggered inference with cooldowns and budgets. Hazards, hard operating limits, route invalidation, and reservation conflicts trigger immediate deterministic safety handling.
+- Log the proposal, feasible alternatives, probability evidence, safety rechecks, chosen action/fallback, and reason. Do not present policy scores as probabilities or imply that explanations reveal a model's private reasoning.
+- Record a versioned decision tape for assisted runs. Replay reads it without inference; stale or duplicate responses never commit. All existing §11 safety invariants remain mandatory.
+- Evaluate rules and assisted policies with held-out synthetic scenarios and paired seeds. Publish regressions as well as improvements; a visually plausible run is not validation of decision quality.

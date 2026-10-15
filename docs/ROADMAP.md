@@ -90,3 +90,17 @@ Ambition is high, so this roadmap is built around **vertical slices** and **expl
 | Workers diverge from contracts | Zod validation in CI, mocks in repo |
 | LLM output invalid or offline | schema validation, retry once, analyser-only fallback, cached reports |
 | Scope explosion | cut lines above; M-gates are demoable |
+
+## Proposed follow-on track: Laya-compatible agent decisions (2026-10-15)
+
+This track extends the architecture; it does not mark M0–M6 complete or displace their never-cut requirements. Implementation is gated by the missing production sim and validated navigation/resource invariants.
+
+1. **AK + AJ:** baseline audit; production worker/headless comparison; fix footpaths, crossings, entrances, traffic queues, and safety foundations.
+2. **AK + AJ + W3:** approve optional decision configuration, request/result protocol, and a versioned tape/archive with backwards compatibility.
+3. **AK:** extract pure observation, candidate, deterministic policy, safety gate, and atomic commit functions.
+4. **W3 + AJ:** prototype a pinned local Laya service, server-side adapter, and cancellable/budgeted worker broker.
+5. **AK + AJ + W3:** implement decision-window scheduling, timeout fallback, deterministic tape replay, and stale-response tests.
+6. **W3 + AK + W2:** shadow evaluation on held-out synthetic cases; expose source, evidence, alternatives, and fallback in the UI.
+7. **AK + AJ + W3:** enable one bounded decision class only after evaluation; compare paired seeds across both required dispatch modes and retain rollback.
+
+Execution details and estimated effort: [LAYA_MIGRATION_PLAN.md](LAYA_MIGRATION_PLAN.md). Verified price references and free/local options: [LAYA_FEASIBILITY.md](LAYA_FEASIBILITY.md). Real-city replicas remain later scope; synthetic-data and human-approved city patches remain the current boundary.

@@ -9,7 +9,9 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   turbopack: {
     rules: {
-      "*.css": {
+      // Only the global sheet contains Tailwind directives. Applying `as: *.css`
+      // to CSS Modules strips their module identity and produces empty exports.
+      "globals.css": {
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",
       },

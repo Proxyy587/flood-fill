@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know
@@ -7,8 +6,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
-<!-- END:nextjs-agent-rules -->
-=======
+# <!-- END:nextjs-agent-rules -->
+
 # AGENTS.md — FloodSim (Code-E-Manipal 2.0, PS 27 + city-planning sandbox)
 
 Read this file fully before touching anything. Then read your own `workers/WORKER_*.md`.
@@ -24,17 +23,17 @@ A **2.5D voxel city sandbox** in the browser.
 
 Problem-statement mapping (Flood Rescue Dispatch, PS 27). Judges will look for these, so they are never cut:
 
-| PS requirement | Where it lives |
-|---|---|
-| Agents with partial information, resource contention, urgency | `src/sim/agents`, `src/sim/dispatch` |
-| Dynamic re-planning on a changing road/water graph | `src/sim/nav` |
-| Uncertainty-tagged reports | `src/sim/reports` |
-| Capacity constraints, fairness, explicit safety invariants | `src/sim/invariants`, `src/sim/metrics` |
-| Decentralised negotiation vs **centralised baseline** | `src/sim/dispatch/{negotiation,centralised}.ts` |
-| Time to service, unmet requests, idle time, route violations, fairness, recovery | `src/sim/metrics` |
-| Simultaneous bridge closure + boat failure + shelter overflow + blackout + helicopter grounding | `scenarios/stress-*.json` |
-| Time-stepped sim, injected events, assignment log, reroute explanation, after-action replay | event log + `src/ui/replay` |
-| Synthetic data only, no live feeds | everything is generated |
+| PS requirement                                                                                  | Where it lives                                  |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Agents with partial information, resource contention, urgency                                   | `src/sim/agents`, `src/sim/dispatch`            |
+| Dynamic re-planning on a changing road/water graph                                              | `src/sim/nav`                                   |
+| Uncertainty-tagged reports                                                                      | `src/sim/reports`                               |
+| Capacity constraints, fairness, explicit safety invariants                                      | `src/sim/invariants`, `src/sim/metrics`         |
+| Decentralised negotiation vs **centralised baseline**                                           | `src/sim/dispatch/{negotiation,centralised}.ts` |
+| Time to service, unmet requests, idle time, route violations, fairness, recovery                | `src/sim/metrics`                               |
+| Simultaneous bridge closure + boat failure + shelter overflow + blackout + helicopter grounding | `scenarios/stress-*.json`                       |
+| Time-stepped sim, injected events, assignment log, reroute explanation, after-action replay     | event log + `src/ui/replay`                     |
+| Synthetic data only, no live feeds                                                              | everything is generated                         |
 
 ## 2. Stack
 
@@ -84,8 +83,7 @@ floodsim/
 └─ app/                   Next.js routes; page.tsx just mounts <FloodSimApp/>
 ```
 
-## 5. Commands
-
+## 5. Commands  
 ```
 pnpm dev            # next dev
 pnpm test           # vitest (sim tests run in node)
@@ -134,4 +132,4 @@ pnpm lint           # eslint incl. sim-purity + determinism rules
 - When unsure whether something belongs in `sim` or `render`: if it affects outcomes, it is `sim`; if it only affects pixels, it is `render`.
 - Never call `Math.random` in `src/sim`. Use `ctx.rng`.
 - When you finish, state what you ran to verify it.
->>>>>>> 9b39065c20c16f309e8f4e2ac2cf81185f42c77c
+  > > > > > > > 9b39065c20c16f309e8f4e2ac2cf81185f42c77c

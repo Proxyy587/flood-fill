@@ -91,3 +91,11 @@ Run these in a Web Worker pool (or Node via an API route for heavier batches). K
 
 - `ANTHROPIC_API_KEY` only in server env. Never in client bundles. Rate-limit the route.
 - Only send the evidence pack, which is synthetic and contains no personal data.
+
+## 9. Proposed separation from in-run Laya decisions (2026-10-15)
+
+The after-run critic and the in-run decision provider are separate capabilities. Laya's bounded decision outputs are not a replacement for a report-writing model. Keep the critic's analyser fallback, human acceptance of `ScenarioPatch`, and measured before/after verification intact.
+
+The proposed `app/api/agent-decisions` adapter handles small action selections during simulation; `app/api/critic` handles after-action narrative and city-change hypotheses. Reuse synthetic evidence preparation and validation conventions where appropriate, but maintain independent request schemas, budgets, and logs. No current route or model is replaced by this documentation.
+
+Future critic evidence should distinguish rules/shadow/assisted runs, reference decision-tape IDs, report rejected proposals/fallbacks, and show measured policy comparisons. Model confidence must not be reported as verified improvement. Both worse outcomes and missing evidence stay visible. See [LAYA_FEASIBILITY.md](LAYA_FEASIBILITY.md) and [LAYA_MIGRATION_PLAN.md](LAYA_MIGRATION_PLAN.md).

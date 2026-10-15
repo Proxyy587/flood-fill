@@ -163,3 +163,21 @@ export interface RunSummary {
 
 ## Mocks
 Each consumer ships a mock in `src/contracts/mocks/` so work can start before the sim exists: `mockScenario()`, `mockSnapshotStream()`, `mockEvents()`, `mockRunSummary()`.
+
+## Planned extension: bounded decisions and decision tape (2026-10-15)
+
+**Design proposal only.** These fields do not currently exist in `src/contracts`. AK/AJ must review a coherent types + Zod + mocks + changelog change before consumers implement them. See [LAYA_MIGRATION_PLAN.md](LAYA_MIGRATION_PLAN.md).
+
+| Proposed surface | Required information |
+|---|---|
+| Decision configuration | Policy (`rules`, `laya-shadow`, `laya-assisted`, or recorded replay), policy version, allowed decision classes, batching/cooldown/budget, eligibility/calibration policy, timing mode |
+| Decision request | Run/episode identity, unique request ID, agent reference using existing branded IDs, origin/expiry ticks, observation/candidate hashes and schema version, navigation/resource versions, permitted belief observation, stable feasible candidate IDs and evidence |
+| Decision result | Matching request/run/version identity, selected candidate ID or abstention, finite per-candidate probabilities, raw confidence fields with defined semantics, checkpoint/runtime/calibration revision, truncation/error/usage metadata |
+| Decision record | Request identity and reproducible observation/candidate data, provider proposal, gate outcome, rejected/accepted alternatives, committed action or fallback, applied tick and reason |
+| Versioned run archive | Scenario and seed, simulator/policy versions, injected inputs, decision tape, events/metrics, timing mode, model configuration and aggregate inference/cost usage |
+
+Worker protocol additions must carry decision requests out and validated results in; they do not carry unrestricted executable commands. Simulation-side admission validates candidate membership, run generation, expiry, freshness, and current resource availability. Duplicate/late replies have no effects. Provider response types are translated at the adapter boundary rather than leaking an SDK throughout the app.
+
+`dispatchMode` keeps its current negotiation/centralised meaning. Decision configuration is separate and optional, with a rules-only default. Old scenarios and archives remain loadable; old archives without tapes cannot be relabelled as reproducible assisted runs. A new archive/schema version must have an explicit migration path rather than silently changing `Scenario.schemaVersion: 1` semantics.
+
+The current `SimEvent.data` accepts primitives, not nested probability arrays. Do not force a new decision record into that map with casts. Store detailed records in the tape and reference their decision ID from events; final event names and inspector extensions are part of the reviewed contract change. Existing safety events and `lastDecision` remain meaningful to older consumers.

@@ -103,3 +103,41 @@ Buildings are multi-cell footprints with a table entry: type, capacity, current 
 - Scenarios: JSON, validated by Zod, versioned with `schemaVersion`.
 - Runs: `{scenario, seed, options, events[], metrics[]}` JSON. Replay re-simulates from the seed and the event log, or loads recorded snapshots at keyframes every 60 ticks.
 - Local only (IndexedDB or downloads). No backend database.
+
+## 11. Architecture addendum — bounded agent decisions with Laya (2026-10-15)
+
+**Status: proposed design and migration plan; not an implemented runtime feature.** Initial feasibility/cost findings: [LAYA_FEASIBILITY.md](LAYA_FEASIBILITY.md). Ordered code migration and acceptance gates: [LAYA_MIGRATION_PLAN.md](LAYA_MIGRATION_PLAN.md).
+
+### Responsibilities and boundaries
+
+Add an optional decision provider that chooses among a small, simulator-generated action set. The initial experiment is hospital selection; subsequent candidates include report verification, evacuation choices, and dispatch bidding. The provider never writes world arrays, creates arbitrary routes, reserves capacity, or bypasses safety rules.
+
+```text
+Sim belief + feasible candidates
+  → typed worker request → main-thread broker → Next server route
+  → local Laya inference service → validated typed result
+  → sim freshness/safety gate → atomic commit OR deterministic fallback
+  → decision tape + event/inspector evidence
+```
+
+`src/sim` stays pure and contains observation/candidate construction, deterministic scoring, admission checks, and commit logic. SDK and HTTP calls live outside it. `src/render` continues to consume worker snapshots faithfully. Existing navigation/physics defects must be fixed in the sim; rendering a pedestrian beside its actual path does not fix its behaviour.
+
+Use a new server route, proposed as `app/api/agent-decisions`, for in-run provider calls. The existing `app/api/critic` remains the after-run explanation/proposal boundary. A local inference process is an optional new runtime component; this does not require replacing Next.js or three.js. Default operation and offline demos remain rules-only.
+
+### Decision ordering and safety
+
+The nine-stage tick pipeline above is unchanged. During the decision stage, process queued, eligible results in stable order, recheck navigation and resource versions, and reserve resources atomically before movement. No async callback mutates a live sim state. Reject out-of-set actions, expired requests, replies from old run generations, invalid/truncated evidence, and resource conflicts. A timeout, low-confidence/unevaluated result, exhausted budget, or unavailable model falls back with a recorded reason.
+
+Candidate observations use the agent's partial information. Ground truth remains authoritative for preventing unsafe execution, but must not leak into a decentralised agent's policy input. The centralised baseline's visibility remains an explicit experiment setting. Model probabilities are evidence, not proof of safety or permission to act.
+
+### Replay and reproducibility amendment
+
+Rules-only determinism remains unchanged. An assisted run has an additional external input: the decision tape. Record request/observation/candidate hashes, model and calibration revisions, raw proposal, gate outcome, committed action, and applied tick. The reproducibility claim becomes **same scenario + seed + sim/policy versions + recorded external inputs and decision tape = identical replay**. Fresh online inference is not promised to reproduce from a seed alone.
+
+Interactive runs may use results available at a future tick or fall back; controlled evaluation may hold sim advancement at a decision boundary. Both record the realised outcome and replay without contacting Laya. The renderer stays responsive while a controlled run waits.
+
+### Rollout and scale
+
+Keep decision policy orthogonal to `dispatchMode`: negotiation and centralised dispatch remain available. Progress from rules → shadow evaluation → one bounded assisted slice. Model requests are event-triggered, shortlisted, batched, and capped; ordinary steering, water flow, traffic safety, and immediate replanning never depend on inference availability. Retain the existing tick/frame performance budgets and measure inference separately.
+
+This addendum authorises architectural planning, not a claim of validated emergency-decision capability. Synthetic-data and human-accepted city-patch rules remain in force. Real-city replication is separate future scope.
