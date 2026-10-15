@@ -1,6 +1,6 @@
 # AK M3D Design: Independent Police Traffic Control
 
-**Status:** Approved design, awaiting user review of this written spec; implementation has not started.
+**Status:** Approved design, updated per user follow-on request; awaiting user review of this written spec. Implementation has not started.
 **Owner:** AK simulation lane.
 **Depends on:** deterministic living-city traffic and the M3A-M3C simulation on `codex/ak-m3-reports`.
 
@@ -8,7 +8,7 @@
 
 Add an independent, finite police response that restores order at sustained gridlock intersections. Police cars travel from safe police-station access points, control an assigned intersection on arrival, and become available again when the gridlock clears. Police dispatch is not part of incident rescue dispatch and does not take work from ambulances, boats, or other rescue units.
 
-This slice implements traffic control only. It does not implement civilian escort, crowd control, law-enforcement encounters, police investigation, or helicopter response. It uses synthetic simulation state, existing contracts, current event types, and existing vehicle snapshots; no shared contract changes are in scope.
+This slice implements traffic control only. Civilian escort and crowd control are committed follow-on police slices, sequenced after this one as M3E (civilian escort) and M3F (crowd control); they remain separate designs and are not part of M3D acceptance. Law-enforcement encounters, police investigation, and helicopter response are outside the current police follow-on sequence. All slices use synthetic simulation state; no shared contract changes are currently in scope.
 
 ## Approaches considered
 
@@ -16,7 +16,7 @@ This slice implements traffic control only. It does not implement civilian escor
 2. **General shared responder dispatch.** Extend ambulance incident bidding to police and other vehicle types. This is unnecessary for traffic restoration and couples police to rescue task ownership and policy comparison.
 3. **Static police-control mask.** Mark intersections as controlled without moving a finite police fleet. This is small but cannot model station access, travel delay, or police-car contention.
 
-The user selected the independent police role and confirmed this slice is gridlock control only.
+The user selected the independent police role and confirmed this slice is gridlock control only. The user also explicitly requested civilian escort and crowd control as subsequent slices; the agreed sequence is escort, then crowd control.
 
 ## Existing behavior and boundaries
 
@@ -73,4 +73,4 @@ The user selected the independent police role and confirmed this slice is gridlo
 
 ## Explicitly deferred
 
-Civilian escort, crowd control, police-specific fuel/failure injections, police analytics fields, additional contract or event types, helicopter rescue/medevac, full compound-stress acceptance, renderer-specific changes, and demo/release approval.
+M3E civilian escort and M3F crowd control are planned next and intentionally deferred from this slice. Also deferred are police-specific fuel/failure injections, police analytics fields, additional contract or event types, helicopter rescue/medevac, full compound-stress acceptance, renderer-specific changes, and demo/release approval.
