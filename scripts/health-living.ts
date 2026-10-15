@@ -3,6 +3,7 @@ import { performance } from "node:perf_hooks";
 import { BlockType, RenderSnapshotSchema, RunSummarySchema, VehicleState } from "../src/contracts";
 import { createSimulation, runBatch } from "../src/sim";
 import { livingFixture } from "../src/sim/agents/living-fixture";
+import { defaultNpcParams } from "../src/sim/agents/population";
 
 // Synthetic throughput probes, not the five-failure rescue stress scenario.
 const results = [];
@@ -49,3 +50,22 @@ assert(warnings.every((run) => run.events.filter((event) => event.type === "EVAC
 assert(warnings.every((run) => run.events.some((event) => event.type === "NPC_STRANDED")));
 assert.deepEqual(warnings, runBatch(evacuation, [0, 42, 77], "negotiation", { durationTicks: 120 }));
 console.log(JSON.stringify({ validation: "three-seed deterministic flood warning and one-seat shelter contention", seeds: [0, 42, 77], ordersPerRun: 1, strandedPerRun: 1 }));
+
+function reportCapacityRun(seed: number) {
+  const s = livingFixture();
+  const count = 10000;
+  s.population = { count, mix: { carOwners: 0, limitedMobility: 0, needsAssist: 0 }, schedule: "custom", customSchedule: { departAt: 86399, workTicks: 86400 } };
+  s.fleet = { ambulances: 0, policeCars: 0, boats: 0, helicopters: 0, doctors: 0, nurses: 0, policeOfficers: 0, boatOperators: 0 };
+  s.buildings[0].capacity = count; s.buildings[2].capacity = count;
+  s.weather.sources = [];
+  s.injected = Array.from({ length: count / 2 }, (_, i) => ({ kind: "false_report", tick: 0, cell: i % (s.size.w * s.size.h), confidence: 0.4 }));
+  const sim = createSimulation(s, seed, "centralised", { durationTicks: 1, npcParams: { ...defaultNpcParams(s), falseReportRate: 1, commsDelay: 0 } });
+  sim.step();
+  const snapshot = sim.snapshot(); const summary = sim.summary();
+  assert.equal(snapshot.reports.confidence.length, count + count / 2);
+  assert(snapshot.reports.confidence.every((value) => value >= 0 && value <= 1));
+  assert.equal(summary.events.filter((event) => event.type === "REPORT_CREATED").length, count + count / 2);
+  return { snapshot, summary };
+}
+for (const seed of [0, 42, 77]) assert.deepEqual(reportCapacityRun(seed), reportCapacityRun(seed));
+console.log(JSON.stringify({ validation: "three-seed deterministic report capacity smoke", seeds: [0, 42, 77], civilians: 10000, injectedReports: 5000, expectedDelivered: 15000 }));

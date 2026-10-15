@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { mockScenario } from "../contracts/mocks";
 import { RenderSnapshotSchema, RunSummarySchema } from "../contracts";
 import { createSimulation, runBatch } from "./runner";
+import { defaultNpcParams } from "./agents/population";
 
 it("replays a batch byte-identically without mutating the input", () => {
   const s = mockScenario(); const original = JSON.stringify(s);
@@ -45,11 +46,30 @@ it("measures actual flood/power effects and declares unavailable dispatch eviden
   expect(run.events.some((e) => e.type === "POWER_TRIP")).toBe(true);
   expect(run.events[0].data?.dispatchImplemented).toBe(false);
 });
-it("rejects invalid seeds, duration, mode and unsupported injected actions", () => {
+it("rejects invalid seeds, duration and mode", () => {
   expect(() => runBatch(mockScenario(), [-1], "negotiation")).toThrow();
   expect(() => runBatch(mockScenario(), [42], "negotiation", { durationTicks: 0 })).toThrow();
-  const s = mockScenario(); s.injected = [{ kind: "comms_outage", tick: 1, durationTicks: 4 }];
-  expect(() => createSimulation(s, 42, "negotiation")).toThrow(/not implemented/);
+});
+it("delivers injected synthetic reports after delay and communications recovery", () => {
+  const s = mockScenario();
+  s.injected = [{ kind: "false_report", tick: 0, cell: 12, confidence: 0.8 }, { kind: "comms_outage", tick: 0, durationTicks: 2 }];
+  const sim = createSimulation(s, 42, "negotiation", { durationTicks: 4, npcParams: { ...defaultNpcParams(s), falseReportRate: 0 } });
+  expect(sim.snapshot().reports.confidence).toHaveLength(0);
+  sim.step(); sim.step();
+  expect(sim.snapshot().reports.confidence).toHaveLength(0);
+  sim.step();
+  const snapshot = sim.snapshot();
+  expect(snapshot.reports.confidence).toEqual(new Float32Array([0.8]));
+  expect(RenderSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  expect(sim.summary().events.find((event) => event.type === "REPORT_CREATED")?.tick).toBe(3);
+  snapshot.reports.confidence[0] = 0;
+  expect(sim.snapshot().reports.confidence[0]).toBeCloseTo(0.8);
+});
+it("delivers tick-zero reports immediately when there is no delay or outage", () => {
+  const s = mockScenario(); s.injected = [{ kind: "false_report", tick: 0, cell: 12, confidence: 0.6 }];
+  const sim = createSimulation(s, 42, "negotiation", { durationTicks: 1, npcParams: { panicMean: 0.2, complianceMean: 0.8, riskToleranceMean: 0.35, altruismMean: 0.5, awarenessMean: 0.7, carOwnership: s.population.mix.carOwners, warningDelay: s.weather.warningDelay, falseReportRate: 0, commsDelay: 0, staffFatigueRate: 0.00002 } });
+  expect(sim.snapshot().reports.confidence).toEqual(new Float32Array([0.6]));
+  expect(sim.summary().events.find((event) => event.type === "REPORT_CREATED")?.tick).toBe(0);
 });
 it("rejects sparse seed lists instead of returning holes/null summaries", () => {
   expect(() => runBatch(mockScenario(), new Array<number>(1), "centralised", { durationTicks: 1 })).toThrow();

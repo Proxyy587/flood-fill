@@ -11,8 +11,9 @@ import { createPopulation } from "./agents/population";
 import { createAgentSystem, stepAgents, agentSnapshot, inspectAgent } from "./agents/system";
 import { createTraffic, gridlockCells } from "./traffic";
 import { canEnter } from "./nav/hazards";
+import { createReportSystem, injectFalseReport, reportSnapshot, stepReports } from "./reports/system";
 
-export const SIM_CAPABILITIES = { weather: true, flood: true, power: true, agents: true, commuting: true, traffic: true, evacuation: true, reports: false, dispatch: false, aircraft: false } as const;
+export const SIM_CAPABILITIES = { weather: true, flood: true, power: true, agents: true, commuting: true, traffic: true, evacuation: true, reports: true, dispatch: false, aircraft: false } as const;
 /** Compatibility alias for existing headless clients. */
 export const FOUNDATION_CAPABILITIES = SIM_CAPABILITIES;
 
@@ -22,7 +23,7 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   const mode = DispatchModeSchema.parse(modeInput); const parsed = RunOptionsSchema.parse(options);
   const duration = parsed.durationTicks ?? 600; const every = parsed.metricsEvery ?? 10;
   for (const event of scenario.injected) {
-    if (event.kind !== "substation_flooded" && event.kind !== "bridge_closed" && event.kind !== "road_blocked_by_debris" && event.kind !== "shelter_overflow") throw new Error(`Injected action ${event.kind} not implemented in M2 runner`);
+    if (event.kind !== "substation_flooded" && event.kind !== "bridge_closed" && event.kind !== "road_blocked_by_debris" && event.kind !== "shelter_overflow" && event.kind !== "false_report" && event.kind !== "comms_outage") throw new Error(`Injected action ${event.kind} not implemented in M3A runner`);
     if (event.kind === "bridge_closed" && scenario.blocks[event.cell] !== BlockType.Bridge) throw new Error("bridge_closed requires a bridge cell");
     if (event.kind === "road_blocked_by_debris" && scenario.blocks[event.cell] !== BlockType.Road && scenario.blocks[event.cell] !== BlockType.Bridge) throw new Error("road_blocked_by_debris requires a road or bridge cell");
   }
@@ -66,9 +67,25 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   events.push(...stepPower(world, scenario, power, 0));
   updateClosures(0);
   const population = createPopulation(scenario, seed, parsed);
+  const scheduledFalseCount = scenario.injected.filter((event) => event.kind === "false_report").length;
+  const reports = createReportSystem(population, scenario.size.w, scenario.size.h, seed, scheduledFalseCount);
+  let outageUntil = 0;
+  function applyReportInjections(boundary: number) {
+    for (const event of scenario.injected) if (event.tick === boundary) {
+      if (event.kind === "false_report") {
+        injectFalseReport(reports, event.cell, event.confidence, boundary, population.params.commsDelay);
+        events.push({ tick: boundary, type: "INJECTED", cell: event.cell, data: { kind: event.kind }, reason: "Scheduled synthetic unverified report" });
+      } else if (event.kind === "comms_outage") {
+        outageUntil = Math.max(outageUntil, boundary + event.durationTicks);
+        events.push({ tick: boundary, type: "INJECTED", data: { kind: event.kind, until: outageUntil }, reason: "Scheduled synthetic communications outage" });
+      }
+    }
+  }
+  applyReportInjections(0);
   const agents = createAgentSystem(population, world, scenario);
   const traffic = createTraffic(world);
   events.push(...population.events);
+  events.push(...stepReports(reports, population, 0, 0 < outageUntil));
 
   function metrics(): MetricsFrame {
     let floodedCells = 0; let maxDepth = 0;
@@ -90,7 +107,7 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   function snapshot(): RenderSnapshot {
     return { tick, water: world.water.slice(), powered: world.powered.slice(),
       ...agentSnapshot(agents),
-      reports: { x: new Float32Array(), z: new Float32Array(), confidence: new Float32Array(), status: new Uint8Array() },
+      reports: reportSnapshot(reports),
       dirtyChunks: tick === 0 ? Array.from({ length: Math.ceil(world.width / 16) * Math.ceil(world.height / 16) }, (_, i) => i) : [] };
   }
   function summary(): RunSummary {
@@ -108,10 +125,12 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
       lastRain = rain; lastWind = wind;
       stepFlood(world, { rain: rain * 0.002, sources: scenario.weather.sources, tick });
       applyScheduled(tick + 1);
+      applyReportInjections(tick + 1);
       events.push(...stepPower(world, scenario, power, tick + 1));
       updateClosures(tick + 1);
       events.push(...stepAgents(agents, world, scenario, tick + 1, blocked, traffic));
       tick++;
+      events.push(...stepReports(reports, population, tick, tick < outageUntil));
       if (tick % every === 0 || tick === duration) frames.push(metrics());
       if (tick === duration) events.push({ tick, type: "RUN_FINISHED", reason: `Completed ${duration} deterministic simulation seconds` });
     },
