@@ -206,10 +206,10 @@ function plan(a: AgentSystem, i: number, goal: number, routing: Routing): Route 
 }
 
 /** One deterministic second. All entry checks use the current hazard graph. */
-export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tick: number, blocked: Uint8Array, traffic: TrafficState): SimEvent[] {
+export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tick: number, blocked: Uint8Array, traffic: TrafficState, policeControlled?: Uint8Array): SimEvent[] {
   if (!Number.isSafeInteger(tick) || tick !== a.lastTick + 1) throw new RangeError("Agents require consecutive one-second ticks");
   const foot = buildHazardGrid(world, scenario, "foot", blocked);
-  beginTrafficTick(traffic, world);
+  beginTrafficTick(traffic, world, policeControlled);
   const road = buildHazardGrid(world, scenario, "car", blocked, congestionFactors(traffic));
   const routing: Routing = { foot, road, footFields: new Map(), carFields: new Map(), remainingCells: 49152, fields: 0, plans: 0 };
   a.planningStats = { fields: 0, plans: 0, deferred: 0, retainedBytes: 0 };

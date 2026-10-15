@@ -16,8 +16,32 @@ function town(cars = 0): Scenario {
 function setup(s: Scenario) {
   const w = createWorld(s); const p = createPopulation(s, 42); const a = createAgentSystem(p, w, s);
   const traffic = createTraffic(w); const blocked = new Uint8Array(w.water.length);
-  return { w, p, a, traffic, blocked, step: (tick: number) => stepAgents(a, w, s, tick, blocked, traffic) };
+  return { w, p, a, traffic, blocked, step: (tick: number, policeControlled?: Uint8Array) => stepAgents(a, w, s, tick, blocked, traffic, policeControlled) };
 }
+it("passes police traffic control through agent stepping only for unpowered intersections", () => {
+  const s = town(); s.blocks[19] = BlockType.Road; s.blocks[35] = BlockType.Road;
+  const uncontrolled = setup(s); uncontrolled.w.powered[27] = 0;
+  uncontrolled.step(1);
+  expect(uncontrolled.traffic.intersections[27]).toBe(1);
+  expect(uncontrolled.traffic.capacity[27]).toBe(0.5);
+
+  const controlled = setup(s); controlled.w.powered[27] = 0;
+  const mask = new Uint8Array(controlled.w.water.length); mask[27] = 1;
+  controlled.step(1, mask);
+  expect(controlled.traffic.capacity[27]).toBe(0.8);
+
+  const powered = setup(s); powered.w.powered[27] = 1;
+  powered.step(1, mask);
+  expect(powered.traffic.capacity[27]).toBe(1);
+});
+it("rejects malformed police masks through agent stepping", () => {
+  const s = town(); s.blocks[19] = BlockType.Road; s.blocks[35] = BlockType.Road;
+  const wrongLength = setup(s);
+  expect(() => wrongLength.step(1, new Uint8Array(wrongLength.w.water.length - 1))).toThrow(RangeError);
+
+  const nonBinary = setup(s); const mask = new Uint8Array(nonBinary.w.water.length); mask[27] = 2;
+  expect(() => nonBinary.step(1, mask)).toThrow(RangeError);
+});
 it("walks to work and returns without teleporting or repeating arrivals", () => {
   const s = town(); const { p, step } = setup(s); const events = [];
   let x = p.npcs.x[0]; let z = p.npcs.z[0];
