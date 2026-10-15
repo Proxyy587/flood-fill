@@ -119,4 +119,11 @@ it("cancels and clears ownership when the route becomes unreachable", () => {
   expect(police.assignment[0]).toBe(-1);
   expect(result.events[0]).toMatchObject({ type: "COMMIT_CANCELLED", tick: 5 });
   expect(result.events[0]?.reason).toContain("route");
+
+  blocked[25] = 0;
+  blocked[19] = 0;
+  expect(police.available[0]).toBe(1);
+  expect(planPoliceRoute(police, 0, 35, world, scenario, blocked, 2)).toBe(true);
+  expect(police.target[0]).toBe(35);
+  expect(police.state[0]).toBe(VehicleState.Moving);
 });
