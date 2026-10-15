@@ -16,6 +16,7 @@
 - Create `src/sim/dispatch/hospitals.ts` and `.test.ts`: synthetic exposure, field triage, operational-hospital eligibility, bed reservations/admissions/diversions.
 - Create `src/sim/dispatch/ambulances.ts` and `.test.ts`: finite configured fleet, stable vehicle IDs, safe bases, movement and replanning.
 - Create/modify `src/sim/dispatch/negotiation.ts`, `centralised.ts`, and policy tests: distinct deterministic policies over shared candidate/ETA primitives.
+- Create `src/sim/dispatch/policy-common.ts`: information-limited demand/unit types, validated shared candidate enumeration, priority ordering and assignment projections.
 - Create `src/sim/dispatch/hotspots.ts` and `.test.ts`: fixed 8x8 regions, rolling severe-demand scores and safe staging.
 - Modify `src/sim/invariants/movement.ts` and tests only for ambulance/casualty/bed uniqueness and safe movement; preserve existing checks.
 - Modify `src/sim/runner.ts` and `runner.test.ts`: construction, tick order, snapshot/metrics/events/capabilities, policy execution.
@@ -56,11 +57,11 @@
 
 **Files:** create/modify `src/sim/dispatch/negotiation.ts`, `centralised.ts`, and `src/sim/dispatch/policies.test.ts`.
 
-- [ ] **Step 1: Write tests** that both policies receive only pending estimated incidents and available units; ties are stable; unit/casualty allocation is unique; uncovered casualties rank before zone score, age and request ID; negotiation records bids/commits/cancellations; centralized greedy matching records assignments without negotiation bids.
-- [ ] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/policies.test.ts`.
-- [ ] **Step 3: Implement** common pure candidate enumeration using safe ETA, then distinct deterministic algorithms: negotiation bid ordering and one-pair commits; centralized greedy pairing by incident priority, ETA, ambulance ID and request ID. Neither policy accepts `PopulationState` or `ReportSystem`.
-- [ ] **Step 4: Run GREEN**: `pnpm exec vitest run src/sim/dispatch/policies.test.ts src/sim/reports/system.test.ts`.
-- [ ] **Step 5: Commit** with `feat(sim): add comparable ambulance dispatch policies`.
+- [x] **Step 1: Write tests** that both policies receive only pending estimated incidents and available units; ties are stable; unit/casualty allocation is unique; uncovered casualties rank before zone score, severity evidence, age and request ID; negotiation records accepted/rejected bids; centralized greedy matching returns assignments without negotiation bids.
+- [x] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/policies.test.ts`; expected missing shared policy module observed.
+- [x] **Step 3: Implement** validated shared candidate enumeration and information-limited input types, then distinct deterministic algorithms: negotiation rounds of unit proposals with request-side ETA/ID acceptance; centralized greedy pairing by incident priority, ETA, ambulance ID and request ID. Neither policy accepts `PopulationState` or `ReportSystem`. Runner integration will translate decisions into contract events in Task 7.
+- [x] **Step 4: Run GREEN**: policy suite passes, 5 tests; strict TypeScript passes.
+- [x] **Step 5: Commit** with `feat(sim): add comparable ambulance dispatch policies` (committed with this checkpoint).
 
 ## Task 5: Scene search, casualty allocation and hospital beds
 

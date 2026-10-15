@@ -82,11 +82,12 @@ incident and a finite fleet. Inline implementation is in progress. Task 1 adds
 bounded incident requests/provenance over delivered M3A clusters (including late
 cluster-bridge coalescing); Task 2 adds deterministic synthetic flood exposure and
 field triage; Task 3 adds a finite typed-array ambulance fleet, safe road access
-bases, hazard-aware routes and deterministic replanning. RED was observed before
-each module; current focused incident/report/hospital/ambulance/movement suites pass
-30 tests and strict TypeScript passes. Hospital building cells are represented by
-their nearest safe adjacent road cell for ambulance staging. No shared-contract
-changes.
+bases, hazard-aware routes and deterministic replanning; Task 4 adds distinct
+negotiation and centralized dispatch over a shared candidate set without access to
+hidden truth. RED was observed before each module; current focused
+incident/report/hospital/ambulance/policy/movement suites pass 35 tests and strict
+TypeScript passes. Hospital building cells are represented by their nearest safe
+adjacent road cell for ambulance staging. No shared-contract changes.
 
 ## 2026-10-15 baseline
 
