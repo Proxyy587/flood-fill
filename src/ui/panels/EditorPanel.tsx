@@ -11,7 +11,7 @@ import styles from '../hud/Sandbox.module.css';
 export const blockColor = (b: BlockType) => `#${BLOCK_VISUALS[b].top.toString(16).padStart(6, '0')}`;
 
 export function EditorPanel() {
-  const state = useEditorStore(), [category, setCategory] = useState<typeof CATEGORIES[number]>('Roads');
+  const state = useEditorStore(), [category, setCategory] = useState<typeof CATEGORIES[number]>('Transport');
   const warnings = useMemo(() => state.scenario ? cityWarnings(state.scenario) : [], [state.scenario]);
   const disabled = state.mode !== 'edit';
   const active = BLOCK_META[state.block];

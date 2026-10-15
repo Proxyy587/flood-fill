@@ -43,10 +43,14 @@ export const InjectedEventSchema: z.ZodType<InjectedEvent> = z.object({
     'false_report',
     'comms_outage',
     'helicopter_grounded_wind',
+    'rescue_teams_deployed',
   ]),
   cell: nonNeg.optional(),
   target: nonNeg.optional(),
   durationTicks: nonNeg.optional(),
+  confidence: unit.optional(),
+  speed: unit.optional(),
+  count: int.min(1).max(20).optional(),
 });
 
 export const ScenarioSchema: z.ZodType<Scenario> = z
@@ -57,11 +61,13 @@ export const ScenarioSchema: z.ZodType<Scenario> = z
     ground: z.array(int.min(0).max(255)),
     blocks: z.array(BlockTypeSchema),
     buildings: z.array(BuildingDefSchema),
+    bridges: z.array(z.object({ cell: nonNeg, deckHeight: z.number().nonnegative() })).optional(),
     districts: z.array(z.object({ id: nonNeg, name: z.string(), cells: z.array(nonNeg) })),
     population: z.object({
       count: nonNeg,
       mix: z.object({ carOwners: unit, limitedMobility: unit, needsAssist: unit }),
       schedule: z.enum(['office-hours', 'night', 'custom']),
+      customSchedule: z.object({ departAt: nonNeg, workTicks: nonNeg.min(1) }).optional(),
     }),
     fleet: z.object({
       ambulances: nonNeg,
@@ -209,6 +215,9 @@ export const MetricsFrameSchema: z.ZodType<MetricsFrame> = z.object({
   unpoweredPopPct: z.number().min(0).max(100),
   heliRescues: nonNeg,
   routeViolations: nonNeg,
+  homesFlooded: nonNeg.optional(),
+  residentsAffected: nonNeg.optional(),
+  roadsClosedPct: z.number().min(0).max(100).optional(),
 });
 
 export const RunSummarySchema: z.ZodType<RunSummary> = z.object({

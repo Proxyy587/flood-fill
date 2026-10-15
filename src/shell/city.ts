@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { BlockType, type Scenario, type SimEvent, type SimEventType } from '../contracts';
 import { mockBuildingNames } from '../contracts/mocks';
-import type { MapLabel } from '../bridge/sceneStore';
+import { useSceneStore, type MapLabel } from '../bridge/sceneStore';
 import { LANDMARK_CATEGORY } from '../render/overlays/LandmarkHalos';
 
 export const blockName = (b: number): string => (BlockType[b] ?? 'Ground').replace(/([a-z])([A-Z])/g, '$1 $2');
@@ -69,29 +69,34 @@ export const HEADLINES: Partial<Record<SimEventType, { title: string; tone: Tone
   SHELTER_OVERFLOW: { title: 'Shelter full', tone: 'bad' },
   HELI_GROUNDED_WIND: { title: 'Helicopters grounded by wind', tone: 'warn' },
   GRIDLOCK: { title: 'Gridlock', tone: 'warn' },
+  DRAIN_BACKFLOW: { title: 'Drains backing up', tone: 'warn' },
+  HOMES_FLOODED: { title: 'Homes flooded', tone: 'bad' },
+  TEAMS_DEPLOYED: { title: 'Rescue teams released', tone: 'good' },
   INJECTED: { title: 'Stress event injected', tone: 'info' },
   INVARIANT_VIOLATION: { title: 'Safety rule broken', tone: 'bad' },
 };
 
 /** Event groups for the log filter. */
 export const EVENT_GROUPS: { id: string; label: string; types: SimEventType[] }[] = [
-  { id: 'water', label: 'Water', types: ['WEATHER', 'FLOOD_THRESHOLD', 'LOCAL_FLOOD', 'ROAD_CLOSED', 'ROAD_REOPENED', 'BRIDGE_OVERTOPPED', 'EVAC_ORDER'] },
+  { id: 'water', label: 'Water', types: ['WEATHER', 'FLOOD_THRESHOLD', 'LOCAL_FLOOD', 'DRAIN_BACKFLOW', 'HOMES_FLOODED', 'ROAD_CLOSED', 'ROAD_REOPENED', 'BRIDGE_OVERTOPPED', 'EVAC_ORDER', 'GRIDLOCK'] },
   { id: 'power', label: 'Power', types: ['POWER_TRIP', 'POWER_RESTORED', 'BLACKOUT_ZONE', 'GENERATOR_START', 'GENERATOR_FUEL_LOW', 'GENERATOR_EXHAUSTED', 'SIGNAL_DARK'] },
   {
     id: 'rescue',
     label: 'Rescue',
-    types: ['NPC_STRANDED', 'REQUEST_CREATED', 'ASSIGNED', 'SERVED', 'HELI_DISPATCH', 'HELI_PICKUP', 'HELI_DROPOFF', 'ROOFTOP_RESCUE', 'MEDEVAC', 'HELI_GROUNDED', 'HELI_GROUNDED_WIND'],
+    types: ['TEAMS_DEPLOYED', 'NPC_STRANDED', 'REQUEST_CREATED', 'ASSIGNED', 'SERVED', 'HELI_DISPATCH', 'HELI_PICKUP', 'HELI_DROPOFF', 'ROOFTOP_RESCUE', 'MEDEVAC', 'HELI_GROUNDED', 'HELI_GROUNDED_WIND'],
   },
   { id: 'dispatch', label: 'Decisions', types: ['BID', 'COMMIT_CANCELLED', 'REROUTE', 'HOSPITAL_ASSIGN', 'HOSPITAL_DIVERT', 'HOSPITAL_DIVERSION_ON', 'REPORT_CREATED', 'REPORT_VERIFIED', 'REPORT_FALSE'] },
 ];
 
 export const eventTitle = (e: SimEvent): string => HEADLINES[e.type]?.title ?? e.type.charAt(0) + e.type.slice(1).toLowerCase().replace(/_/g, ' ');
 
-/** Simulated clock: the scenario day starts at 08:00. */
-export const clockOf = (tick: number): string => {
-  const s = 8 * 3600 + tick;
-  return `${String(Math.floor(s / 3600) % 24).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}`;
+export const formatTimeOfDay = (seconds: number): string => {
+  const s = ((seconds % 86400) + 86400) % 86400;
+  return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}`;
 };
+
+/** Simulated clock for a tick of the loaded run (which starts at the run's chosen time). */
+export const clockOf = (tick: number): string => formatTimeOfDay(useSceneStore.getState().startSeconds + tick);
 
 export const elapsed = (tick: number): string => {
   const m = Math.floor(tick / 60);

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { sameEntity, type DispatchMode, type EntityRef, type InspectorData } from '../contracts';
+import { DEFAULT_START_SECONDS, sameEntity, type DispatchMode, type EntityRef, type InspectorData, type SimEngine } from '../contracts';
 
 export type CameraMode = 'overview' | 'focus' | 'follow' | 'free';
 export type ViewMode = 'truth' | 'belief';
@@ -45,13 +45,29 @@ export interface HoverInfo {
   screen: { x: number; y: number };
 }
 
+/** Chosen before a run; sent with every load. */
+export interface RunSettings {
+  engine: SimEngine;
+  /** Time of day at tick 0, seconds after midnight. */
+  startSeconds: number;
+}
+
 export interface SceneState {
   connection: 'idle' | 'loading' | 'ready' | 'error';
   error: string | null;
   scenario: string;
   seed: number;
+  /** Tick on screen. Behind `liveTick` while replaying. */
   tick: number;
+  liveTick: number;
   maxTicks: number;
+  /** Engine and start time of the loaded run (from the worker). */
+  engine: SimEngine;
+  startSeconds: number;
+  busy: { label: string; progress: number } | null;
+  /** Scenario inputs the running engine cannot execute. */
+  notes: string[];
+  runSettings: RunSettings;
   playing: boolean;
   speed: number;
   dispatchMode: DispatchMode;
@@ -85,6 +101,7 @@ export interface SceneState {
   setView: (view: ViewMode) => void;
   setLens: (lens: Lens) => void;
   toggleOverlay: (key: keyof Overlays) => void;
+  setRunSettings: (patch: Partial<RunSettings>) => void;
 }
 
 export const useSceneStore = create<SceneState>()((set, get) => ({
@@ -93,7 +110,13 @@ export const useSceneStore = create<SceneState>()((set, get) => ({
   scenario: '',
   seed: 0,
   tick: 0,
+  liveTick: 0,
   maxTicks: 0,
+  engine: 'preview',
+  startSeconds: DEFAULT_START_SECONDS,
+  busy: null,
+  notes: [],
+  runSettings: { engine: 'preview', startSeconds: DEFAULT_START_SECONDS },
   playing: false,
   speed: 16,
   dispatchMode: 'negotiation',
@@ -152,4 +175,5 @@ export const useSceneStore = create<SceneState>()((set, get) => ({
   setView: (view) => set({ view }),
   setLens: (lens) => set({ lens }),
   toggleOverlay: (key) => set((s) => ({ overlays: { ...s.overlays, [key]: !s.overlays[key] } })),
+  setRunSettings: (patch) => set((s) => ({ runSettings: { ...s.runSettings, ...patch } })),
 }));

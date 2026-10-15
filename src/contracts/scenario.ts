@@ -13,6 +13,8 @@ export interface Scenario {
   /** w*h `BlockType`. */
   blocks: number[];
   buildings: BuildingDef[];
+  /** Explicit deck heights (voxels); bridge cells not listed use `bridgeDeckHeights`. */
+  bridges?: { cell: number; deckHeight: number }[];
   /** For fairness metrics. */
   districts: { id: number; name: string; cells: number[] }[];
   population: PopulationDef;
@@ -42,6 +44,8 @@ export interface PopulationDef {
   count: number;
   mix: { carOwners: number; limitedMobility: number; needsAssist: number };
   schedule: 'office-hours' | 'night' | 'custom';
+  /** Required when `schedule` is 'custom'. Seconds of the day / ticks at work. */
+  customSchedule?: { departAt: number; workTicks: number };
 }
 
 export interface FleetDef {
@@ -80,7 +84,8 @@ export type InjectedEventKind =
   | 'road_blocked_by_debris'
   | 'false_report'
   | 'comms_outage'
-  | 'helicopter_grounded_wind';
+  | 'helicopter_grounded_wind'
+  | 'rescue_teams_deployed';
 
 /** From docs/SIM_SPEC.md §4. `t` is the tick the event fires at. */
 export interface InjectedEvent {
@@ -90,4 +95,10 @@ export interface InjectedEvent {
   /** Vehicle, building or power-node id, depending on `kind`. */
   target?: number;
   durationTicks?: number;
+  /** `false_report`: the report's stated confidence, 0..1. */
+  confidence?: number;
+  /** `helicopter_grounded_wind`: gust speed, normalised 0..1 like `WeatherDef.wind`. */
+  speed?: number;
+  /** `rescue_teams_deployed`: number of boat teams released. */
+  count?: number;
 }

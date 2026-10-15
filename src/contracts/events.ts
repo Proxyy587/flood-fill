@@ -41,6 +41,12 @@ export const SIM_EVENT_TYPES = [
   'MEDEVAC',
   'INJECTED',
   'INVARIANT_VIOLATION',
+  /** The river is above a storm-drain outfall, so unpumped drains back up instead of emptying. */
+  'DRAIN_BACKFLOW',
+  /** Water rose above the floor of homes in a district (aggregated). */
+  'HOMES_FLOODED',
+  /** Extra rescue teams (boats and crews) released into the city. */
+  'TEAMS_DEPLOYED',
 ] as const;
 
 export type SimEventType = (typeof SIM_EVENT_TYPES)[number];

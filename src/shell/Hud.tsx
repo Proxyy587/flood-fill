@@ -8,6 +8,8 @@ import { BlockType, type MetricsFrame, type SimEvent } from '../contracts';
 import { LANDMARK_COLORS } from '../render/palette';
 import { LANDMARK_CATEGORY } from '../render/overlays/LandmarkHalos';
 import { LENSES } from '../render/lenses';
+import { SoundToggle } from '../ui/audio/SoundDirector';
+import { ScoreBadge } from '../ui/score/ScoreCard';
 import { useEditorStore } from '../ui/store/editorStore';
 import { blockName, clockOf, eventTitle, HEADLINES, useCityStore, type Tone } from './city';
 import { LensLegend } from './tools/LensTool';
@@ -46,6 +48,7 @@ export function Identity() {
       <span className={styles.pill} data-tone={status.tone}>
         {status.text}
       </span>
+      <SoundToggle className={styles.iconButton} />
     </div>
   );
 }
@@ -132,7 +135,7 @@ function LiveVitals({ frames }: { frames: MetricsFrame[] }) {
   );
 }
 
-export function Vitals() {
+export function Vitals({ onScore }: { onScore?: () => void }) {
   const frames = useSimFeedStore((s) => s.metrics);
   const mode = useEditorStore((s) => s.mode);
   const tick = useSceneStore((s) => s.tick);
@@ -159,6 +162,7 @@ export function Vitals() {
           </button>
         </div>
       </div>
+      {live && <ScoreBadge onOpen={onScore} />}
       {open && (live ? <LiveVitals frames={frames} /> : <CityFacts />)}
     </section>
   );

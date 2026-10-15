@@ -77,6 +77,13 @@ button {
     0 0 8px rgba(255, 255, 255, 0.8);
 }
 
+[data-night='true'] .fs-district {
+  color: rgba(236, 242, 250, 0.88);
+  text-shadow:
+    0 0 3px rgba(4, 8, 16, 0.95),
+    0 0 10px rgba(4, 8, 16, 0.8);
+}
+
 .fs-pin {
   --cat: #1f9d63;
   z-index: 1;

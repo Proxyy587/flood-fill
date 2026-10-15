@@ -3,6 +3,7 @@
 import { Download, FolderOpen, Save, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ScenarioSchema } from '../../contracts/schemas';
+import { AUTOSAVE_KEY, restoreCity } from '../../editor/autosave';
 import { citySlot, downloadCity, parseCity, type SavedCity } from '../../editor/persistence';
 import { useEditorStore } from '../../ui/store/editorStore';
 import { Flyout } from '../primitives';
@@ -19,7 +20,7 @@ export function FilesTool({ onClose, onTemplate }: { onClose: () => void; onTemp
 
   useEffect(() => {
     let active = true;
-    void citySlot('read', 'autosave')
+    void citySlot('read', AUTOSAVE_KEY)
       .then((v) => active && setRecovery(v))
       .catch(() => {});
     void fetch('/api/templates')
@@ -33,10 +34,7 @@ export function FilesTool({ onClose, onTemplate }: { onClose: () => void; onTemp
     };
   }, []);
 
-  const restore = (v: SavedCity) => {
-    useEditorStore.setState({ params: v.params });
-    load(v.scenario);
-  };
+  const restore = restoreCity;
   const safely = async (action: () => Promise<string>) => {
     try {
       setMessage({ text: await action() });

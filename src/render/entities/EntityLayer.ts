@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { NpcState, VEHICLE_KIND_COUNT, VehicleKind, VehicleState, type EntityRef, type RenderSnapshot } from '../../contracts';
-import { CAR_COLORS, ROLE_COLORS, STRANDED_COLOR } from '../palette';
+import { NpcRole, NpcState, VEHICLE_KIND_COUNT, VehicleKind, VehicleState, type EntityRef, type RenderSnapshot } from '../../contracts';
+import { CAR_COLORS, CIVILIAN_SHIRTS, ROLE_COLORS, STRANDED_COLOR } from '../palette';
 import { hash01, Y_SCALE } from '../units';
 import { Interpolator, type Sample } from './interpolation';
-import { personGeometry, rotorGeometry, ROTOR_HUB_Y, vehicleGeometry } from './models';
+import { entityMaterial, personGeometry, rotorGeometry, ROTOR_HUB_Y, vehicleGeometry } from './models';
 
 /** Ground height (world units) at a point; supplied by the scene. */
 export type HeightFn = (x: number, z: number) => number;
@@ -12,9 +12,15 @@ export type WaterFn = (x: number, z: number) => number;
 
 const HELI_CRUISE = 9;
 const AIRBORNE = new Set<number>([VehicleState.Flying, VehicleState.Returning, VehicleState.Responding, VehicleState.Transporting]);
+/** Stride phase per world unit walked (1 unit = 4 m, about 5 strides). */
+const STRIDE = 32;
+/** Speed (units/s, interpolated) at which the walk cycle reaches full swing. */
+const FULL_SWING_SPEED = 0.12;
 
 class Pool {
   mesh: THREE.InstancedMesh;
+  /** Per-instance (phase, amplitude, wave) for the walk cycle, when the pool animates limbs. */
+  walk: THREE.InstancedBufferAttribute | null = null;
   private capacity = 0;
 
   constructor(
@@ -22,6 +28,7 @@ class Pool {
     private material: THREE.Material,
     private parent: THREE.Group,
     private shadows: boolean,
+    private animated = false,
   ) {
     this.mesh = this.create(256);
   }
@@ -42,6 +49,11 @@ class Pool {
   }
 
   private create(capacity: number): THREE.InstancedMesh {
+    if (this.animated) {
+      this.walk = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
+      this.walk.setUsage(THREE.DynamicDrawUsage);
+      this.geometry.setAttribute('walk', this.walk);
+    }
     const m = new THREE.InstancedMesh(this.geometry, this.material, capacity);
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3);
@@ -58,7 +70,8 @@ class Pool {
 /** All moving things, as instanced meshes, interpolated between snapshots. */
 export class EntityLayer {
   readonly group = new THREE.Group();
-  private material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  private vehicleMat = entityMaterial();
+  private personMat = entityMaterial({ walk: true });
   private npcPool: Pool;
   private vehiclePools: Pool[];
   private rotorPool: Pool;
@@ -76,12 +89,25 @@ export class EntityLayer {
   private color = new THREE.Color();
   private sample: Sample = { x: 0, z: 0, heading: 0 };
   private v3 = new THREE.Vector3();
+  /** Walk-cycle state by npc index, re-keyed when the id at an index changes. */
+  private stepId = new Int32Array(0);
+  private stepX = new Float32Array(0);
+  private stepZ = new Float32Array(0);
+  private stepPhase = new Float32Array(0);
+  private stepAmp = new Float32Array(0);
+  private lastNow = 0;
 
   constructor() {
     this.group.name = 'entities';
-    this.npcPool = new Pool(personGeometry(), this.material, this.group, false);
-    this.vehiclePools = Array.from({ length: VEHICLE_KIND_COUNT }, (_, k) => new Pool(vehicleGeometry(k as VehicleKind), this.material, this.group, true));
-    this.rotorPool = new Pool(rotorGeometry(), this.material, this.group, false);
+    this.npcPool = new Pool(personGeometry(), this.personMat.material, this.group, false, true);
+    this.vehiclePools = Array.from({ length: VEHICLE_KIND_COUNT }, (_, k) => new Pool(vehicleGeometry(k as VehicleKind), this.vehicleMat.material, this.group, true));
+    this.rotorPool = new Pool(rotorGeometry(), this.vehicleMat.material, this.group, false);
+  }
+
+  /** 0 by day, 1 at night: headlights, tail lamps and cockpit lights. */
+  setNight(night: number): void {
+    this.vehicleMat.uniforms.uNight.value = night;
+    this.personMat.uniforms.uNight.value = night;
   }
 
   setSnapshot(s: RenderSnapshot, now: number): void {
@@ -101,27 +127,66 @@ export class EntityLayer {
   }
 
   update(now: number, dt: number, groundY: HeightFn, waterY: WaterFn): void {
+    this.vehicleMat.uniforms.uTime.value = now / 1000;
+    this.personMat.uniforms.uTime.value = now / 1000;
     this.updateNpcs(now, groundY);
     this.updateVehicles(now, dt, groundY, waterY);
+  }
+
+  private growSteps(n: number): void {
+    if (this.stepId.length >= n) return;
+    const grow = <T extends Int32Array | Float32Array>(a: T, make: (len: number) => T): T => {
+      const b = make(n * 2);
+      b.set(a);
+      return b;
+    };
+    this.stepId = grow(this.stepId, (l) => new Int32Array(l).fill(-1));
+    this.stepX = grow(this.stepX, (l) => new Float32Array(l));
+    this.stepZ = grow(this.stepZ, (l) => new Float32Array(l));
+    this.stepPhase = grow(this.stepPhase, (l) => new Float32Array(l));
+    this.stepAmp = grow(this.stepAmp, (l) => new Float32Array(l));
   }
 
   private updateNpcs(now: number, groundY: HeightFn): void {
     const n = this.npcs.count;
     const mesh = this.npcPool.ensure(n);
+    const walk = this.npcPool.walk;
     if (this.npcPos.length < n * 3) this.npcPos = new Float32Array(n * 3 * 2);
+    this.growSteps(n);
     const a = this.npcs.alpha(now);
-    const blink = Math.sin(now / 160) > 0;
+    const ids = this.npcs.current?.id;
+    const dt = Math.min(0.1, Math.max(1e-3, (now - this.lastNow) / 1000));
+    this.lastNow = now;
+    const ease = 1 - Math.exp(-dt * 8);
     for (let i = 0; i < n; i++) {
       const s = this.npcs.sample(i, a, this.sample);
+      const id = ids ? ids[i] : i;
       const stranded = this.npcState[i] === NpcState.Stranded;
-      const y = groundY(s.x, s.z) + (stranded && blink ? 0.04 : 0);
+      const y = groundY(s.x, s.z);
       this.dummy.position.set(s.x, y, s.z);
       this.dummy.rotation.set(0, -s.heading, 0);
-      this.dummy.scale.setScalar(stranded ? 1.25 : 1);
+      this.dummy.scale.setScalar(stranded ? 1.2 : 1);
       this.dummy.updateMatrix();
       mesh.setMatrixAt(i, this.dummy.matrix);
-      this.color.setHex(stranded ? STRANDED_COLOR : (ROLE_COLORS[this.npcRole[i] as keyof typeof ROLE_COLORS] ?? 0xffffff));
+      const role = this.npcRole[i] as NpcRole;
+      const shirt = role === NpcRole.Civilian ? CIVILIAN_SHIRTS[Math.floor(hash01(id) * CIVILIAN_SHIRTS.length)] : (ROLE_COLORS[role] ?? 0xffffff);
+      this.color.setHex(stranded ? STRANDED_COLOR : shirt);
       mesh.setColorAt(i, this.color);
+
+      if (this.stepId[i] !== id) {
+        this.stepId[i] = id;
+        this.stepPhase[i] = hash01(id) * Math.PI * 2;
+        this.stepAmp[i] = 0;
+      } else {
+        const moved = Math.hypot(s.x - this.stepX[i], s.z - this.stepZ[i]);
+        this.stepPhase[i] = (this.stepPhase[i] + (stranded ? dt * 6 : moved * STRIDE)) % (Math.PI * 200);
+        const target = Math.min(1, moved / dt / FULL_SWING_SPEED);
+        this.stepAmp[i] += (target - this.stepAmp[i]) * ease;
+      }
+      this.stepX[i] = s.x;
+      this.stepZ[i] = s.z;
+      walk?.setXYZ(i, this.stepPhase[i], this.stepAmp[i] * 0.75, stranded ? 1 : 0);
+
       this.npcPos[i * 3] = s.x;
       this.npcPos[i * 3 + 1] = y + 0.3;
       this.npcPos[i * 3 + 2] = s.z;
@@ -129,6 +194,7 @@ export class EntityLayer {
     mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (walk) walk.needsUpdate = true;
   }
 
   private updateVehicles(now: number, dt: number, groundY: HeightFn, waterY: WaterFn): void {
@@ -236,6 +302,7 @@ export class EntityLayer {
     this.npcPool.dispose();
     this.vehiclePools.forEach((p) => p.dispose());
     this.rotorPool.dispose();
-    this.material.dispose();
+    this.vehicleMat.material.dispose();
+    this.personMat.material.dispose();
   }
 }

@@ -11,6 +11,8 @@ weather constraints, and the full compound stress scenario. Browser/worker integ
 independent review, remaining invariants and later M4-M6 work also remain open; this
 status is not release approval.
 
+> **Integration note (AJ, 2026-10-15):** the browser runs this core through `src/worker/host.ts`, and W1 templates load through `src/worker/scenarioAdapter.ts`. "Browser/template integration pending" below is historical. Playback and live decision-panel verification remain open. Open core items found during integration are listed under `[AJ -> AK]` in REQUESTS.md.
+
 ### M3F: adaptive police crowd control implemented
 
 The existing finite, officer-staffed police fleet now shares deterministic dispatch

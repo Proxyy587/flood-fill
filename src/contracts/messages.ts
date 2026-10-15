@@ -16,7 +16,14 @@ export interface RunOptions {
   speed: number;
   /** Editor mode accepts `edit` messages. */
   mode: 'edit' | 'run' | 'replay';
+  /** 'core' = AK's validated simulator (default); 'preview' = the wider mock model. */
+  engine?: SimEngine;
+  /** Time of day at tick 0, in seconds after midnight (default 08:00). */
+  startTimeSeconds?: number;
 }
+
+export type SimEngine = 'core' | 'preview';
+export const DEFAULT_START_SECONDS = 8 * 3600;
 
 export type MainToWorker =
   | { type: 'load'; scenario: Scenario; seed: number; options: RunOptions }
@@ -40,6 +47,14 @@ export interface WorkerStatus {
   scenario: string;
   seed: number;
   maxTicks: number;
+  /** Furthest simulated tick. Greater than `tick` while replaying recorded frames. */
+  liveTick?: number;
+  engine?: SimEngine;
+  startTimeSeconds?: number;
+  /** Long work in progress (catching up after an injected event or a forward seek). */
+  busy?: { label: string; progress: number };
+  /** Scenario inputs the active engine cannot execute, in plain words. */
+  notes?: string[];
 }
 
 export type WorkerToMain =

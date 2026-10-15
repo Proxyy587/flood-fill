@@ -49,6 +49,16 @@ Re-run these after integration. Add a browser/worker smoke test; headless health
 - Resolve the outstanding navigation/metrics requests and complete independent review/release gates.
 - Refresh `docs/AK_STATUS.md`, `docs/ROADMAP.md` and stale entries in `docs/REQUESTS.md`; they do not yet consistently reflect the pushed AK M3B and W1 state.
 
+## AJ integration status (2026-10-15)
+
+1. Done. `src/worker/host.ts` speaks the frozen protocol and wraps AK's `createSimulation` (engine `core`) or the mock (engine `preview`). `createSimWorker` points at it and the mock worker is gone.
+2. Done. `src/worker/scenarioAdapter.ts` converts AK ⇄ UI scenarios explicitly. Inputs the core cannot execute are surfaced as `WorkerStatus.notes`, never dropped silently. `/api/templates` uses it, and every template is tested through the adapter and the host.
+3. Done. `BLOCK_META` / the W1 palette is the single block source for the renderer and editor.
+4. Done. W1 voxel models are meshed for the entity layer, police use `public/assets/police.glb`, and mapping tests are added.
+5. Done headless (`src/worker/host.test.ts`, all templates: load, run, pause, step, seek) and smoke-tested in the browser.
+
+Verification: `bunx tsc --noEmit`, `bunx eslint src app scripts`, `bunx vitest run` (45 files, 532 tests), `bun scripts/validate-scenarios.ts` (schema-only, `releaseReady: false`), `bunx next build`. Remaining core gaps are listed under `[AJ -> AK]` in `docs/REQUESTS.md`.
+
 ## Guardrails
 
 - Keep `src/sim` pure and deterministic; use seeded RNG only.

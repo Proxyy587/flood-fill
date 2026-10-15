@@ -1,6 +1,6 @@
 /**
- * The one place that decides which sim runs in the worker.
- * When AK's `src/sim/worker.ts` speaks `src/contracts/messages.ts`, point the URL at it.
+ * The one place that decides which worker runs the simulation. The engine
+ * inside it (AK core or preview model) is picked per run via `RunOptions.engine`.
  */
 export const createSimWorker = (): Worker =>
-  new Worker(new URL('./mockSim.worker.ts', import.meta.url), { type: 'module', name: 'floodsim' });
+  new Worker(new URL('../worker/sim.worker.ts', import.meta.url), { type: 'module', name: 'floodsim' });

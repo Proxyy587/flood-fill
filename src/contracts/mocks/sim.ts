@@ -13,7 +13,7 @@ import type { MetricsFrame, RunSummary } from '../metrics';
 import { DEFAULT_NPC_PARAMS, type NpcParams } from '../params';
 import type { BuildingDef, DispatchMode, InjectedEvent, Scenario } from '../scenario';
 import { chunkOfCell, type RenderSnapshot, type WorldSnapshot } from '../snapshot';
-import { bridgeDeckHeights } from '../world';
+import { bridgeDeckHeights, isSignalJunction, signalPhase } from '../world';
 import { createMockRng, type MockRng } from './rng';
 import { mockBuildingNames } from './scenario';
 
@@ -28,19 +28,52 @@ export const MOCK_LIMITS = {
 } as const;
 
 const RIVER_BASE_STAGE = 1.4;
+/**
+ * Paved cities send rain to the river faster, raising its peak; green ground holds it back.
+ * The rain-driven rise is scaled by BASE + SLOPE × (mean runoff coefficient of the land).
+ */
+const RIVER_RUNOFF_BASE = 0.64;
+const RIVER_RUNOFF_SLOPE = 0.65;
 const LEVEE_HEIGHT = 3;
 const BELIEF_REFRESH_TICKS = 120;
+const NEGOTIATION_VIEW = 3;
+
+// Traffic. Progress runs 0..1 across a cell (4 m).
+/** Bumper-to-bumper gap, as a fraction of a cell. */
+const CAR_GAP = 0.45;
+/** Vehicles a cell holds across all lanes before nobody else may enter. */
+const CELL_VEHICLES = 3;
+/** Where vehicles wait before a junction. */
+const STOP_LINE = 0.85;
+/** Ticks at a full stop before crossing a dark signal. */
+const DARK_SIGNAL_STOP = 3;
+/** Ticks held before a vehicle counts as gridlocked; after twice this it looks for another way. */
+const GRIDLOCK_WAIT = 30;
+const RESCUERS_PER_TEAM = 4;
 
 // Local (pluvial) flooding. Volumes are in cell·metres (1 cell = 16 m²).
 /** Rain intensity 1.0 is a 150 mm/h cloudburst. */
 export const RAIN_MM_PER_HOUR_AT_FULL = 150;
 const RAIN_M_PER_TICK = RAIN_MM_PER_HOUR_AT_FULL / 1000 / 3600;
-/** One storm-drain inlet with a pump: 0.05 m³/s. Gravity only (no power): 30 %. */
+/**
+ * One storm-drain inlet with a pump: 0.05 m³/s. Gravity only (no power): 30 %,
+ * and nothing at all once the river rises above the drain's outfall (backflow).
+ */
 const DRAIN_CELL_M_PER_TICK = 0.05 / 16;
 const DRAIN_UNPOWERED = 0.3;
-/** Infiltration of ponded water, ~5 mm/h per wetted cell. */
-const INFILTRATION_M_PER_TICK = 0.005 / 3600;
 const LOCAL_FLOOD_STEPS = [0.3, 1];
+
+/** Ponded water soaking into each surface, mm/h. Paved ground and roofs soak up nothing. */
+const INFILTRATION_MM_PER_HOUR: Partial<Record<BlockType, number>> = {
+  [BlockType.Grass]: 15,
+  [BlockType.Tree]: 25,
+  [BlockType.Sand]: 30,
+  [BlockType.Dirt]: 10,
+  [BlockType.Rock]: 1,
+  [BlockType.Levee]: 2,
+};
+const soakOf = (block: number): number => (INFILTRATION_MM_PER_HOUR[block as BlockType] ?? 0) / 1000 / 3600;
+const HOMES = new Set<number>([BlockType.House, BlockType.Apartment]);
 
 /** Fraction of rainfall that runs off each surface. */
 const RUNOFF: Partial<Record<BlockType, number>> = {
@@ -58,6 +91,9 @@ interface Pond {
   cells: number[];
   /** Ground of each pond cell, ascending. */
   grounds: Float64Array;
+  /** Infiltration (m/tick) of the cell at the same index in `grounds`. */
+  soak: Float64Array;
+  backflowAnnounced: boolean;
   spill: number;
   capacity: number;
   /** Cells whose rain drains here (including the pond itself). */
@@ -87,6 +123,10 @@ interface Mover {
   plan: number[];
   planVersion: number;
   lastReroute: number;
+  /** Ticks spent unable to move (queue, red light, blocked junction). */
+  wait: number;
+  /** Ticks stopped at the line of a dark (unpowered) signal. */
+  stopWait: number;
 }
 
 interface Walker extends Mover {
@@ -219,6 +259,11 @@ export class MockSim {
   private shelterLoad = new Map<number, number>();
   private shelterOverflowed = new Set<number>();
   private intersections: number[] = [];
+  private signal: Uint8Array = new Uint8Array(0);
+  /** Road vehicles per lane (cell × direction of travel), rebuilt every tick. */
+  private lanes = new Map<number, Vehicle[]>();
+  private gridlockCells = 0;
+  private lastGridlockNews = -Infinity;
   private serviceSub: Int16Array;
 
   private walkers: Walker[] = [];
@@ -228,6 +273,8 @@ export class MockSim {
   private generators: Generator[] = [];
 
   private stage = RIVER_BASE_STAGE;
+  /** How strongly rain on the city feeds the river (see RIVER_RUNOFF_BASE). */
+  private riverRunoff = 1;
   private rainSmooth = 0;
   private rain = 0;
   private wind = 0;
@@ -241,10 +288,15 @@ export class MockSim {
   private windGrounded = false;
   private nextRequest = 1;
   private nextReport = 1;
+  private nextNpcId = 1;
+  private nextVehicleId = 1;
   private served: { created: number; served: number; district: number }[] = [];
   private requestCreated = new Map<number, number>();
   private heliRescues = 0;
   private hospitalLoad = new Map<number, number>();
+  /** Homes whose floor has been under water at any point (damage does not drain away). */
+  private floodedHomes = new Set<number>();
+  private homesNews = new Map<number, { homes: number; residents: number; cell: number; last: number }>();
   private pendingInjected: InjectedEvent[];
   private dirty = new Set<number>();
 
@@ -303,6 +355,11 @@ export class MockSim {
     if (z > 0) out.push(c - this.w);
     if (z < this.h - 1) out.push(c + this.w);
     return out;
+  }
+
+  /** Display name; names are stored by list position, which template ids need not match. */
+  private nameOf(b: BuildingDef): string {
+    return this.buildingNames[this.buildings.indexOf(b)] ?? `${BlockType[b.type]} #${b.id}`;
   }
 
   private isRoad(c: number): boolean {
@@ -391,7 +448,9 @@ export class MockSim {
           stack.push(nb);
         }
       }
-      const grounds = Float64Array.from(cells, (k) => this.ground[k]).sort();
+      const sorted = [...cells].sort((a, b) => this.ground[a] - this.ground[b] || a - b);
+      const grounds = Float64Array.from(sorted, (k) => this.ground[k]);
+      const soak = Float64Array.from(sorted, (k) => soakOf(this.blocks[k]));
       let low = cells[0];
       for (const k of cells) if (this.ground[k] < this.ground[low]) low = k;
       let capacity = 0;
@@ -399,6 +458,8 @@ export class MockSim {
       this.ponds.push({
         cells,
         grounds,
+        soak,
+        backflowAnnounced: false,
         spill: level,
         capacity,
         catchment: 0,
@@ -485,12 +546,22 @@ export class MockSim {
 
   private rebuildCaches(): void {
     this.deck = bridgeDeckHeights(this.w, this.h, this.ground, this.blocks);
+    let land = 0;
+    let runoff = 0;
+    for (let c = 0; c < this.n; c++) {
+      if (this.blocks[c] === BlockType.WaterSource) continue;
+      land++;
+      runoff += runoffOf(this.blocks[c]);
+    }
+    this.riverRunoff = RIVER_RUNOFF_BASE + RIVER_RUNOFF_SLOPE * (land ? runoff / land : 0);
     this.computeDepressions();
     this.computeSpans();
     this.intersections = [];
+    this.signal = new Uint8Array(this.n);
     for (let c = 0; c < this.n; c++) {
       if (this.blocks[c] !== BlockType.Road) continue;
       if (this.neighbours(c).filter((nb) => this.isRoad(nb)).length >= 3) this.intersections.push(c);
+      if (isSignalJunction(this.w, this.h, this.blocks, c)) this.signal[c] = 1;
     }
     this.computeShelterField();
   }
@@ -520,7 +591,7 @@ export class MockSim {
     const subNodes = nodes.filter((p) => p.kind === 'substation');
     for (const node of subNodes) {
       const b = node.building !== undefined ? this.buildings[node.building] : null;
-      if (b) this.substations.push({ building: b, name: this.buildingNames[b.id], tripped: false, forced: false, dryTicks: 0 });
+      if (b) this.substations.push({ building: b, name: this.nameOf(b), tripped: false, forced: false, dryTicks: 0 });
     }
     const parentSub = new Map<number, number>();
     for (const [a, b] of this.scenario.powerGrid.edges) {
@@ -549,7 +620,7 @@ export class MockSim {
       if (b?.generator) {
         this.generators.push({
           building: b,
-          name: this.buildingNames[b.id],
+          name: this.nameOf(b),
           fuel: b.generator.fuelTicks,
           maxFuel: b.generator.fuelTicks,
           active: false,
@@ -584,6 +655,8 @@ export class MockSim {
       plan: [],
       planVersion: 0,
       lastReroute: -1000,
+      wait: 0,
+      stopWait: 0,
     };
   }
 
@@ -619,47 +692,15 @@ export class MockSim {
       }
       return homes[homes.length - 1].entrance;
     };
-    let id = 1;
-    const addWalker = (role: NpcRole) => {
-      const cell = startCell(role);
-      this.walkers.push({
-        ...this.makeMover(cell, this.rng.range(0.18, 0.32), this.rng.range(-0.32, 0.32)),
-        id: id++,
-        role,
-        state: role === NpcRole.Civilian ? NpcState.Commuting : NpcState.OnDuty,
-        panic: Math.min(1, Math.max(0, this.params.panicMean + this.rng.range(-0.2, 0.2))),
-        compliance: Math.min(1, Math.max(0, this.params.complianceMean + this.rng.range(-0.25, 0.25))),
-        risk: Math.min(1, Math.max(0, this.params.riskToleranceMean + this.rng.range(-0.2, 0.2))),
-        strandedAt: -1,
-        requestId: -1,
-        assignedTo: -1,
-      });
-    };
+    const addWalker = (role: NpcRole) => this.addWalker(role, startCell(role));
     const civilians = Math.max(0, pop.count - staff.reduce((s, [, k]) => s + k, 0));
     for (let i = 0; i < civilians; i++) addWalker(NpcRole.Civilian);
     for (const [role, k] of staff) for (let i = 0; i < k; i++) addWalker(role);
 
-    let vid = 1;
     const entranceOf = (type: BlockType) => this.buildings.filter((b) => b?.type === type).map((b) => (b as BuildingDef).entrance);
     const hospitals = entranceOf(BlockType.Hospital);
     const police = entranceOf(BlockType.PoliceStation);
-    const addVehicle = (kind: VehicleKind, cell: number, speed: number, depthLimit: number, state: VehicleState) => {
-      this.vehicles.push({
-        ...this.makeMover(cell, speed, 0.22),
-        id: vid++,
-        kind,
-        state,
-        depthLimit,
-        base: cell,
-        targetNpc: -1,
-        phase: 'idle',
-        hover: 0,
-        stuck: 0,
-        failed: false,
-        tx: this.cx(cell) + 0.5,
-        tz: this.cz(cell) + 0.5,
-      });
-    };
+    const addVehicle = (kind: VehicleKind, cell: number, speed: number, depthLimit: number, state: VehicleState) => this.addVehicle(kind, cell, speed, depthLimit, state);
     const cars = Math.round((pop.count * pop.mix.carOwners) / 4);
     for (let i = 0; i < cars; i++) addVehicle(VehicleKind.Car, this.rng.pick(roads), this.rng.range(0.6, 0.9), MOCK_LIMITS.car, VehicleState.Driving);
     for (let i = 0; i < fleet.ambulances; i++) {
@@ -676,6 +717,68 @@ export class MockSim {
       const pad = pads.length ? pads[i % pads.length] : null;
       addVehicle(VehicleKind.Helicopter, pad ? pad.cells[i % pad.cells.length] : roads[0], 1.6, Infinity, VehicleState.Landed);
     }
+  }
+
+  private addWalker(role: NpcRole, cell: number): void {
+    this.walkers.push({
+      ...this.makeMover(cell, this.rng.range(0.18, 0.32), this.rng.range(-0.32, 0.32)),
+      id: this.nextNpcId++,
+      role,
+      state: role === NpcRole.Civilian ? NpcState.Commuting : NpcState.OnDuty,
+      panic: Math.min(1, Math.max(0, this.params.panicMean + this.rng.range(-0.2, 0.2))),
+      compliance: Math.min(1, Math.max(0, this.params.complianceMean + this.rng.range(-0.25, 0.25))),
+      risk: Math.min(1, Math.max(0, this.params.riskToleranceMean + this.rng.range(-0.2, 0.2))),
+      strandedAt: -1,
+      requestId: -1,
+      assignedTo: -1,
+    });
+  }
+
+  private addVehicle(kind: VehicleKind, cell: number, speed: number, depthLimit: number, state: VehicleState): Vehicle {
+    const v: Vehicle = {
+      ...this.makeMover(cell, speed, 0.22),
+      id: this.nextVehicleId++,
+      kind,
+      state,
+      depthLimit,
+      base: cell,
+      targetNpc: -1,
+      phase: 'idle',
+      hover: 0,
+      stuck: 0,
+      failed: false,
+      tx: this.cx(cell) + 0.5,
+      tz: this.cz(cell) + 0.5,
+    };
+    this.vehicles.push(v);
+    return v;
+  }
+
+  /** Releases boat teams from HQ (or the boat depot) onto the floodwater nearest to it. */
+  private deployTeams(count: number): void {
+    const base = this.buildings.find((b) => b?.type === BlockType.FloodHQ) ?? this.buildings.find((b) => b?.type === BlockType.BoatDepot) ?? null;
+    const from = base?.entrance ?? this.roadCells()[0] ?? 0;
+    let launch = -1;
+    let best = Infinity;
+    for (let c = 0; c < this.n; c++) {
+      if (this.water[c] < MOCK_LIMITS.boatMin || this.buildingIndex[c] !== 0) continue;
+      const d = Math.abs(this.cx(c) - this.cx(from)) + Math.abs(this.cz(c) - this.cz(from));
+      if (d < best) {
+        best = d;
+        launch = c;
+      }
+    }
+    if (launch < 0) launch = this.nearestWaterCell(from);
+    for (let i = 0; i < count; i++) {
+      this.addVehicle(VehicleKind.Boat, launch, 0.55, Infinity, VehicleState.Parked);
+      if (this.isRoad(from)) for (let k = 0; k < RESCUERS_PER_TEAM; k++) this.addWalker(NpcRole.BoatOperator, from);
+    }
+    const where = base ? this.nameOf(base) : 'the riverbank';
+    this.emit(
+      'TEAMS_DEPLOYED',
+      `${count} SDRF boat team${count === 1 ? '' : 's'} released at ${where}: ${count} boat${count === 1 ? '' : 's'} and ${count * RESCUERS_PER_TEAM} rescuers launch at ${this.cellName(launch)}, ${best === Infinity ? 'on the river' : `${best * 4} m from base`}`,
+      { cell: launch, data: { teams: count, rescuers: count * RESCUERS_PER_TEAM } },
+    );
   }
 
   private nearestWaterCell(from: number): number {
@@ -730,7 +833,7 @@ export class MockSim {
     const wx = this.scenario.weather;
     this.rainSmooth += (this.rain - this.rainSmooth) / 300;
     const sourceBoost = wx.sources.some((s) => this.tick >= s.startT && this.tick <= s.endT) ? 0.5 : 0;
-    const target = RIVER_BASE_STAGE + 2.5 * this.rainSmooth + sourceBoost;
+    const target = RIVER_BASE_STAGE + 2.5 * this.rainSmooth * this.riverRunoff + sourceBoost;
     this.stage += (target - this.stage) * 0.01;
     this.stepPonds();
 
@@ -772,10 +875,23 @@ export class MockSim {
       let v = p.volume + p.inflow + rain * p.runoff;
       p.inflow = 0;
       if (v > 0) {
-        for (const d of p.drains) v -= DRAIN_CELL_M_PER_TICK * (this.power[d] === PowerState.Off ? DRAIN_UNPOWERED : 1);
-        let wet = 0;
-        for (const g of p.grounds) if (g < p.level) wet++;
-        v -= INFILTRATION_M_PER_TICK * wet;
+        let backedUp = 0;
+        for (const d of p.drains) {
+          const pumped = this.power[d] !== PowerState.Off;
+          const drowned = this.stage >= this.ground[d];
+          if (drowned && !pumped) backedUp++;
+          v -= DRAIN_CELL_M_PER_TICK * (pumped ? 1 : drowned ? 0 : DRAIN_UNPOWERED);
+        }
+        for (let i = 0; i < p.grounds.length && p.grounds[i] < p.level; i++) v -= p.soak[i];
+        if (backedUp > 0 && !p.backflowAnnounced && p.level > p.grounds[0] + 0.05) {
+          p.backflowAnnounced = true;
+          const district = this.scenario.districts[this.districtOf[p.low]]?.name ?? 'the city';
+          this.emit(
+            'DRAIN_BACKFLOW',
+            `River at ${round2(this.stage)} m is above the storm-drain outfalls in ${district}; ${backedUp} unpumped drain${backedUp === 1 ? '' : 's'} back up instead of emptying the hollow at ${this.cellName(p.low)}`,
+            { cell: p.low, data: { drains: backedUp, stage: round2(this.stage) } },
+          );
+        }
       }
       v = Math.max(0, v);
       if (v > p.capacity) {
@@ -788,12 +904,14 @@ export class MockSim {
       while (p.announced < LOCAL_FLOOD_STEPS.length && depth >= LOCAL_FLOOD_STEPS[p.announced] && p.cells.length >= 3) {
         const district = this.scenario.districts[this.districtOf[p.low]]?.name ?? 'the city';
         const pumped = p.drains.filter((d) => this.power[d] !== PowerState.Off).length;
+        const green = p.soak.filter((s) => s > 0).length;
         const drains = p.drains.length
           ? `${p.drains.length} storm drain${p.drains.length === 1 ? '' : 's'} (${pumped} pumped) can't keep up`
           : 'no storm drain serves this hollow';
+        const soil = green ? `${green} of ${p.cells.length} cells are green ground that soaks water` : 'the hollow is paved, so nothing soaks away';
         this.emit(
           'LOCAL_FLOOD',
-          `Rain ponding in a ${district} hollow at ${this.cellName(p.low)}: ${round2(depth)} m deep. ${p.catchment} cells drain here; ${drains} at ${Math.round(this.rain * RAIN_MM_PER_HOUR_AT_FULL)} mm/h`,
+          `Rain ponding in a ${district} hollow at ${this.cellName(p.low)}: ${round2(depth)} m deep. ${p.catchment} cells drain here; ${drains} at ${Math.round(this.rain * RAIN_MM_PER_HOUR_AT_FULL)} mm/h; ${soil}`,
           { cell: p.low, data: { depth: round2(depth), catchment: p.catchment, drains: p.drains.length, cells: p.cells.length } },
         );
         p.announced++;
@@ -863,7 +981,7 @@ export class MockSim {
     let cells = 0;
     let signals = 0;
     for (let c = 0; c < this.n; c++) if (this.serviceSub[c] === i) cells++;
-    for (const c of this.intersections) if (this.serviceSub[c] === i) signals++;
+    for (let c = 0; c < this.n; c++) if (this.signal[c] && this.serviceSub[c] === i) signals++;
     const actor = asBuildingId(s.building.id);
     this.emit('POWER_TRIP', reason, { actor, cell: s.building.entrance });
     this.emit('BLACKOUT_ZONE', `${cells} cells downstream of ${s.name} lost power`, { actor, data: { cells } });
@@ -898,6 +1016,7 @@ export class MockSim {
       newlyClosed++;
     }
     if (newlyClosed > 0 || this.tick % 30 === 0) this.computeShelterField();
+    if (this.tick % 10 === 0) this.checkHomes();
 
     let flooded = 0;
     let land = 0;
@@ -959,6 +1078,31 @@ export class MockSim {
       this.emit('EVAC_ORDER', `HQ evacuation order ${this.params.warningDelay} ticks after flood onset; ${complied} civilians complied`, {
         data: { complied },
       });
+    }
+  }
+
+  /** Marks homes with water above their floor; one aggregated event per district per minute. */
+  private checkHomes(): void {
+    this.buildings.forEach((b, i) => {
+      if (!b || !HOMES.has(b.type) || this.floodedHomes.has(i)) return;
+      if (!b.cells.some((c) => this.water[c] > b.floorHeight)) return;
+      this.floodedHomes.add(i);
+      const d = this.districtOf[b.entrance];
+      const acc = this.homesNews.get(d) ?? { homes: 0, residents: 0, cell: b.entrance, last: -Infinity };
+      acc.homes++;
+      acc.residents += b.capacity;
+      this.homesNews.set(d, acc);
+    });
+    for (const [d, acc] of this.homesNews) {
+      if (acc.homes === 0 || this.tick - acc.last < 60) continue;
+      const district = this.scenario.districts[d]?.name ?? 'the city';
+      let total = 0;
+      for (const i of this.floodedHomes) if (this.buildings[i] && this.districtOf[(this.buildings[i] as BuildingDef).entrance] === d) total++;
+      this.emit('HOMES_FLOODED', `${acc.homes} home${acc.homes === 1 ? '' : 's'} in ${district} took water above the floor; ${acc.residents} residents affected (${total} homes so far)`, {
+        cell: acc.cell,
+        data: { homes: acc.homes, residents: acc.residents, total },
+      });
+      this.homesNews.set(d, { homes: 0, residents: 0, cell: acc.cell, last: this.tick });
     }
   }
 
@@ -1046,18 +1190,21 @@ export class MockSim {
       .map((a, i) => ({ a, i }))
       .filter(({ a }) => a.state === NpcState.Stranded && a.assignedTo < 0)
       .sort((p, q) => p.a.strandedAt - q.a.strandedAt);
-    for (const { a, i } of waiting) {
-      const bids: { v: Vehicle; eta: number }[] = [];
+    if (this.dispatchMode === 'negotiation') {
+      // Contract net with local views: each free unit only bids on its nearest few
+      // open requests; requests are awarded oldest first to the best bid they got.
+      const local = new Map<number, Set<number>>();
       for (const v of this.vehicles) {
         if (v.failed || v.targetNpc >= 0) continue;
-        const d = Math.hypot(v.x - a.x, v.z - a.z);
-        if (v.kind === VehicleKind.Boat && this.deepNear(a.cell)) bids.push({ v, eta: Math.round(d / v.speed + 10) });
-        if (v.kind === VehicleKind.Helicopter && v.phase === 'idle' && !this.windGrounded) bids.push({ v, eta: Math.round(d / v.speed + 30) });
+        const near = waiting
+          .map(({ a }) => ({ a, d: Math.hypot(v.x - a.x, v.z - a.z) }))
+          .sort((p, q) => p.d - q.d || p.a.strandedAt - q.a.strandedAt)
+          .slice(0, NEGOTIATION_VIEW);
+        local.set(v.id, new Set(near.map(({ a }) => a.requestId)));
       }
-      if (bids.length === 0) continue;
-      bids.sort((p, q) => p.eta - q.eta || p.v.id - q.v.id);
-      const best = bids[0];
-      if (this.dispatchMode === 'negotiation') {
+      for (const { a, i } of waiting) {
+        const bids = this.bidsFor(a).filter((b) => local.get(b.v.id)?.has(a.requestId));
+        if (bids.length === 0) continue;
         for (const b of bids.slice(0, 2)) {
           this.emit('BID', `${VehicleKind[b.v.kind]} #${b.v.id} bids ETA ${b.eta} ticks`, {
             actor: asVehicleId(b.v.id),
@@ -1065,32 +1212,56 @@ export class MockSim {
             data: { eta: b.eta },
           });
         }
+        const runnerUp = bids[1] ? `; next best ${VehicleKind[bids[1].v.kind]} #${bids[1].v.id} ETA ${bids[1].eta}` : '';
+        this.assign(a, i, bids[0], `won contract-net auction, ETA ${bids[0].eta} ticks${runnerUp}`);
       }
-      const runnerUp = bids[1] ? `; next best ${VehicleKind[bids[1].v.kind]} #${bids[1].v.id} ETA ${bids[1].eta}` : '';
-      const how = this.dispatchMode === 'negotiation' ? 'won contract-net auction' : 'central min-cost matching';
-      this.emit('ASSIGNED', `${VehicleKind[best.v.kind]} #${best.v.id} ${how}, ETA ${best.eta} ticks${runnerUp}`, {
+      return;
+    }
+    // Centralised baseline: HQ sees every open request and free unit at once and
+    // greedily takes the globally shortest ETA pair first (approximate min-cost matching).
+    const pairs: { a: Walker; i: number; v: Vehicle; eta: number }[] = [];
+    for (const { a, i } of waiting) for (const b of this.bidsFor(a)) pairs.push({ a, i, v: b.v, eta: b.eta });
+    pairs.sort((p, q) => p.eta - q.eta || p.a.strandedAt - q.a.strandedAt || p.v.id - q.v.id);
+    for (const p of pairs) {
+      if (p.a.assignedTo >= 0 || p.v.targetNpc >= 0) continue;
+      this.assign(p.a, p.i, { v: p.v, eta: p.eta }, `central min-cost matching, ETA ${p.eta} ticks across ${waiting.length} open requests`);
+    }
+  }
+
+  private bidsFor(a: Walker): { v: Vehicle; eta: number }[] {
+    const bids: { v: Vehicle; eta: number }[] = [];
+    for (const v of this.vehicles) {
+      if (v.failed || v.targetNpc >= 0) continue;
+      const d = Math.hypot(v.x - a.x, v.z - a.z);
+      if (v.kind === VehicleKind.Boat && this.deepNear(a.cell)) bids.push({ v, eta: Math.round(d / v.speed + 10) });
+      if (v.kind === VehicleKind.Helicopter && v.phase === 'idle' && !this.windGrounded) bids.push({ v, eta: Math.round(d / v.speed + 30) });
+    }
+    return bids.sort((p, q) => p.eta - q.eta || p.v.id - q.v.id);
+  }
+
+  private assign(a: Walker, i: number, best: { v: Vehicle; eta: number }, how: string): void {
+    this.emit('ASSIGNED', `${VehicleKind[best.v.kind]} #${best.v.id} ${how}`, {
+      actor: asVehicleId(best.v.id),
+      target: asRequestId(a.requestId),
+      cell: a.cell,
+      data: { eta: best.eta },
+    });
+    a.assignedTo = best.v.id;
+    best.v.targetNpc = i;
+    best.v.stuck = 0;
+    if (best.v.kind === VehicleKind.Helicopter) {
+      best.v.phase = 'out';
+      best.v.state = VehicleState.Flying;
+      best.v.tx = a.x;
+      best.v.tz = a.z;
+      this.emit('HELI_DISPATCH', `rooftop rescue of #${a.id}; no ground unit can reach ${this.cellName(a.cell)}`, {
         actor: asVehicleId(best.v.id),
-        target: asRequestId(a.requestId),
+        target: asNpcId(a.id),
         cell: a.cell,
-        data: { eta: best.eta },
       });
-      a.assignedTo = best.v.id;
-      best.v.targetNpc = i;
-      best.v.stuck = 0;
-      if (best.v.kind === VehicleKind.Helicopter) {
-        best.v.phase = 'out';
-        best.v.state = VehicleState.Flying;
-        best.v.tx = a.x;
-        best.v.tz = a.z;
-        this.emit('HELI_DISPATCH', `rooftop rescue of #${a.id}; no ground unit can reach ${this.cellName(a.cell)}`, {
-          actor: asVehicleId(best.v.id),
-          target: asNpcId(a.id),
-          cell: a.cell,
-        });
-      } else {
-        best.v.state = VehicleState.Responding;
-        best.v.phase = 'out';
-      }
+    } else {
+      best.v.state = VehicleState.Responding;
+      best.v.phase = 'out';
     }
   }
 
@@ -1109,11 +1280,88 @@ export class MockSim {
       this.advanceOnRoads(a, MOCK_LIMITS.footSafe, evac ? 'evac' : 'wander', slow, evac ? `npc` : null, asNpcId(a.id));
       if (evac && this.shelterDist[a.cell] === 0) this.arriveAtShelter(a);
     }
+    this.lanes.clear();
+    for (const v of this.vehicles) {
+      if (v.failed || v.next < 0 || v.kind === VehicleKind.Helicopter || v.kind === VehicleKind.Boat) continue;
+      const key = this.laneKey(v.cell, v.next);
+      const lane = this.lanes.get(key);
+      if (lane) lane.push(v);
+      else this.lanes.set(key, [v]);
+    }
     for (const v of this.vehicles) {
       if (v.failed) continue;
       if (v.kind === VehicleKind.Helicopter) this.moveHeli(v);
       else if (v.kind === VehicleKind.Boat) this.moveBoat(v);
       else this.moveRoadVehicle(v);
+    }
+    this.stepGridlock();
+  }
+
+  private laneKey(from: number, to: number): number {
+    const d = to === from + 1 ? 0 : to === from - 1 ? 1 : to === from + this.w ? 2 : 3;
+    return from * 4 + d;
+  }
+
+  private emergency(v: Vehicle): boolean {
+    return v.kind === VehicleKind.Ambulance || (v.kind === VehicleKind.PoliceCar && v.state === VehicleState.Responding);
+  }
+
+  /**
+   * How far along its current cell a road vehicle may go this tick: it keeps a
+   * gap to the vehicle ahead in its lane, waits for room in the next cell, stops
+   * at red lights, and treats a dark (unpowered) signal as a four-way stop.
+   * Emergency vehicles run red lights with sirens but still never drive through another car.
+   */
+  private trafficCap(v: Vehicle): number {
+    if (v.next < 0) return Infinity;
+    let cap = Infinity;
+    for (const o of this.lanes.get(this.laneKey(v.cell, v.next)) ?? []) {
+      if (o !== v && o.progress > v.progress) cap = Math.min(cap, o.progress - CAR_GAP);
+    }
+    const dir = this.laneKey(v.cell, v.next) - v.cell * 4;
+    let ahead = 0;
+    for (let d = 0; d < 4; d++) {
+      for (const o of this.lanes.get(v.next * 4 + d) ?? []) {
+        if (o === v) continue;
+        ahead++;
+        // Same direction in the next cell: keep the gap across the cell boundary.
+        if (d === dir) cap = Math.min(cap, 1 + o.progress - CAR_GAP);
+      }
+    }
+    if (ahead >= CELL_VEHICLES) cap = Math.min(cap, STOP_LINE);
+    if (this.signal[v.next] && !this.signal[v.cell] && v.progress <= STOP_LINE + 0.01) {
+      if (this.power[v.next] === PowerState.Off) {
+        // Dark signal: full stop, then go only when the junction is clear.
+        v.stopWait = v.progress >= STOP_LINE - 0.05 ? v.stopWait + 1 : 0;
+        if (v.stopWait < DARK_SIGNAL_STOP || ahead > 0) cap = Math.min(cap, STOP_LINE);
+      } else if (!this.emergency(v)) {
+        const axis = Math.abs(v.next - v.cell) === 1 ? 'x' : 'z';
+        const phase = signalPhase(this.tick, v.next, this.w);
+        if (phase.green !== axis || phase.amber) cap = Math.min(cap, STOP_LINE);
+      }
+    }
+    return cap;
+  }
+
+  /** Vehicles held for a long time mark gridlocked cells; announced at most every two minutes. */
+  private stepGridlock(): void {
+    const cells = new Set<number>();
+    let dark = 0;
+    for (const v of this.vehicles) {
+      if (v.failed || v.wait < GRIDLOCK_WAIT || v.kind === VehicleKind.Boat || v.kind === VehicleKind.Helicopter) continue;
+      cells.add(v.cell);
+      if (v.next >= 0 && this.signal[v.next] && this.power[v.next] === PowerState.Off) dark++;
+    }
+    this.gridlockCells = cells.size;
+    if (cells.size >= 4 && this.tick - this.lastGridlockNews >= 120) {
+      this.lastGridlockNews = this.tick;
+      const first = cells.values().next().value as number;
+      const district = this.scenario.districts[this.districtOf[first]]?.name ?? 'the city';
+      const why = dark ? `${dark} waiting at dark signals` : 'flooded and blocked streets leave no way through';
+      this.emit('GRIDLOCK', `Traffic jammed in ${district}: vehicles stuck for over ${GRIDLOCK_WAIT} s in ${cells.size} cells; ${why}`, {
+        cell: first,
+        data: { cells: cells.size, darkSignals: dark },
+      });
     }
   }
 
@@ -1149,7 +1397,17 @@ export class MockSim {
       });
       return;
     }
-    this.advanceOnRoads(v, v.depthLimit, 'wander', 1, VehicleKind[v.kind], asVehicleId(v.id));
+    // Cars crawl through standing water and slow down in heavy rain.
+    const slow = (1 - Math.min(0.6, this.depthAt(v.cell) * 2)) * (1 - 0.2 * this.rain);
+    const before = v.progress;
+    const cell = v.cell;
+    this.advanceOnRoads(v, v.depthLimit, 'wander', slow, VehicleKind[v.kind], asVehicleId(v.id), this.trafficCap(v));
+    v.wait = v.cell === cell && v.progress <= before + 1e-6 ? v.wait + 1 : 0;
+    if (v.wait > GRIDLOCK_WAIT * 2 && v.next >= 0) {
+      // Give up on this way and turn around or take another street.
+      this.replan(v, v.depthLimit, 'wander', v.next);
+      v.wait = GRIDLOCK_WAIT;
+    }
   }
 
   private advanceOnRoads(
@@ -1159,6 +1417,7 @@ export class MockSim {
     speedFactor: number,
     rerouteLabel: string | null,
     actor: SimEvent['actor'],
+    cap = Infinity,
   ): void {
     if (m.next < 0 || !this.passable(m.next, limit)) {
       const blocked = m.next;
@@ -1178,7 +1437,7 @@ export class MockSim {
       }
       if (m.next < 0) return;
     }
-    m.progress += m.speed * speedFactor;
+    m.progress = Math.max(m.progress, Math.min(m.progress + m.speed * speedFactor, cap));
     while (m.progress >= 1) {
       m.progress -= 1;
       m.prev = m.cell;
@@ -1194,21 +1453,22 @@ export class MockSim {
     this.placeMover(m);
   }
 
-  private replan(m: Mover, limit: number, mode: 'wander' | 'evac'): void {
+  private replan(m: Mover, limit: number, mode: 'wander' | 'evac', avoid = -1): void {
     m.plan = [];
     m.planVersion++;
     m.progress = 0;
     m.next = -1;
-    this.extendPlan(m, limit, mode, 12);
+    this.extendPlan(m, limit, mode, 12, avoid);
     m.next = m.plan.shift() ?? -1;
   }
 
-  private extendPlan(m: Mover, limit: number, mode: 'wander' | 'evac', want: number): void {
+  private extendPlan(m: Mover, limit: number, mode: 'wander' | 'evac', want: number, avoid = -1): void {
     const chain = [m.prev, m.cell, ...(m.next >= 0 ? [m.next] : []), ...m.plan];
     let last = chain[chain.length - 1];
     let before = chain[chain.length - 2];
     while (m.plan.length < want) {
-      const options = this.neighbours(last).filter((c) => this.passable(c, limit));
+      const open = this.neighbours(last).filter((c) => this.passable(c, limit));
+      const options = open.length > 1 ? open.filter((c) => c !== avoid) : open;
       if (options.length === 0) break;
       let choice: number;
       if (mode === 'evac') {
@@ -1478,6 +1738,9 @@ export class MockSim {
         this.commsDownUntil = this.tick + dur;
         this.emit('INJECTED', `radio and phone network down for ${dur} ticks (injected)`, { data: { kind: ev.kind } });
         break;
+      case 'rescue_teams_deployed':
+        this.deployTeams(Math.max(1, Math.min(20, ev.count ?? 3)));
+        break;
     }
   }
 
@@ -1634,6 +1897,21 @@ export class MockSim {
       const vs = this.vehicles.filter((v) => v.kind === kind && !v.failed);
       return vs.length ? vs.filter((v) => v.targetNpc < 0).length / vs.length : 0;
     };
+    let roads = 0;
+    let closedRoads = 0;
+    for (let c = 0; c < this.n; c++) {
+      if (!this.isRoad(c)) continue;
+      roads++;
+      if (this.closed[c] || this.debris[c] || (this.blocks[c] === BlockType.Bridge && !this.passable(c, Infinity))) closedRoads++;
+    }
+    let residentsAffected = 0;
+    let homesFlooded = 0;
+    for (const i of this.floodedHomes) {
+      const b = this.buildings[i];
+      if (!b) continue;
+      homesFlooded++;
+      residentsAffected += b.capacity;
+    }
     return {
       tick: this.tick,
       tts: { mean: round2(mean), p50: q(0.5), p90: q(0.9) },
@@ -1653,12 +1931,15 @@ export class MockSim {
         }),
       evacDonePct: round2((100 * sheltered) / Math.max(1, sheltered + evacuating)),
       stranded,
-      gridlockCells: 0,
+      gridlockCells: this.gridlockCells,
       floodedCells: flooded,
       maxDepth: round2(maxDepth),
       unpoweredPopPct: round2((100 * unpowered) / Math.max(1, civilians.length)),
       heliRescues: this.heliRescues,
       routeViolations: 0,
+      homesFlooded,
+      residentsAffected,
+      roadsClosedPct: round2((100 * closedRoads) / Math.max(1, roads)),
     };
   }
 
@@ -1738,7 +2019,7 @@ export class MockSim {
       return {
         id: b.id,
         kind: 'building',
-        title: this.buildingNames[b.id],
+        title: this.nameOf(b),
         attributes: {
           type: BlockType[b.type],
           capacity: b.capacity,

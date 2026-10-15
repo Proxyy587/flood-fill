@@ -1,6 +1,11 @@
-// Render-local palette. Worker 1 owns the canonical one (src/assets/palette.ts,
-// BLOCK_META); swap these lookups to it when it lands (see docs/REQUESTS.md).
+// Render palette. Identity colours (role uniforms, vehicle liveries) come from
+// Worker 1's canonical palette in src/assets/palette.ts. Surface colours below
+// are render-only: they are tuned for the lit, desaturated scene and the
+// lenses, so they deliberately differ from W1's flat BLOCK_PALETTE swatches.
+import { ROLE_PALETTE, VEHICLE_PALETTE } from '../assets/palette';
 import { BlockType, NpcRole, ReportStatus, VehicleKind } from '../contracts';
+
+const hex = (css: string): number => parseInt(css.replace('#', ''), 16);
 
 export type BlockShape = 'terrain' | 'flat' | 'structure' | 'tree' | 'pole' | 'bridge';
 
@@ -38,7 +43,8 @@ export const BLOCK_VISUALS: Record<BlockType, BlockVisual> = {
   [BlockType.Office]: structure(0xbccad4, 0x7d8a95, 12),
   [BlockType.Shop]: structure(0xe9dbbb, 0xa98763, 3),
   [BlockType.Hospital]: structure(0xf6f8f7, 0xe3ebe7, 7),
-  [BlockType.PoliceStation]: structure(0x8aa2c8, 0x4e6a9a, 4),
+  // Plinth only; the building is the police.glb model (render/props/PoliceStations).
+  [BlockType.PoliceStation]: structure(0xc9ccc6, 0x9a9d98, 0.3, false),
   [BlockType.FloodHQ]: structure(0xeab184, 0xc8743a, 5),
   [BlockType.BoatDepot]: structure(0x9cc3c8, 0x4f8790, 3, false),
   [BlockType.FireStation]: structure(0xd9978e, 0xb0483e, 4),
@@ -80,31 +86,16 @@ export const WATER = {
   deepAt: 3,
 } as const;
 
-export const ROLE_COLORS: Record<NpcRole, number> = {
-  [NpcRole.Civilian]: 0xf2efe6,
-  [NpcRole.Driver]: 0xd9d4c7,
-  [NpcRole.Police]: 0x2f63d6,
-  [NpcRole.BoatOperator]: 0xff8a1f,
-  [NpcRole.Paramedic]: 0x2fbf71,
-  [NpcRole.Doctor]: 0x9be7ff,
-  [NpcRole.Nurse]: 0xff8fc7,
-  [NpcRole.HospitalStaff]: 0x7fd6c2,
-  [NpcRole.Pilot]: 0x9b6bff,
-  [NpcRole.Dispatcher]: 0xffd23f,
-};
+export const ROLE_COLORS = Object.fromEntries(Object.entries(ROLE_PALETTE).map(([role, css]) => [role, hex(css)])) as Record<NpcRole, number>;
 
 export const STRANDED_COLOR = 0xff3b30;
 
-export const CAR_COLORS = [0xd94b3d, 0x3e7cc9, 0xe8e4da, 0x2f2f33, 0x5fae5a, 0xe0b23a] as const;
+/** Everyday clothes, so a crowd of civilians doesn't read as one uniform. */
+export const CIVILIAN_SHIRTS: readonly number[] = [0x3fa7d6, 0xf29e4c, 0x59c36a, 0xe8d44d, 0xe56b8a, 0x8e7cc3, 0xf2f2f2, 0x5c6f82, 0xd9534f, 0x2bb3a3];
 
-export const VEHICLE_BASE: Record<VehicleKind, number> = {
-  [VehicleKind.Car]: 0xffffff,
-  [VehicleKind.Bus]: 0xf2c230,
-  [VehicleKind.Ambulance]: 0xffffff,
-  [VehicleKind.PoliceCar]: 0xffffff,
-  [VehicleKind.Boat]: 0xffffff,
-  [VehicleKind.Helicopter]: 0xffffff,
-};
+const carLiveries = VEHICLE_PALETTE[VehicleKind.Car];
+export const CAR_COLORS: readonly number[] = (Array.isArray(carLiveries) ? carLiveries : [carLiveries]).map(hex);
+
 
 export const REPORT_COLORS: Record<ReportStatus, number> = {
   [ReportStatus.Unverified]: 0xffb300,
@@ -113,7 +104,7 @@ export const REPORT_COLORS: Record<ReportStatus, number> = {
   [ReportStatus.False]: 0x8e8e93,
 };
 
-export const SIGNAL_COLORS = { green: 0x3ddc84, amber: 0xffc233, dark: 0x22262c } as const;
+export const SIGNAL_COLORS = { green: 0x3ddc84, amber: 0xffc233, red: 0xff4a3d, dark: 0x22262c } as const;
 
 export const UI_COLORS = {
   hover: 0xffffff,
@@ -122,4 +113,17 @@ export const UI_COLORS = {
   highlight: 0xd6336c,
 } as const;
 
-export const SKY = { clear: 0xd8e4ea, storm: 0x6d7880 } as const;
+export const SKY = { clear: 0xd8e4ea, storm: 0x6d7880, golden: 0xf2b27e, night: 0x0c1524, nightStorm: 0x080d15 } as const;
+
+/** Light colours across the day. */
+export const DAYLIGHT = {
+  sun: 0xfff4e0,
+  sunLow: 0xffa860,
+  moon: 0x8fa6d8,
+  hemiSkyDay: 0xcfe6ff,
+  hemiSkyNight: 0x41588f,
+  hemiGroundDay: 0x5a4a3a,
+  hemiGroundNight: 0x1a1c26,
+  /** Window material multiplier at night: lit glass turns warm. */
+  windowsNight: 0xffd08a,
+} as const;

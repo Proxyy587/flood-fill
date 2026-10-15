@@ -98,6 +98,11 @@ export class TerrainLayer {
     }
   }
 
+  /** Night 0..1: powered glass warms toward lamplight; dark (blackout) glass stays dark. */
+  setNight(night: number, warm: THREE.Color): void {
+    this.windowMat.color.setRGB(1, 1, 1).lerp(warm, night);
+  }
+
   dispose(): void {
     for (const id of [...this.chunks.keys()]) this.disposeChunk(id);
     this.solidMat.dispose();

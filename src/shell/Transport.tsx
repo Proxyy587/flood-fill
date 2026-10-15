@@ -1,28 +1,32 @@
 'use client';
 
-import { CloudRain, GitBranch, Pause, Play, RotateCcw, StepForward } from 'lucide-react';
+import { CloudRain, GitBranch, LifeBuoy, Pause, Play, Radio, RotateCcw, StepForward } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useSceneStore } from '../bridge/sceneStore';
 import type { SimBridge } from '../bridge/SimBridge';
 import { useSimFeedStore } from '../bridge/simFeedStore';
 import { useEditorStore } from '../ui/store/editorStore';
-import { clockOf, elapsed, eventTitle, HEADLINES } from './city';
+import { clockOf, elapsed, eventTitle, formatTimeOfDay, HEADLINES } from './city';
 import styles from './shell.module.css';
 
 const VW = 1000;
 const VH = 40;
 const TONE = { info: '#1e6fd9', warn: '#e8a317', bad: '#d93a2b', good: '#1f9d63' } as const;
+const RESCUE_TEAMS = 3;
 
 /**
  * Bottom transport: run controls plus the storm timeline, a rain hyetograph
- * with key moments marked. Dragging the playhead replays the run to that
- * moment (the simulation is deterministic, so it re-runs to the same state).
+ * with key moments marked. Dragging the playhead back replays recorded
+ * frames; dragging past the live edge simulates ahead.
  */
 export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: SimBridge; onPlay: () => void; onRestart: () => void; onBranch: () => void }) {
   const playing = useSceneStore((s) => s.playing);
   const speed = useSceneStore((s) => s.speed);
   const tick = useSceneStore((s) => s.tick);
   const maxTicks = useSceneStore((s) => s.maxTicks);
+  const liveTick = useSceneStore((s) => s.liveTick);
+  const busy = useSceneStore((s) => s.busy);
+  const dayStart = useSceneStore((s) => s.runSettings.startSeconds);
   const loading = useSceneStore((s) => s.connection !== 'ready');
   const mode = useEditorStore((s) => s.mode);
   const rain = useEditorStore((s) => s.scenario?.weather.rain);
@@ -63,7 +67,9 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
     return Math.round(Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * total);
   };
   const shown = scrub ?? tick;
+  const seed = useSceneStore((s) => s.seed);
   const over = maxTicks > 0 && tick >= maxTicks;
+  const replaying = running && tick < liveTick;
 
   return (
     <div className={`${styles.panel} ${styles.transport}`} role="group" aria-label="Storm controls">
@@ -71,9 +77,9 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
         {playing ? <Pause size={16} /> : <Play size={16} />}
         {loading ? 'Loading city…' : playing ? 'Pause' : !running || over ? 'Start storm' : 'Resume'}
       </button>
-      <div className={styles.clock} title={`${tick} simulated seconds`}>
+      <div className={styles.clock} title={`${tick} simulated seconds · seed ${seed}. The same city and seed replay the same storm.`}>
         <strong>{clockOf(shown)}</strong>
-        <span>{running ? elapsed(shown) : 'Day starts 08:00'}</span>
+        <span>{!running ? `Day starts ${formatTimeOfDay(dayStart)}` : `${replaying ? 'Replay · ' : ''}${elapsed(shown)} · seed ${seed}`}</span>
       </div>
       <div
         ref={bar}
@@ -103,6 +109,7 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
         <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" aria-hidden>
           <line x1={0} x2={VW} y1={VH - 0.5} y2={VH - 0.5} stroke="rgba(21,35,45,0.15)" vectorEffect="non-scaling-stroke" />
           <path d={hyeto} fill="rgba(30,111,217,0.14)" stroke="rgba(30,111,217,0.5)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          {running && <rect x={0} y={0} width={X(liveTick)} height={VH} fill="rgba(21,35,45,0.05)" />}
           {running && <rect x={0} y={0} width={X(shown)} height={VH} fill="rgba(21,35,45,0.07)" />}
           {marks.map((m, i) => (
             <line key={i} x1={m.x} x2={m.x} y1={2} y2={VH} stroke={TONE[m.tone]} strokeWidth={2} vectorEffect="non-scaling-stroke" />
@@ -144,6 +151,11 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
             {hover.label}
           </span>
         )}
+        {busy && (
+          <span className={styles.timelineLabel} role="status">
+            {busy.label} · {Math.round(busy.progress * 100)}%
+          </span>
+        )}
         {!running && (
           <span className={styles.timelineLabel}>
             <CloudRain size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} />
@@ -158,9 +170,25 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
           </button>
         ))}
       </div>
+      {replaying && !busy && (
+        <button type="button" className={styles.button} onClick={() => bridge.seek(liveTick)} title="Jump to the furthest simulated moment">
+          <Radio size={14} /> Go live
+        </button>
+      )}
       {running && (
         <>
-          <button type="button" className={styles.iconButton} disabled={playing || over} onClick={() => bridge.step(60)} title="Step one minute" aria-label="Step one minute">
+          <button
+            type="button"
+            className={`${styles.button} ${styles.rescue}`}
+            disabled={over || !!busy || replaying}
+            onClick={() => bridge.inject({ t: tick, kind: 'rescue_teams_deployed', count: RESCUE_TEAMS })}
+            aria-label="Release rescue teams"
+            title={`Release ${RESCUE_TEAMS} SDRF boat teams (a boat and 4 rescuers each) from flood HQ or the boat depot`}
+          >
+            <LifeBuoy size={14} />
+            <span className={styles.rescueLabel}>Release rescue teams</span>
+          </button>
+          <button type="button" className={styles.iconButton} disabled={playing || over || !!busy} onClick={() => bridge.step(60)} title="Step one minute" aria-label="Step one minute">
             <StepForward size={16} />
           </button>
           <button type="button" className={styles.iconButton} onClick={onRestart} title="Restart the storm (same seed)" aria-label="Restart">
