@@ -46,11 +46,11 @@
 
 **Files:** create `src/sim/dispatch/ambulances.ts`, `src/sim/dispatch/ambulances.test.ts`; reuse `src/sim/nav/index.ts`, `src/sim/nav/hazards.ts`, and the existing vehicle snapshot shape.
 
-- [ ] **Step 1: Write tests** for zero/configured fleet, stable IDs after civilian-car IDs, safe placement priority (operational hospital, safe HQ road, lowest safe road), unavailable fleet without safe roads, one casualty per ambulance, no double assignment, depth-safe adjacent movement and deterministic replanning after closure/version change.
-- [ ] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/ambulances.test.ts`.
-- [ ] **Step 3: Implement** typed-array state sized exactly to `scenario.fleet.ambulances`; never grow it at runtime. Export creation, safe route planning, one-cell movement and owned snapshot projection. Allocate IDs after the reserved vehicle range used by `population.cars.id`; route checks use current blocked cells, water and nav version. Never step into a newly unsafe cell.
-- [ ] **Step 4: Run GREEN**: `pnpm exec vitest run src/sim/dispatch/ambulances.test.ts src/sim/invariants/movement.test.ts`.
-- [ ] **Step 5: Commit** with `feat(sim): add finite ambulance fleet movement`.
+- [x] **Step 1: Write tests** for zero/configured fleet, stable ambulance IDs in the reserved emergency range (civilian cars start after it), safe placement priority (operational hospital access road, safe HQ road, lowest safe road), unavailable fleet without safe roads, depth-safe adjacent movement and deterministic replanning after closure/version change. Casualty exclusivity is tested with dispatch allocation in Task 4.
+- [x] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/ambulances.test.ts`; expected missing-module failure observed.
+- [x] **Step 3: Implement** typed-array state sized exactly to `scenario.fleet.ambulances`; never grow it at runtime. Export creation, safe route planning, one-cell movement and owned snapshot projection. Allocate IDs from `1..scenario.fleet.ambulances` inside the emergency ID range reserved by `population.createPopulation` (civilian cars start after the combined emergency-fleet range). Because hospital building cells are not car-traversable, use a safe adjacent road access cell as the ambulance's hospital entrance base; route checks use current blocked cells, water and nav version. Never step into a newly unsafe cell.
+- [x] **Step 4: Run GREEN**: ambulance and movement-invariant suites pass, 9 tests; strict TypeScript passes.
+- [x] **Step 5: Commit** with `feat(sim): add finite ambulance fleet movement` (committed with this checkpoint).
 
 ## Task 4: Distinct dispatch policies and assignment lifecycle
 

@@ -124,7 +124,9 @@ continue to update during exposure; once a casualty is loaded, flood exposure st
 
 - Ambulances are created only from `scenario.fleet.ambulances`, with stable
   non-colliding vehicle IDs and a fixed start at the nearest safe hospital
-  entrance, preferring powered hospitals. If no hospital entrance is safe, use
+  entrance, preferring powered hospitals. Since hospital building cells are not
+  car-traversable, the operational entrance is represented in the road graph by
+  its nearest safe adjacent road access cell. If no hospital entrance is safe, use
   the nearest safe road cell to Flood HQ; if there is no HQ, use the lowest-index
   safe road cell. If the map has no safe road cell, the unit stays unavailable
   and demand is counted unmet. Units are not spawned when demand exceeds supply.

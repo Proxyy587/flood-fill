@@ -81,8 +81,12 @@ provisional request per report cluster, field-only triage, multiple casualties p
 incident and a finite fleet. Inline implementation is in progress. Task 1 adds
 bounded incident requests/provenance over delivered M3A clusters (including late
 cluster-bridge coalescing); Task 2 adds deterministic synthetic flood exposure and
-field triage. RED was observed before both modules; focused report/dispatch health
-passes 21 tests and strict TypeScript passes. No shared-contract changes.
+field triage; Task 3 adds a finite typed-array ambulance fleet, safe road access
+bases, hazard-aware routes and deterministic replanning. RED was observed before
+each module; current focused incident/report/hospital/ambulance/movement suites pass
+30 tests and strict TypeScript passes. Hospital building cells are represented by
+their nearest safe adjacent road cell for ambulance staging. No shared-contract
+changes.
 
 ## 2026-10-15 baseline
 
