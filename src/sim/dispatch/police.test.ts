@@ -320,6 +320,7 @@ it("cancels a closed dispatch route, clears ownership, and retries safely", () =
     type: "COMMIT_CANCELLED",
     actor: fixture.police.id[0],
     actorKind: "vehicle",
+    cell: 27,
     reason: expect.stringMatching(/route/i),
   }));
   expect(failed.events.find((event) => event.type === "COMMIT_CANCELLED")?.reason.length).toBeGreaterThan(0);
@@ -330,4 +331,23 @@ it("cancels a closed dispatch route, clears ownership, and retries safely", () =
   fixture.blocked[19] = 0;
   stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 2, 3);
   expect(fixture.police.assignment[0]).toBe(27);
+});
+
+it("reports the assigned intersection when the next route step becomes unsafe", () => {
+  const fixture = trafficFixture();
+  fixture.traffic.intersections[27] = 1;
+  fixture.traffic.gridlock[27] = 1;
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
+  fixture.blocked[26] = 1;
+
+  const failed = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 2);
+
+  expect(failed.events).toContainEqual(expect.objectContaining({
+    tick: 2,
+    type: "COMMIT_CANCELLED",
+    actor: fixture.police.id[0],
+    actorKind: "vehicle",
+    cell: 27,
+    reason: expect.stringMatching(/route.*unsafe/i),
+  }));
 });

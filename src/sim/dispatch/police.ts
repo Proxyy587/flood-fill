@@ -178,7 +178,7 @@ export function stepPolice(
     if (!route) continue;
     if (route.navVersion !== navVersion) {
       if (!planPoliceRoute(system, unit, route.target, world, scenario, blocked, navVersion)) {
-        events.push({ tick, type: "COMMIT_CANCELLED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", reason: "Police vehicle route became unreachable after the road graph changed; assignment released for retry" });
+        events.push({ tick, type: "COMMIT_CANCELLED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", cell: route.target, reason: "Police vehicle route became unreachable after the road graph changed; assignment released for retry" });
         continue;
       }
       route = system.routes[unit];
@@ -196,7 +196,7 @@ export function stepPolice(
       system.target[unit] = -1;
       system.assignment[unit] = -1;
       system.state[unit] = VehicleState.Idle;
-      events.push({ tick, type: "COMMIT_CANCELLED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", cell: system.cell[unit], reason: "Police vehicle route became unsafe; assignment released for retry" });
+      events.push({ tick, type: "COMMIT_CANCELLED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", cell: route.target, reason: "Police vehicle route became unsafe; assignment released for retry" });
       continue;
     }
     assertMovementEntry(world, system.cell[unit], next, "car", blocked);
