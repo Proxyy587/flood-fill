@@ -58,7 +58,7 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   }
   const world = createWorld(scenario); const power = createPowerState(scenario);
   const rng = createRng(seed);
-  const events: SimEvent[] = [{ tick: 0, type: "RUN_STARTED", data: { stage: "dispatch", seed, agentsImplemented: true, evacuationImplemented: true, reportsImplemented: true, dispatchImplemented: true }, reason: "Weather, flood, power, commuting, evacuation, uncertain reports, ambulance and boat rescue, shelter handoff and hospital balancing are implemented; police and aircraft remain later slices" }];
+  const events: SimEvent[] = [{ tick: 0, type: "RUN_STARTED", data: { stage: "dispatch", seed, agentsImplemented: true, evacuationImplemented: true, reportsImplemented: true, dispatchImplemented: true }, reason: "Weather, flood, power, commuting, evacuation, reports, ambulance and boat rescue, shelter handoff, hospital balancing, and police gridlock control are implemented; civilian escort, crowd control, and aircraft remain follow-ons" }];
   const frames: MetricsFrame[] = [];
   let tick = 0; let navVersion = 0; let lastRain = -1; let lastWind = -1;
   const blocked = new Uint8Array(world.water.length);
