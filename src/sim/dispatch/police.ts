@@ -99,9 +99,55 @@ export function stepPolice(
   navVersion: number,
   tick: number,
 ): { events: SimEvent[]; controlled: Uint8Array } {
-  void traffic; // Traffic selection/control is intentionally reserved for the next slice.
   const events: SimEvent[] = [];
   const controlled = new Uint8Array(world.width * world.height);
+
+  // Clear assignments whose incidents are no longer gridlocked before any
+  // new work is considered. A unit at scene is available again immediately.
+  for (let unit = 0; unit < system.count; unit++) {
+    const assigned = system.assignment[unit];
+    if (assigned < 0 || traffic.gridlock[assigned] === 1) continue;
+    system.assignment[unit] = -1;
+    system.target[unit] = -1;
+    system.routes[unit] = null;
+    system.state[unit] = VehicleState.Idle;
+  }
+
+  const owned = new Uint8Array(traffic.gridlock.length);
+  for (let unit = 0; unit < system.count; unit++) {
+    const assigned = system.assignment[unit];
+    if (assigned >= 0 && assigned < owned.length) owned[assigned] = 1;
+  }
+  const eligible: number[] = [];
+  for (let cell = 0; cell < traffic.gridlock.length; cell++) {
+    if (traffic.intersections[cell] === 1 && traffic.gridlock[cell] === 1 && owned[cell] === 0) eligible.push(cell);
+  }
+  eligible.sort((a, b) => traffic.waited[b] - traffic.waited[a] ||
+    traffic.lastDemand[b] - traffic.lastDemand[a] || a - b);
+
+  const hazardGrid = buildHazardGrid(world, scenario, "car", blocked);
+  for (const target of eligible) {
+    let selected = -1;
+    let selectedPath: number[] | null = null;
+    for (let unit = 0; unit < system.count; unit++) {
+      if (!system.available[unit] || system.state[unit] !== VehicleState.Idle ||
+          system.assignment[unit] !== -1 || system.target[unit] !== -1 || system.routes[unit] !== null) continue;
+      const path = findPath(hazardGrid, system.cell[unit], target);
+      if (!path) continue;
+      if (selectedPath === null || path.length < selectedPath.length ||
+          (path.length === selectedPath.length && system.id[unit] < system.id[selected])) {
+        selected = unit;
+        selectedPath = path;
+      }
+    }
+    if (selected < 0 || selectedPath === null) continue;
+    system.assignment[selected] = target;
+    system.target[selected] = target;
+    system.routes[selected] = { cells: Int32Array.from(selectedPath), cursor: 1, target, navVersion };
+    system.state[selected] = selectedPath.length > 1 ? VehicleState.Moving : VehicleState.Idle;
+    owned[target] = 1;
+  }
+
   for (let unit = 0; unit < system.count; unit++) {
     if (!system.available[unit]) continue;
     let route = system.routes[unit];
@@ -117,7 +163,7 @@ export function stepPolice(
     if (route.cursor >= route.cells.length) {
       system.state[unit] = VehicleState.Idle;
       system.routes[unit] = null;
-      system.target[unit] = -1;
+      if (system.assignment[unit] === -1) system.target[unit] = -1;
       continue;
     }
     const next = route.cells[route.cursor];
@@ -140,8 +186,12 @@ export function stepPolice(
     if (route.cursor >= route.cells.length) {
       system.state[unit] = VehicleState.Idle;
       system.routes[unit] = null;
-      system.target[unit] = -1;
+      if (system.assignment[unit] === -1) system.target[unit] = -1;
     }
+  }
+  for (let unit = 0; unit < system.count; unit++) {
+    const target = system.assignment[unit];
+    if (target >= 0 && system.cell[unit] === target && traffic.gridlock[target] === 1) controlled[target] = 1;
   }
   return { events, controlled };
 }
