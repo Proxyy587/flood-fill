@@ -53,7 +53,7 @@ the 10000-resident/30-tick run takes about 2.7s. This is not full rescue stress 
 proof of the 8ms target. Dispatch comparison and worker/template release gates remain
 unavailable.
 
-### M3A: reports implemented; M3B dispatch design under review
+### M3A/M3B: synthetic reports and ambulance response implemented
 
 Detailed reports-first design and inline plan are committed in 1f9c471. The managed
 worktree `codex/ak-m3-reports` excludes active untracked W1 assets. Frozen-lockfile
@@ -70,15 +70,15 @@ runner tests pass 19/19. Final health passes lint, strict types, 366 tests and
 schema-only validation (`releaseReady:false`); production build, batch/compare and
 the living-city script pass. Its three-seed report smoke confirms 15,000 deterministic
 deliveries/run at 10,000 civilians without exceeding capacity. No contract, renderer,
-or W1 files have been changed. M3B rescue requests/dispatch, aircraft, full stress
-scenario and UI integration remain pending.
+or W1 files have been changed. Boats, police, helicopters, full stress scenario and
+UI integration remain pending.
 
 M3B design and implementation plan are approved and committed:
 `docs/superpowers/specs/2026-10-15-ak-m3b-ambulance-dispatch-hospital-design.md` and
 `docs/superpowers/plans/2026-10-15-ak-m3b-ambulance-dispatch.md`. Scope is ambulance-
 first dispatch with hospital balancing and adaptive hot-zone response, one
 provisional request per report cluster, field-only triage, multiple casualties per
-incident and a finite fleet. Inline implementation is in progress. Task 1 adds
+incident and a finite fleet. Inline implementation is complete through Tasks 1-7. Task 1 adds
 bounded incident requests/provenance over delivered M3A clusters (including late
 cluster-bridge coalescing); Task 2 adds deterministic synthetic flood exposure and
 field triage; Task 3 adds a finite typed-array ambulance fleet, safe road access
@@ -89,9 +89,21 @@ resolution after all admissions, severity-aware destination selection and atomic
 bed reservation/release/retry; Task 6 adds rolling severe-demand hot zones and idle
 ambulance staging at the powered hospital with the lowest safe ETA. RED was observed
 before each module; current focused incident/report/hospital/ambulance/policy/
-hotspot/movement suites pass 46 tests and strict TypeScript passes. Hospital
+hotspot/movement suites pass 54 tests and strict TypeScript passes. Hospital
 building cells are represented by their nearest safe adjacent road cell for
-ambulance staging. No shared-contract changes.
+ambulance staging. The frozen summary schema has no ambulance-hot-zone kind, so
+staging is exposed via assignments and reroute events while the legacy hotspots
+array remains empty. No shared-contract changes. Full health, scale, production,
+verification: `pnpm health` passes lint, strict types and 407 tests; schema validation
+remains explicitly schema-only (`releaseReady:false`) because W1 templates are absent.
+`pnpm build`, three-seed `pnpm sim:batch`, three-seed `pnpm sim:compare`,
+`pnpm exec tsx scripts/health-living.ts`, and `git diff --check` pass. The living-city
+smoke covers 12/1,000/10,000 civilians, seven configured ambulances at the 10,000
+scale, and 15,000 delivered reports/run at 10,000 civilians. Ambulance hot-zone
+staging is recorded as assignment/reroute events; the frozen summary hotspot enum
+does not include ambulance demand, so no shared-contract change was made. Production
+build passes. No policy superiority is claimed. This does not constitute release
+approval or a full rescue stress test.
 
 ## 2026-10-15 baseline
 

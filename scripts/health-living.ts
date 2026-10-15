@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
-import { BlockType, RenderSnapshotSchema, RunSummarySchema, VehicleState } from "../src/contracts";
+import { BlockType, RenderSnapshotSchema, RunSummarySchema, VehicleKind, VehicleState } from "../src/contracts";
 import { createSimulation, runBatch } from "../src/sim";
 import { livingFixture } from "../src/sim/agents/living-fixture";
 import { defaultNpcParams } from "../src/sim/agents/population";
@@ -11,7 +11,7 @@ for (const count of [12, 1000, 10000]) {
   const s = livingFixture();
   s.name = `MOCK living health ${count}`;
   s.population = { count, mix: { carOwners: 0.3, limitedMobility: 0.1, needsAssist: 0.1 }, schedule: "custom", customSchedule: { departAt: 0, workTicks: 5 } };
-  s.fleet = { ambulances: 0, policeCars: 0, boats: 0, helicopters: 0, doctors: 0, nurses: 0, policeOfficers: 0, boatOperators: 0 };
+  s.fleet = { ambulances: count === 10000 ? 7 : 0, policeCars: 0, boats: 0, helicopters: 0, doctors: 0, nurses: 0, policeOfficers: 0, boatOperators: 0 };
   s.buildings[0].capacity = count; s.buildings[2].capacity = count;
   s.weather.sources = []; s.weather.rain = [{ t: 0, intensity: 0 }];
   const ticks = count === 10000 ? 30 : 120;
@@ -19,10 +19,12 @@ for (const count of [12, 1000, 10000]) {
   const sim = createSimulation(s, 42, "centralised", { durationTicks: ticks });
   let previous = sim.snapshot();
   assert.equal(previous.npcs.id.length, count);
+  assert.equal(previous.vehicles.kind.filter((kind) => kind === VehicleKind.Ambulance).length, s.fleet.ambulances);
   let moved = 0;
   while (!sim.done) {
     sim.step(); const snapshot = sim.snapshot();
     assert(RenderSnapshotSchema.safeParse(snapshot).success);
+    assert.equal(snapshot.vehicles.kind.filter((kind) => kind === VehicleKind.Ambulance).length, s.fleet.ambulances);
     for (let i = 0; i < snapshot.npcs.id.length; i++) {
       const distance = Math.hypot(snapshot.npcs.x[i] - previous.npcs.x[i], snapshot.npcs.z[i] - previous.npcs.z[i]);
       assert(distance <= 2.000001, `NPC ${i} teleported ${distance} cells`);

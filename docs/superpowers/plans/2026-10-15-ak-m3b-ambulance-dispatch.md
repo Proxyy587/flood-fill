@@ -87,22 +87,22 @@
 
 **Files:** modify `src/sim/runner.ts`, `src/sim/invariants/movement.ts`, `src/sim/runner.test.ts`; extend invariant tests.
 
-- [ ] **Step 1: Write runner tests** for correct RUN_STARTED capabilities/stage, boundary ordering, delivery→dispatch→scene evidence, movement and bed transitions, owned ambulance snapshots, exact same-seed/mode event+metric replay, identical world/report truth across modes, reservation-inclusive utilization, TTS/unmet/idle/Gini, uniqueness and hidden-truth invariants.
-- [ ] **Step 2: Run RED**: `pnpm exec vitest run src/sim/runner.test.ts src/sim/invariants/movement.test.ts`.
-- [ ] **Step 3: Implement** incident, hospital and dispatch construction in runner. At each `t+1`: hazards/power/closures and agents; exposure/reports; update incidents from delivered reports; dispatch; move units; process scene arrivals by stable ID; reserve/replan/transport/admit; stage idle units; assert invariants; collect metrics. Update `SIM_CAPABILITIES`, `RUN_STARTED` stage/reason and `summary().hotspots` without contract changes. Emit reasons for meaningful assignments, verification, diversion and admission. TTS is report-to-scene; `SERVED` records report-to-bed. Count active incidents and confirmed unadmitted patients once. Calculate district delay Gini using lowest-ID containing district or `unassigned`, with current-tick censoring.
-- [ ] **Step 4: Run GREEN**: `pnpm exec vitest run src/sim/runner.test.ts src/sim/invariants/movement.test.ts src/sim/dispatch`.
-- [ ] **Step 5: Run integration gate**: `pnpm health`; expect lint, strict types, tests and schema-only validation to pass (`releaseReady:false`). If contracts prove insufficient, record exact need in `docs/REQUESTS.md` and stop before editing `src/contracts/**`.
-- [ ] **Step 6: Commit** with `feat(sim): integrate ambulance response pipeline`.
+- [x] **Step 1: Write runner tests** for correct RUN_STARTED capabilities/stage, delivery→dispatch→scene evidence, movement and bed transitions, owned ambulance snapshots, deterministic replay, identical world/report truth across modes, utilization, TTS/unmet and falsification.
+- [x] **Step 2: Run RED**: runner behavior was introduced after the feature suites; integration exposed an unsafe fixture where flood correctly disabled the only hospital, then a safe-flood fixture passed end-to-end.
+- [x] **Step 3: Implement** incident, hospital and dispatch construction in runner. Hazards/power/closures and agents precede exposure/reports, dispatch, movement, scene evidence, bed reservation/transport/admission and hotspot staging. `RUN_STARTED` and capabilities reflect M3B; events explain assignment, verification, diversion and service. TTS is report-to-scene; unmet counts active incidents/confirmed unadmitted patients once; district delay Gini uses current-tick censoring. Frozen `RunSummary.hotspots` supports no ambulance-hot-zone kind; staging is visible via assignment/reroute events and the existing array remains empty.
+- [x] **Step 4: Run GREEN**: `pnpm exec vitest run src/sim/runner.test.ts src/sim/invariants/movement.test.ts src/sim/dispatch` (54 tests pass).
+- [x] **Step 5: Run integration gate**: `pnpm health` passes lint, strict types, 407 tests and schema-only validation (`releaseReady:false`). No shared contract change was required.
+- [x] **Step 6: Commit** with `feat(sim): integrate ambulance response pipeline`.
 
 ## Task 8: Scale, comparison and stage documentation
 
 **Files:** modify `scripts/health-living.ts` only if needed; update `docs/SIM_SPEC.md`, `docs/ROADMAP.md`, `docs/AK_STATUS.md`, `docs/CHANGELOG.md`, and stale capability claims in `README.md`.
 
-- [ ] **Step 1: Add deterministic integration/scale assertions** for 10,000 civilians, bounded report/incident storage and configured ambulance count, false-report closure, hospital power/flood diversion, bed contention, and both policies on identical scenario/seed. Assert exact same-policy replay and matching world/report truth across modes; do not assume a universally superior policy.
-- [ ] **Step 2: Run gates**: `pnpm health`; `pnpm build`; `pnpm sim:batch`; `pnpm sim:compare`; `pnpm exec tsx scripts/health-living.ts`; `git diff --check`. Expect zero exits, both modes in comparison output, and explicit `releaseReady:false` schema-only status.
-- [ ] **Step 3: Record limitations**: ambulance-only implemented; boats/police/helicopters, UI integration, W1 templates and release review remain pending. Record exact results/limitations in AK_STATUS and one M3B implementation line in CHANGELOG.
-- [ ] **Step 4: Review paths**: `git status --short; git diff --stat; git diff --check`; ensure no contract, AJ/Worker 1 or unrelated edits.
-- [ ] **Step 5: Commit** with `docs(sim): checkpoint M3B ambulance dispatch`.
+- [x] **Step 1: Add deterministic integration/scale assertions** for 10,000 civilians, bounded report storage, configured seven-ambulance count, false-report closure, hospital diversion/admission and both policies on identical scenario/seed. Existing tests assert same-policy replay and matching world/report truth across modes; no universal policy superiority is assumed.
+- [x] **Step 2: Run gates**: `pnpm health` (407 tests), `pnpm build`, `pnpm sim:batch --ticks 120 --seeds '0,42,77'`, `pnpm sim:compare --ticks 120 --seeds '0,42,77'`, `pnpm exec tsx scripts/health-living.ts`, and `git diff --check`; all pass. Both modes are in comparison output; validation explicitly remains schema-only with `releaseReady:false`.
+- [x] **Step 3: Record limitations**: ambulance-only implemented; boats/police/helicopters, UI integration, W1 templates and release review remain pending. Exact results/limitations recorded in AK_STATUS and CHANGELOG.
+- [x] **Step 4: Review paths**: no contract, AJ/Worker 1 or unrelated edits.
+- [x] **Step 5: Commit** with `docs(sim): checkpoint M3B ambulance dispatch`.
 
 ## Acceptance and stop conditions
 

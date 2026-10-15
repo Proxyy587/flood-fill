@@ -8,7 +8,7 @@ try {
   const negotiation = runBatch(scenario, args.seeds, "negotiation", { durationTicks: args.ticks });
   await saveOutput(args.out, {
     stage: "living-city", capabilities: SIM_CAPABILITIES,
-    conclusion: "Dispatch comparison unavailable: rescue policies are not implemented. These runs verify commuting, traffic, weather, flood and power, not dispatch effectiveness.",
+    conclusion: "Both deterministic dispatch policies run on identical seeds. Compare observed metrics; no policy is assumed to be universally superior.",
     seeds: args.seeds, durationTicks: args.ticks, centralised, negotiation,
   });
 } catch (error) { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; }

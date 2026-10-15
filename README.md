@@ -9,10 +9,12 @@ emergency-planning authority.
 
 AK headless core: frozen contracts/mocks, seeded population, weighted A*/flow fields,
 weather/flood/power, walking/driving commutes, hazard rerouting, traffic and
-capacity-reserved shelter evacuation after delayed synthetic flood warnings.
-Snapshots and inspectors expose live civilians, staff and civilian cars. The browser
-still displays the Next.js starter page. Rescue dispatch and uncertain reports,
-aircraft, editor, renderer, replay and critic integration remain pending.
+capacity-reserved shelter evacuation after delayed synthetic flood warnings,
+uncertain synthetic reports, ambulance-only rescue dispatch, field triage and
+severity-aware hospital bed balancing. Snapshots and inspectors expose live
+civilians, staff, civilian cars and ambulances. The browser still displays the
+Next.js starter page. Boats, police, helicopters, editor, renderer, replay and critic
+integration remain pending.
 See docs/AK_STATUS.md for checkpoint evidence and incomplete review gates.
 
 ## Setup and verification
@@ -48,13 +50,15 @@ pnpm sim:batch --scenario scenarios/riverside-town.json --ticks 1200 --out out/t
 
 Quote comma-separated seeds in PowerShell. Without --scenario, commands use
 MOCK living town; output includes implemented capabilities. Comparison runs both
-mode labels but explicitly declares dispatch unavailable. Water/power, stranded
-commuters and gridlock are measured. idleFrac.car is the current idle-car fraction,
+both negotiation and centralized dispatch policies on identical seeded inputs.
+Water/power, stranded commuters, gridlock, report-to-scene response, unmet rescue
+demand, ambulance idle fraction, hospital utilization and district delay fairness
+are measured. idleFrac.car is the current idle-car fraction,
 not cumulative duty utilization. unpoweredPopPct counts actual NPC current cells,
 including staff/unhoused people, not housing capacity or district outage exposure.
 Evacuation completion, stranded residents, power, flood and traffic are measured.
-Response TTS, unmet rescue requests, fairness, casualties and aerial rescue metrics
-remain zero placeholders. Mode labels must not be interpreted as policy evidence.
+Comparison results do not imply a universally superior dispatch policy. Aerial
+rescue metrics remain zero until aircraft dispatch is implemented.
 
 No Worker 1 templates exist yet. `pnpm validate` checks the contract fixture and
 all scenario files present, prints their count and reports templatesPresent.
