@@ -1,4 +1,5 @@
 import { BlockType, NpcState, VehicleState } from "../contracts/types";
+import { RAIN_MM_PER_HOUR_AT_FULL } from "../contracts/scenario";
 import type { Scenario, DispatchMode, RunOptions, RenderSnapshot, MetricsFrame, RunSummary, SimEvent, EntitySelection, RequestId, VehicleId, BuildingId } from "../contracts/types";
 import { DispatchModeSchema, RunOptionsSchema, ScenarioSchema, SeedSchema } from "../contracts/sim-schemas";
 import { z } from "zod";
@@ -133,6 +134,7 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   events.push(...stepPower(world, scenario, power, 0));
   updateClosures(0);
   const population = createPopulation(scenario, seed, parsed);
+  const buildingsById = new Map(scenario.buildings.map((building) => [building.id, building] as const));
   const scheduledFalseCount = scenario.injected.filter((event) => event.kind === "false_report").length;
   const reports = createReportSystem(population, scenario.size.w, scenario.size.h, seed, scheduledFalseCount);
   let outageUntil = 0;
@@ -681,9 +683,12 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
     let floodedCells = 0; let maxDepth = 0;
     for (const depth of world.water) { if (depth > 0.01) floodedCells++; maxDepth = Math.max(maxDepth, depth); }
     let stranded = 0; let unpowered = 0; let idleCars = 0; let idleAmbulances = 0; let unmet = 0;
+    const buildingPower = new Map(scenario.buildings.map((building) => [building.id, building.cells.some((cell) => world.powered[cell] > 0)] as const));
     for (let i = 0; i < population.npcs.id.length; i++) {
       if (population.npcs.state[i] === NpcState.SeekHelp || population.npcs.state[i] === NpcState.Stranded) stranded++;
-      if (world.powered[population.npcs.cell[i]] === 0) unpowered++;
+      const residence = buildingsById.get(population.npcs.homeBuilding[i] as BuildingId) ?? buildingsById.get(population.npcs.workBuilding[i] as BuildingId);
+      const hasPower = residence ? buildingPower.get(residence.id) : world.powered[population.npcs.cell[i]] > 0;
+      if (!hasPower) unpowered++;
     }
     for (const state of population.cars.state) if (state === VehicleState.Idle) idleCars++;
     for (let unit = 0; unit < ambulances.count; unit++) if (ambulances.available[unit] && ambulances.state[unit] === VehicleState.Idle && ambulances.assignment[unit] < 0 && ambulances.patientAssignment[unit] < 0) idleAmbulances++;
@@ -744,14 +749,19 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   }
   return {
     get tick() { return tick; }, get done() { return tick >= duration; }, get navVersion() { return navVersion; },
-    rng, snapshot, summary, inspect: (selection: EntitySelection) => inspectAgent(agents, selection),
+    rng, snapshot, summary,
+    updatesSince(eventOffset: number, metricOffset: number) {
+      if (!Number.isInteger(eventOffset) || eventOffset < 0 || !Number.isInteger(metricOffset) || metricOffset < 0) throw new RangeError("Update offsets must be nonnegative integers");
+      return structuredClone({ events: events.slice(eventOffset), metrics: frames.slice(metricOffset) });
+    },
+    inspect: (selection: EntitySelection) => inspectAgent(agents, selection),
     step() {
       if (tick >= duration) throw new Error("Run has already finished");
       const rain = sampleTimeline(scenario.weather.rain.map((p) => ({ t: p.t, value: p.intensity })), tick);
       const wind = sampleTimeline(scenario.weather.wind.map((p) => ({ t: p.t, value: p.speed })), tick);
       if (rain !== lastRain || wind !== lastWind) events.push({ tick, type: "WEATHER", data: { rain, wind }, reason: `Rain intensity ${rain.toFixed(3)}, wind ${wind.toFixed(3)}m/s` });
       lastRain = rain; lastWind = wind;
-      stepFlood(world, { rain: rain * 0.002, sources: scenario.weather.sources, tick });
+      stepFlood(world, { rain: rain * RAIN_MM_PER_HOUR_AT_FULL / 1_000 / 3_600, sources: scenario.weather.sources, tick });
       applyScheduled(tick + 1);
       applyReportInjections(tick + 1);
       events.push(...stepPower(world, scenario, power, tick + 1));

@@ -1,9 +1,11 @@
 import { expect, it } from "vitest";
 import { mockScenario } from "../contracts/mocks/ak";
+import { mockScenario as testCityScenario } from "../contracts/mocks/scenario";
 import { BlockType, VehicleKind } from "../contracts/types";
 import type { VehicleId } from "../contracts/types";
 import { RenderSnapshotSchema, RunSummarySchema } from "../contracts/sim-schemas";
 import { createSimulation, runBatch } from "./runner";
+import { toCoreScenario } from "../worker/akAdapter";
 import { defaultNpcParams } from "./agents/population";
 import { livingFixture } from "./agents/living-fixture";
 
@@ -73,6 +75,20 @@ it("snapshots and summaries own arrays and never detach or mutate live state", (
   const summary = sim.summary(); summary.events[0].reason = "changed";
   expect(sim.summary().events[0].reason).not.toBe("changed");
 });
+it("returns isolated incremental event and metric updates", () => {
+  const sim = createSimulation(mockScenario(), 42, "negotiation", { durationTicks: 12, metricsEvery: 10 });
+  const initial = sim.updatesSince(0, 0);
+  expect(initial.events).toEqual(sim.summary().events);
+  expect(initial.metrics).toEqual([sim.summary().metrics[0]]);
+  initial.events[0].reason = "changed";
+  expect(sim.summary().events[0].reason).not.toBe("changed");
+
+  sim.step();
+  const delta = sim.updatesSince(initial.events.length, initial.metrics.length);
+  expect(delta.events).toEqual(sim.summary().events.slice(initial.events.length));
+  expect(delta.metrics).toEqual(sim.summary().metrics.slice(initial.metrics.length));
+  expect(() => sim.updatesSince(-1, 0)).toThrow(RangeError);
+});
 it("measures actual flood/power effects and reports implemented dispatch capability", () => {
   const s = mockScenario(); s.weather.sources = [{ cell: 6, startT: 0, endT: 5, rate: 2 }];
   const [run] = runBatch(s, [42], "negotiation", { durationTicks: 10 });
@@ -80,6 +96,56 @@ it("measures actual flood/power effects and reports implemented dispatch capabil
   expect(run.events.some((e) => e.type === "POWER_TRIP")).toBe(true);
   expect(run.events[0].data?.dispatchImplemented).toBe(true);
 });
+
+it("converts displayed 150 mm/h peak rainfall to metres per simulated second", () => {
+  const scenario = mockScenario();
+  scenario.population.count = 0;
+  scenario.fleet = { ambulances: 0, policeCars: 0, boats: 0, helicopters: 0, doctors: 0, nurses: 0, policeOfficers: 0, boatOperators: 0 };
+  scenario.weather.rain = [{ t: 0, intensity: 1 }];
+  scenario.weather.sources = [];
+  const sim = createSimulation(scenario, 7, "negotiation", { durationTicks: 1 });
+  sim.step();
+  const totalRainDepth = sim.snapshot().water.reduce((sum, depth) => sum + depth, 0);
+
+  // 150 mm/h is 0.0000417 m per cell per simulated second, not 0.002 m/s.
+  expect(totalRainDepth).toBeGreaterThan(0);
+  expect(totalRainDepth).toBeLessThan(scenario.size.w * scenario.size.h * 0.00005);
+});
+
+it("keeps the default test-city river source within a gradual-rise range", () => {
+  const source = toCoreScenario(testCityScenario()).scenario.weather.sources[0];
+  expect(source).toBeDefined();
+  expect(source.rate).toBeLessThanOrEqual(0.005);
+});
+
+it("does not approach blanket inundation before the default rain graph reaches its peak", () => {
+  const scenario = toCoreScenario(testCityScenario()).scenario;
+  scenario.weather.sources = [];
+  scenario.population.count = 0;
+  scenario.fleet = { ambulances: 0, policeCars: 0, boats: 0, helicopters: 0, doctors: 0, nurses: 0, policeOfficers: 0, boatOperators: 0 };
+  const sim = createSimulation(scenario, 7, "negotiation", { durationTicks: 840, metricsEvery: 840 });
+  while (!sim.done) sim.step();
+  const flooded = sim.summary().metrics.at(-1)?.floodedCells;
+  expect(flooded).toBeDefined();
+  expect(flooded!).toBeLessThan(scenario.size.w * scenario.size.h * 0.25);
+});
+
+it("measures residential power at each home instead of its entrance road cell", () => {
+  const scenario = toCoreScenario(testCityScenario()).scenario;
+  const sim = createSimulation(scenario, 7, "negotiation", { durationTicks: 1 });
+  expect(sim.summary().metrics[0].unpoweredPopPct).toBe(0);
+});
+
+it("keeps the first fifteen minutes of the default test city below blanket inundation", () => {
+  const scenario = toCoreScenario(testCityScenario()).scenario;
+  scenario.population.count = 0;
+  scenario.fleet = { ambulances: 0, policeCars: 0, boats: 0, helicopters: 0, doctors: 0, nurses: 0, policeOfficers: 0, boatOperators: 0 };
+  const sim = createSimulation(scenario, 7, "negotiation", { durationTicks: 900, metricsEvery: 900 });
+  while (!sim.done) sim.step();
+  const last = sim.summary().metrics.at(-1);
+  if (!last) throw new Error("Expected a final flood metrics frame");
+  expect(last.floodedCells).toBeLessThan(scenario.size.w * scenario.size.h * 0.6);
+}, 15_000);
 it("rejects invalid seeds, duration and mode", () => {
   expect(() => runBatch(mockScenario(), [-1], "negotiation")).toThrow();
   expect(() => runBatch(mockScenario(), [42], "negotiation", { durationTicks: 0 })).toThrow();

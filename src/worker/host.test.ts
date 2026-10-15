@@ -17,7 +17,7 @@ const manualClock = () => {
   let now = 0;
   let queue: { at: number; fn: () => void; id: number }[] = [];
   let next = 1;
-  const clock: Clock & { advance(ms: number): void; idle(): boolean } = {
+  const clock: Clock & { advance(ms: number): void; jump(ms: number): void; runNext(): void; idle(): boolean } = {
     now: () => now,
     schedule(fn, ms) {
       const id = next++;
@@ -38,6 +38,16 @@ const manualClock = () => {
         job.fn();
       }
       now = end;
+    },
+    jump(ms) {
+      now += ms;
+    },
+    runNext() {
+      queue.sort((a, b) => a.at - b.at);
+      const job = queue.shift();
+      if (!job) return;
+      now = Math.max(now, job.at);
+      job.fn();
     },
     idle: () => queue.length === 0,
   };
@@ -61,10 +71,51 @@ const harness = (scenario: Scenario, engine: SimEngine, extra: Partial<RunOption
 const cases = [...templates.map((t) => ({ name: t.id, scenario: t.scenario })), { name: 'preview city', scenario: mockScenario() }];
 
 describe('SimHost (worker protocol)', () => {
+  it('keeps pause responsive during playback catch-up', () => {
+    const h = harness(mockScenario(), 'preview', { speed: 64 });
+    h.host.handle({ type: 'play' });
+    h.clock.jump(20_000);
+    h.clock.runNext();
+
+    expect(h.lastStatus().liveTick).toBe(8);
+    h.host.handle({ type: 'pause' });
+    const pausedAt = h.lastStatus().liveTick;
+    h.clock.advance(1_000);
+    expect(h.lastStatus().liveTick).toBe(pausedAt);
+  });
+
+  it('contains a playback worker fault and permits loading a fresh run', () => {
+    const h = harness(mockScenario(), 'preview');
+    const engine = (h.host as unknown as { engine: { step(): void } | null }).engine;
+    if (!engine) throw new Error('Expected the preview engine to be loaded');
+    engine.step = () => {
+      throw new Error('synthetic step fault');
+    };
+
+    h.host.handle({ type: 'play' });
+    h.clock.jump(1_000);
+    h.clock.runNext();
+
+    expect(h.errors()).toEqual(['synthetic step fault']);
+    expect(h.lastStatus().playing).toBe(false);
+    expect(h.clock.idle()).toBe(true);
+
+    h.host.handle({
+      type: 'load',
+      scenario: mockScenario(),
+      seed: 4,
+      options: { dispatchMode: 'negotiation', npcParams: DEFAULT_NPC_PARAMS, maxTicks: 400, speed: 16, mode: 'run', engine: 'preview' },
+    });
+    expect(h.lastStatus().playing).toBe(false);
+    expect(h.of('ready')).toHaveLength(2);
+  });
+
   for (const c of cases)
     for (const engine of ['core', 'preview'] as const) {
       it(`${c.name} on ${engine}: load, step, play, pause without sharing buffers`, () => {
-        const h = harness(c.scenario, engine);
+        // The UI exposes a maximum of 16×; keep the worker playback check at
+        // that supported speed instead of stress-testing an unreachable 64×.
+        const h = harness(c.scenario, engine, { speed: 16 });
         expect(h.errors()).toEqual([]);
         expect(h.of('world')).toHaveLength(1);
         expect(h.of('ready')[0].status.engine).toBe(engine);
@@ -83,7 +134,7 @@ describe('SimHost (worker protocol)', () => {
         expect(h.errors()).toEqual([]);
         const ticks = h.events().map((e) => e.tick);
         expect(ticks).toEqual([...ticks].sort((a, b) => a - b));
-      });
+      }, 30_000);
     }
 
   it('runs a core template to the end and reports, dispatches and reserves beds', () => {
@@ -122,6 +173,38 @@ describe('SimHost (worker protocol)', () => {
     h.host.handle({ type: 'seek', tick: 25 });
     h.host.handle({ type: 'step', ticks: 1 });
     expect(h.lastStatus().tick).toBe(20 + RECORD_EVERY);
+  }, 30_000);
+
+  it('cancels an in-progress seek when the user selects an earlier timeline point', () => {
+    const h = harness(mockScenario(), 'preview', { maxTicks: 6000 });
+    h.host.handle({ type: 'step', ticks: 30 });
+    const engine = (h.host as unknown as { engine: { step(): void } | null }).engine;
+    if (!engine) throw new Error('Expected the preview engine to be loaded');
+    const step = engine.step.bind(engine);
+    engine.step = () => {
+      h.clock.jump(35);
+      step();
+    };
+    h.host.handle({ type: 'seek', tick: 5000 });
+    expect(h.lastStatus().busy?.label).toBe('Simulating ahead');
+    h.clock.runNext();
+    expect(h.lastStatus().busy?.label).toBe('Simulating ahead');
+    const progressedLiveTick = h.lastStatus().liveTick ?? 0;
+    expect(progressedLiveTick).toBeGreaterThan(30);
+    expect(h.lastStatus().tick).toBe(progressedLiveTick);
+    expect(h.lastSnapshot().tick).toBe(progressedLiveTick);
+    expect(h.events().every((event) => event.tick <= progressedLiveTick)).toBe(true);
+
+    h.host.handle({ type: 'seek', tick: 10 });
+
+    expect(h.lastStatus()).toMatchObject({ tick: 10, liveTick: progressedLiveTick });
+    expect(h.lastStatus().busy).toBeUndefined();
+    expect(h.lastSnapshot().tick).toBe(10);
+    expect(h.clock.idle()).toBe(true);
+    h.clock.runNext();
+    expect(h.lastStatus()).toMatchObject({ tick: 10, liveTick: progressedLiveTick });
+    expect(h.lastStatus().busy).toBeUndefined();
+    expect(h.events().every((event) => event.tick <= 10)).toBe(true);
   });
 
   it('re-simulates the core run when an event is injected, without repeating history', () => {
@@ -142,10 +225,23 @@ describe('SimHost (worker protocol)', () => {
 
   it('refuses injected events the core does not model, without crashing the run', () => {
     const h = harness(cases[0].scenario, 'core');
-    h.host.handle({ type: 'inject', event: { kind: 'boat_failure', t: 0, target: 1 } });
+    h.host.handle({ type: 'inject', event: { kind: 'helicopter_grounded_wind', t: 0, speed: 1, durationTicks: 60 } });
     expect(h.errors()[0]).toMatch(/not modelled by the core/);
     h.host.handle({ type: 'step', ticks: 5 });
     expect(h.lastSnapshot().tick).toBe(5);
+  });
+
+  it('accepts a boat failure injection through the core worker protocol', () => {
+    const scenario = cases.find((item) => item.scenario.fleet.boats > 0 && item.scenario.fleet.boatOperators > 0)?.scenario;
+    if (!scenario) throw new Error('Expected one scenario with an operated rescue boat');
+    const boatId = scenario.fleet.ambulances + scenario.fleet.policeCars + 1;
+    const h = harness(scenario, 'core');
+    h.host.handle({ type: 'inject', event: { kind: 'boat_failure', t: 0, target: boatId } });
+    h.clock.advance(0);
+    h.host.handle({ type: 'step', ticks: 2 });
+
+    expect(h.errors()).toEqual([]);
+    expect(h.events().some((event) => event.type === 'INJECTED' && event.data?.kind === 'boat_failure')).toBe(true);
   });
 
   it('is deterministic: same scenario and seed give the same log', () => {

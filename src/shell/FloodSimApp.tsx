@@ -9,7 +9,7 @@ import { createSimWorker } from '../bridge/createSimWorker';
 import { useSceneStore } from '../bridge/sceneStore';
 import { SimBridge } from '../bridge/SimBridge';
 import { useSimFeedStore } from '../bridge/simFeedStore';
-import { BlockType, type ScenarioPatch } from '../contracts';
+import { BlockType, type Scenario, type ScenarioPatch } from '../contracts';
 import { mockScenario } from '../contracts/mocks';
 import { ScenarioSchema } from '../contracts/schemas';
 import { startAutosave } from '../editor/autosave';
@@ -21,6 +21,7 @@ import { ScoreRecorder } from '../ui/score/ScoreCard';
 import { useEditorStore, type EditorTool } from '../ui/store/editorStore';
 import { describeCity, useCityStore } from './city';
 import { Compass, Footer, HoverTip, Identity, Inspector, LensCard, Toasts, Vitals } from './Hud';
+import { DecisionPanel } from './DecisionPanel';
 import { BuildTool, Hotbar, TerrainTool } from './tools/BuildTool';
 import { FilesTool } from './tools/FilesTool';
 import { LensTool } from './tools/LensTool';
@@ -241,13 +242,18 @@ export function FloodSimApp() {
     const s = mockScenario();
     if (name === 'demo:stress') {
       s.name = 'riverside-everything-fails';
-      s.injected = [
-        { t: 600, kind: 'bridge_closed', cell: s.blocks.findIndex((b) => b === BlockType.Bridge) },
-        { t: 600, kind: 'boat_failure' },
-        { t: 600, kind: 'shelter_overflow' },
-        { t: 600, kind: 'substation_flooded' },
-        { t: 600, kind: 'helicopter_grounded_wind', durationTicks: 600 },
+      const incidents: Scenario['injected'] = [
+        { t: 600, kind: 'bridge_closed', cell: s.blocks.findIndex((block) => block === BlockType.Bridge) },
       ];
+      if (s.fleet.boats > 0 && s.fleet.boatOperators > 0) {
+        incidents.push({ t: 600, kind: 'boat_failure', target: s.fleet.ambulances + s.fleet.policeCars + 1 });
+      }
+      const shelter = s.buildings.find((building) => building.type === BlockType.Shelter);
+      if (shelter) incidents.push({ t: 600, kind: 'shelter_overflow', target: shelter.id });
+      const substation = s.powerGrid.nodes.find((node) => node.kind === 'substation');
+      if (substation) incidents.push({ t: 600, kind: 'substation_flooded', target: substation.id });
+      // Helicopter grounding is intentionally omitted until the AK runner implements aircraft.
+      s.injected = incidents;
     }
     useEditorStore.getState().load(s);
   };
@@ -299,6 +305,7 @@ export function FloodSimApp() {
       <SoundDirector />
       <NewsTicker />
       <RecoveryPrompt />
+      {bridge && <DecisionPanel />}
       {tool === 'build' && mode === 'edit' && <Hotbar />}
       {bridge && <Transport bridge={bridge} onPlay={play} onRestart={restart} onBranch={askBranch} />}
       <Compass />

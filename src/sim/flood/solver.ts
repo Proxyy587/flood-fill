@@ -7,6 +7,20 @@ interface FloodInput {
   rain: number; sources: WeatherDef["sources"]; tick: number;
   soakRate?: number; drainRate?: number; coefficient?: number; pumpsNeedPower?: boolean;
 }
+
+/** Fraction of incident rainfall that becomes surface runoff on each land cover. */
+const RUNOFF_COEFFICIENT: Partial<Record<BlockType, number>> = {
+  [BlockType.Grass]: 0.3,
+  [BlockType.Tree]: 0.15,
+  [BlockType.Sand]: 0.2,
+  [BlockType.Dirt]: 0.5,
+  [BlockType.Rock]: 0.7,
+  [BlockType.Levee]: 0.4,
+  [BlockType.WaterSource]: 0,
+};
+
+const runoffCoefficient = (block: number): number => RUNOFF_COEFFICIENT[block as BlockType] ?? 0.9;
+
 export function totalWater(world: World): number {
   let total = 0; for (const depth of world.water) total += depth; return total;
 }
@@ -23,8 +37,7 @@ export function stepFlood(w: World, input: FloodInput) {
   for (const source of sources) if (!Number.isInteger(source.cell) || source.cell < 0 || source.cell >= length || !Number.isFinite(source.rate) || source.rate < 0 || source.rate > 1000 || !Number.isSafeInteger(source.startT) || !Number.isSafeInteger(source.endT) || source.startT < 0 || source.endT <= source.startT) throw new RangeError("Invalid flood source");
   if (!w.water.every((v) => Number.isFinite(v) && v >= 0 && v <= 1e20) || !w.flow.every(Number.isFinite)) throw new RangeError("Invalid flood state");
   for (let i = 0; i < length; i++) {
-    const permeability = w.block[i] === BlockType.Grass || w.block[i] === BlockType.Sand ? 0.8 : 1;
-    const amount = rain * permeability;
+    const amount = rain * runoffCoefficient(w.block[i]);
     w.water[i] += amount; added += amount;
   }
   for (const source of sources) {

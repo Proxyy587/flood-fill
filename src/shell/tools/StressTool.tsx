@@ -17,6 +17,8 @@ interface StressEvent {
   icon: LucideIcon;
   type?: BlockType;
   vehicle?: VehicleKind;
+  supported?: boolean;
+  requiresSelectedLocation?: boolean;
 }
 
 const EVENTS: StressEvent[] = [
@@ -25,9 +27,9 @@ const EVENTS: StressEvent[] = [
   { kind: 'road_blocked_by_debris', label: 'Block a road', caption: 'Debris closes one street.', icon: Construction, type: BlockType.Road },
   { kind: 'shelter_overflow', label: 'Fill a shelter', caption: 'Evacuees are turned away.', icon: Home, type: BlockType.Shelter },
   { kind: 'boat_failure', label: 'Boat breaks down', caption: 'One rescue boat drops out.', icon: Anchor, vehicle: VehicleKind.Boat },
-  { kind: 'helicopter_grounded_wind', label: 'Ground helicopters', caption: 'Wind stops all flights for three minutes.', icon: Wind },
+  { kind: 'helicopter_grounded_wind', label: 'Ground helicopters', caption: 'Aircraft follow-on; not yet supported by the AK runner.', icon: Wind, supported: false },
   { kind: 'comms_outage', label: 'Radio outage', caption: 'Reports stop reaching HQ for a while.', icon: RadioTower },
-  { kind: 'false_report', label: 'False report', caption: 'HQ receives a call about a flood that is not there.', icon: MessageSquareWarning },
+  { kind: 'false_report', label: 'False report', caption: 'Select a map location for HQ to receive a false flood report.', icon: MessageSquareWarning, requiresSelectedLocation: true },
 ];
 
 export function StressTool({ bridge, onClose }: { bridge: SimBridge; onClose: () => void }) {
@@ -57,7 +59,8 @@ export function StressTool({ bridge, onClose }: { bridge: SimBridge; onClose: ()
   };
 
   const available = (e: StressEvent) =>
-    running && (e.type === undefined || !!scenario?.blocks.includes(e.type)) && (e.vehicle === undefined || !!bridge.snapshot?.vehicles.kind.includes(e.vehicle));
+    running && e.supported !== false && (!e.requiresSelectedLocation || selected?.kind === 'cell' || selected?.kind === 'building') &&
+    (e.type === undefined || !!scenario?.blocks.includes(e.type)) && (e.vehicle === undefined || !!bridge.snapshot?.vehicles.kind.includes(e.vehicle));
 
   return (
     <Flyout title="Stress events" subtitle="Break something mid-storm and watch the city adapt." onClose={onClose}>

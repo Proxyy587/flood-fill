@@ -26,12 +26,14 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
   const maxTicks = useSceneStore((s) => s.maxTicks);
   const liveTick = useSceneStore((s) => s.liveTick);
   const busy = useSceneStore((s) => s.busy);
+  const engine = useSceneStore((s) => s.engine);
   const dayStart = useSceneStore((s) => s.runSettings.startSeconds);
   const loading = useSceneStore((s) => s.connection !== 'ready');
   const mode = useEditorStore((s) => s.mode);
   const rain = useEditorStore((s) => s.scenario?.weather.rain);
   const events = useSimFeedStore((s) => s.events);
   const bar = useRef<HTMLDivElement>(null);
+  const scrubPointer = useRef<number | null>(null);
   const [scrub, setScrub] = useState<number | null>(null);
   const [hover, setHover] = useState<{ x: number; t: number; label: string } | null>(null);
   const running = mode !== 'edit';
@@ -88,6 +90,7 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
         onPointerDown={(e) => {
           if (!running) return;
           bar.current?.setPointerCapture(e.pointerId);
+          scrubPointer.current = e.pointerId;
           setScrub(tickAt(e.clientX));
         }}
         onPointerMove={(e) => {
@@ -95,14 +98,25 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
           const r = bar.current?.getBoundingClientRect();
           const near = marks.find((m) => Math.abs(m.t - t) < total / 120);
           setHover(r ? { x: e.clientX - r.left, t, label: near ? `${near.label} · ${clockOf(near.t)}` : clockOf(t) } : null);
-          if (scrub !== null) setScrub(t);
+          if (scrubPointer.current === e.pointerId) setScrub(t);
         }}
         onPointerLeave={() => setHover(null)}
         onPointerUp={(e) => {
-          if (scrub === null) return;
+          if (scrubPointer.current !== e.pointerId) return;
+          scrubPointer.current = null;
           const t = tickAt(e.clientX);
           setScrub(null);
           if (Math.abs(t - tick) > 2) bridge.seek(t);
+        }}
+        onPointerCancel={(e) => {
+          if (scrubPointer.current !== e.pointerId) return;
+          scrubPointer.current = null;
+          setScrub(null);
+        }}
+        onLostPointerCapture={(e) => {
+          if (scrubPointer.current !== e.pointerId) return;
+          scrubPointer.current = null;
+          setScrub(null);
         }}
         aria-label={running ? 'Storm timeline. Drag to replay any moment.' : 'Storm rain profile'}
       >
@@ -180,10 +194,12 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
           <button
             type="button"
             className={`${styles.button} ${styles.rescue}`}
-            disabled={over || !!busy || replaying}
+            disabled={over || !!busy || replaying || engine === 'core'}
             onClick={() => bridge.inject({ t: tick, kind: 'rescue_teams_deployed', count: RESCUE_TEAMS })}
             aria-label="Release rescue teams"
-            title={`Release ${RESCUE_TEAMS} SDRF boat teams (a boat and 4 rescuers each) from flood HQ or the boat depot`}
+            title={engine === 'core'
+              ? 'Dynamic release is not supported; configured boats dispatch automatically from the simulation.'
+              : `Release ${RESCUE_TEAMS} SDRF boat teams (a boat and 4 rescuers each) from flood HQ or the boat depot`}
           >
             <LifeBuoy size={14} />
             <span className={styles.rescueLabel}>Release rescue teams</span>

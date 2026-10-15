@@ -49,8 +49,8 @@ const STARTS = [
 ];
 
 const ENGINE_HELP = {
-  core: 'AK’s validated simulator: flood, power, traffic, reports, ambulances and hospital beds. No boats, police or helicopters yet.',
-  preview: 'The fuller preview model with every responder type. Useful for the demo; its numbers are not the validated ones.',
+  core: 'AK’s deterministic simulator: flood, power, traffic, reports, ambulances, boats, hospital balancing, and independent police traffic, escort and crowd guidance. Helicopters are not yet modeled.',
+  preview: 'A lightweight visual preview engine. Use Core for evidence-backed response decisions and judging runs.',
 } as const;
 
 function SimulationGroup({ disabled }: { disabled: boolean }) {

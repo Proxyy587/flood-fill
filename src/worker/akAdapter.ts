@@ -25,6 +25,7 @@ export const WIND_MS_AT_FULL = 30;
 /** Injected kinds AK's M3B runner executes; the others throw inside `createSimulation`. */
 export const CORE_INJECTABLE: ReadonlySet<InjectedEvent['kind']> = new Set([
   'bridge_closed',
+  'boat_failure',
   'road_blocked_by_debris',
   'shelter_overflow',
   'substation_flooded',
@@ -60,7 +61,7 @@ export const injectedToAk = (e: InjectedEvent): { event: Ak.InjectedEvent } | { 
         event: { kind: e.kind, tick: e.t, speed: (e.speed ?? 1) * WIND_MS_AT_FULL, durationTicks: Math.max(1, e.durationTicks ?? 600) },
       };
     case 'rescue_teams_deployed':
-      return { error: 'the core simulator has no boat teams yet, so releasing rescue teams only works on the preview model' };
+      return { error: 'Dynamic rescue-team release is not supported by the core simulator; configured boats dispatch automatically.' };
   }
 };
 

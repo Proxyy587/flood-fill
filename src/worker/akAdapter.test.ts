@@ -51,10 +51,10 @@ describe('AK ↔ UI scenario adapter', () => {
   });
 
   it('reports injected events the core cannot run instead of dropping them', () => {
-    const ui = { ...mockScenario(), injected: [{ kind: 'boat_failure', t: 30, target: 1 } as InjectedEvent, { kind: 'comms_outage', t: 40, durationTicks: 60 } as InjectedEvent] };
+    const ui = { ...mockScenario(), injected: [{ kind: 'helicopter_grounded_wind', t: 30, speed: 1 } as InjectedEvent, { kind: 'comms_outage', t: 40, durationTicks: 60 } as InjectedEvent] };
     const core = toCoreScenario(ui);
     expect(core.skipped).toHaveLength(1);
-    expect(core.skipped[0].reason).toMatch(/boat failure/);
+    expect(core.skipped[0].reason).toMatch(/helicopter grounded wind/);
     expect(core.scenario.injected).toEqual([{ kind: 'comms_outage', tick: 40, durationTicks: 60 }]);
   });
 

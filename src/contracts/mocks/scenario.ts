@@ -506,7 +506,9 @@ export const mockScenario = (seed = 7): Scenario => {
         { t: 3000, speed: 0.1 },
       ],
       floodKind: 'compound',
-      sources: [{ cell: idx(Math.round(riverCentre(0.5)), 0), startT: 600, endT: 2400, rate: 0.5 }],
+      // Source rates are metres of depth per simulated second. Keep the test-city
+      // river rise gradual enough for dispatch to act before low areas inundate.
+      sources: [{ cell: idx(Math.round(riverCentre(0.5)), 0), startT: 600, endT: 2400, rate: 0.005 }],
       warningDelay: 120,
     },
     injected: [],

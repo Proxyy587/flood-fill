@@ -11,7 +11,7 @@ import { asBuildingId, asNpcId, asRequestId, asVehicleId, type EntityRef } from 
 import type { InspectorData } from '../inspector';
 import type { MetricsFrame, RunSummary } from '../metrics';
 import { DEFAULT_NPC_PARAMS, type NpcParams } from '../params';
-import type { BuildingDef, DispatchMode, InjectedEvent, Scenario } from '../scenario';
+import { RAIN_MM_PER_HOUR_AT_FULL, type BuildingDef, type DispatchMode, type InjectedEvent, type Scenario } from '../scenario';
 import { chunkOfCell, type RenderSnapshot, type WorldSnapshot } from '../snapshot';
 import { bridgeDeckHeights, isSignalJunction, signalPhase } from '../world';
 import { createMockRng, type MockRng } from './rng';
@@ -52,8 +52,7 @@ const GRIDLOCK_WAIT = 30;
 const RESCUERS_PER_TEAM = 4;
 
 // Local (pluvial) flooding. Volumes are in cell·metres (1 cell = 16 m²).
-/** Rain intensity 1.0 is a 150 mm/h cloudburst. */
-export const RAIN_MM_PER_HOUR_AT_FULL = 150;
+export { RAIN_MM_PER_HOUR_AT_FULL };
 const RAIN_M_PER_TICK = RAIN_MM_PER_HOUR_AT_FULL / 1000 / 3600;
 /**
  * One storm-drain inlet with a pump: 0.05 m³/s. Gravity only (no power): 30 %,
