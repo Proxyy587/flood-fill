@@ -16,8 +16,29 @@ function town(cars = 0): Scenario {
 function setup(s: Scenario) {
   const w = createWorld(s); const p = createPopulation(s, 42); const a = createAgentSystem(p, w, s);
   const traffic = createTraffic(w); const blocked = new Uint8Array(w.water.length);
-  return { w, p, a, traffic, blocked, step: (tick: number, policeControlled?: Uint8Array) => stepAgents(a, w, s, tick, blocked, traffic, policeControlled) };
+  return { w, p, a, traffic, blocked, step: (tick: number, policeControlled?: Uint8Array, escortGuidance?: ReadonlySet<number>) => stepAgents(a, w, s, tick, blocked, traffic, policeControlled, escortGuidance) };
 }
+it("increases walking progress only while the assigned police escort is present", () => {
+  const scenario = town();
+  const ordinary = setup(scenario);
+  const escorted = setup(scenario);
+  for (const fixture of [ordinary, escorted]) {
+    fixture.a.intent[0] = 2;
+    fixture.p.npcs.home[0] = 10;
+    fixture.p.npcs.state[0] = NpcState.ReturnHome;
+    fixture.a.routes.set(0, { cells: [9, 10], modes: [0, 0], cursor: 1, progress: 0, goal: 10, version: 1 });
+  }
+  ordinary.step(1);
+  escorted.step(1, undefined, new Set([0]));
+  expect(escorted.p.npcs.x[0]).toBeGreaterThan(ordinary.p.npcs.x[0]);
+  const later = setup(scenario);
+  later.a.intent[0] = 2;
+  later.p.npcs.home[0] = 10;
+  later.p.npcs.state[0] = NpcState.ReturnHome;
+  later.a.routes.set(0, { cells: [9, 10], modes: [0, 0], cursor: 1, progress: 0, goal: 10, version: 1 });
+  later.step(1);
+  expect(later.p.npcs.x[0]).toBe(ordinary.p.npcs.x[0]);
+});
 it("passes police traffic control through agent stepping only for unpowered intersections", () => {
   const s = town(); s.blocks[19] = BlockType.Road; s.blocks[35] = BlockType.Road;
   const uncontrolled = setup(s); uncontrolled.w.powered[27] = 0;

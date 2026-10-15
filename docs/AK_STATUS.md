@@ -91,12 +91,16 @@ and M3D police gridlock control have since been implemented as summarized above.
 ### M3E: independent police civilian escort implemented
 
 Finite staffed police cars can guide eligible evacuation groups and safe boat-to-home
-handoffs beside their existing safe walking routes. Escort grouping preserves civilian
-destinations, route arrays, shelter reservations and rescue ownership; police do not
-carry passengers or enter the traffic-control mask. Arrival and assignment use existing
-event shapes. Focused unit and runner coverage verifies escort dispatch, arrival,
-unchanged civilian route/reservation, and M3D police behavior. M3F crowd control,
-helicopters, and broader integration/review gates remain outstanding.
+handoffs beside their existing safe walking routes. An assigned car affects movement
+only after reaching its safe roadside waypoint, applying a deterministic 10% walking
+progress modifier to escorted civilians. Escort grouping preserves civilian
+destinations, route arrays, shelter reservations and rescue ownership; unsafe current
+or future route cells exclude a group. Police do not carry passengers or enter the
+traffic-control mask. Focused unit and runner coverage verifies escort dispatch,
+arrival-only guidance, route/reservation immutability, M3D police behavior and a
+same-seed summary/snapshot replay. Spec-compliance review found no remaining gaps.
+M3F crowd control, helicopters, and broader integration/review gates remain
+outstanding.
 
 M3B design and implementation plan are approved and committed:
 `docs/superpowers/specs/2026-10-15-ak-m3b-ambulance-dispatch-hospital-design.md` and

@@ -1,6 +1,6 @@
 # AK M3E/M3F Design: Police Escort and Crowd Control
 
-**Status:** Direction approved by AK; written spec is awaiting user review. No implementation has started.
+**Status:** Direction and design approved by AK; M3E is implemented and reviewed; M3F crowd measurement is underway.
 **Owner:** AK simulation lane.
 **Depends on:** M2 civilian evacuation and M3D independent finite police traffic control on `codex/ak-m3-reports`.
 

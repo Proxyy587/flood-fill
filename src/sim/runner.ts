@@ -758,7 +758,7 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
       const escortTasks = escortCandidates(groups, agents, world, scenario, blocked, police.cell);
       const policeStep = stepPolice(police, traffic, world, scenario, blocked, navVersion, tick + 1, escortTasks);
       events.push(...policeStep.events);
-      events.push(...stepAgents(agents, world, scenario, tick + 1, blocked, traffic, policeStep.controlled));
+        events.push(...stepAgents(agents, world, scenario, tick + 1, blocked, traffic, policeStep.controlled, policeStep.escortGuidance));
       tick++;
       stepExposure(population, world, loadedForExposure);
       events.push(...stepReports(reports, population, tick, tick < outageUntil));

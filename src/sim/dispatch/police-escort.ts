@@ -71,7 +71,16 @@ export function escortWaypoint(group: EscortGroup, world: World, scenario: Scena
 
 export function escortCandidates(groups: readonly EscortGroup[], agents: AgentSystem, world: World, scenario: Scenario, blocked: Uint8Array, policeCells: Int32Array): PoliceTaskCandidate[] {
   const candidates: PoliceTaskCandidate[] = [];
+  const foot = buildHazardGrid(world, scenario, "foot", blocked);
+  const car = buildHazardGrid(world, scenario, "car", blocked);
   for (const group of groups) {
+    const routesSafe = group.members.every((member) => {
+      const route = eligibleRoute(agents, member);
+      const firstCell = route ? route.cursor - 1 : 0;
+      return route !== undefined && route.cells.slice(firstCell).every((cell, offset) =>
+        (route.modes[firstCell + offset] === 1 ? car : foot).passable[cell] === 1);
+    });
+    if (!routesSafe) continue;
     const nearestCell = agents.population.npcs.cell[group.subject];
     let selected: number | null = null;
     let bestDistance = Infinity;
@@ -86,7 +95,7 @@ export function escortCandidates(groups: readonly EscortGroup[], agents: AgentSy
     const npc = agents.population.npcs;
     const highNeed = group.members.some((member) => npc.mobility[member] > 0);
     const nearbyWater = world.water[group.nextCell];
-    candidates.push({ kind: PoliceTaskKind.Escort, subject: group.subject, civilianId: npc.id[group.subject], assignmentCell: group.nextCell, targetCell,
+    candidates.push({ kind: PoliceTaskKind.Escort, subject: group.subject, civilianId: npc.id[group.subject], members: group.members, assignmentCell: group.nextCell, targetCell,
       urgency: (highNeed ? 1000 : 0) + Math.round(nearbyWater * 100), critical: false, eligibleSince: group.eligibleSince });
   }
   return candidates.sort((a, b) => b.urgency - a.urgency || a.eligibleSince - b.eligibleSince || a.subject - b.subject);

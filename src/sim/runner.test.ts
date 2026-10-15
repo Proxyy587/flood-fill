@@ -173,7 +173,9 @@ it("integrates independent police guidance for an evacuating civilian", () => {
   scenario.weather.sources = [{ cell: 0, startT: 0, endT: 90, rate: 0.1 }];
   const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 70,
     npcParams: { ...defaultNpcParams(scenario), panicMean: 1, complianceMean: 1, riskToleranceMean: 0, awarenessMean: 1, falseReportRate: 0 } });
-  for (let tick = 0; tick < 70; tick++) sim.step();
+  const replay = createSimulation(scenario, 42, "centralised", { durationTicks: 70,
+    npcParams: { ...defaultNpcParams(scenario), panicMean: 1, complianceMean: 1, riskToleranceMean: 0, awarenessMean: 1, falseReportRate: 0 } });
+  for (let tick = 0; tick < 70; tick++) { sim.step(); replay.step(); }
   const events = sim.summary().events;
   const policeId = scenario.fleet.ambulances + 1;
   expect(events).toContainEqual(expect.objectContaining({ type: "ASSIGNED", actor: policeId, actorKind: "vehicle", targetKind: "npc" }));
@@ -181,6 +183,8 @@ it("integrates independent police guidance for an evacuating civilian", () => {
   expect(events.filter((event) => event.type === "EVAC_ORDER")).toHaveLength(1);
   expect(events.some((event) => event.type === "SERVED" || event.type === "HOSPITAL_ASSIGN")).toBe(false);
   expect(sim.snapshot().vehicles.kind).toContain(VehicleKind.PoliceCar);
+  expect(sim.summary()).toEqual(replay.summary());
+  expect(sim.snapshot()).toEqual(replay.snapshot());
 });
 
 it("replays police vehicles, events and metrics identically for the same seed", () => {

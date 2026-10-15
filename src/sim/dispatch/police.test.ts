@@ -112,7 +112,7 @@ it("keeps an escort roadside cell from claiming an independent gridlock task", (
   fixture.traffic.intersections[26] = 1;
   fixture.traffic.gridlock[26] = 1;
   stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1, [
-    { kind: PoliceTaskKind.Escort, subject: 0, civilianId: 1, assignmentCell: 10, targetCell: 19, urgency: 0, critical: false, eligibleSince: 1 },
+    { kind: PoliceTaskKind.Escort, subject: 0, civilianId: 1, members: [0], assignmentCell: 10, targetCell: 19, urgency: 0, critical: false, eligibleSince: 1 },
   ]);
   expect(Array.from(fixture.police.taskKind)).toEqual([PoliceTaskKind.Escort, PoliceTaskKind.TrafficControl]);
   expect(Array.from(fixture.police.assignment)).toEqual([10, 26]);

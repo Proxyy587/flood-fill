@@ -14,7 +14,7 @@ export interface PoliceRoute {
 }
 
 export enum PoliceTaskKind { None, TrafficControl, Escort }
-export interface PoliceTaskCandidate { kind: PoliceTaskKind.Escort; subject: number; civilianId: number; assignmentCell: number; targetCell: number; urgency: number; critical: false; eligibleSince: number }
+export interface PoliceTaskCandidate { kind: PoliceTaskKind.Escort; subject: number; civilianId: number; members: readonly number[]; assignmentCell: number; targetCell: number; urgency: number; critical: false; eligibleSince: number }
 
 export interface PoliceSystem {
   count: number;
@@ -28,6 +28,7 @@ export interface PoliceSystem {
   assignment: Int32Array;
   taskKind: Uint8Array;
   taskSubject: Int32Array;
+  escortArrived: Uint8Array;
   target: Int32Array;
   routes: (PoliceRoute | null)[];
 }
@@ -76,6 +77,7 @@ export function createPolice(scenario: Scenario, world: World, blocked: Uint8Arr
     assignment: new Int32Array(count).fill(-1),
     taskKind: new Uint8Array(count),
     taskSubject: new Int32Array(count).fill(-1),
+    escortArrived: new Uint8Array(count),
     target: new Int32Array(count).fill(-1),
     routes: Array.from({ length: count }, () => null),
   };
@@ -108,7 +110,7 @@ export function stepPolice(
   navVersion: number,
   tick: number,
   escortCandidates: readonly PoliceTaskCandidate[] = [],
-): { events: SimEvent[]; controlled: Uint8Array } {
+): { events: SimEvent[]; controlled: Uint8Array; escortGuidance: ReadonlySet<number> } {
   const events: SimEvent[] = [];
   const controlled = new Uint8Array(world.width * world.height);
 
@@ -129,6 +131,7 @@ export function stepPolice(
     system.assignment[unit] = -1;
     system.taskKind[unit] = PoliceTaskKind.None;
     system.taskSubject[unit] = -1;
+    system.escortArrived[unit] = 0;
     system.target[unit] = -1;
     system.routes[unit] = null;
     system.state[unit] = VehicleState.Idle;
@@ -139,8 +142,10 @@ export function stepPolice(
     for (let index = 0; index < system.count; index++) if (system.taskKind[index] === PoliceTaskKind.Escort && system.taskSubject[index] === candidate.subject) unit = index;
     if (unit >= 0) {
       system.assignment[unit] = candidate.assignmentCell;
+      if (system.target[unit] !== candidate.targetCell) system.escortArrived[unit] = 0;
       if (system.target[unit] !== candidate.targetCell && !planPoliceRoute(system, unit, candidate.targetCell, world, scenario, blocked, navVersion)) {
         system.taskKind[unit] = PoliceTaskKind.None; system.taskSubject[unit] = -1;
+        system.escortArrived[unit] = 0;
         events.push({ tick, type: "COMMIT_CANCELLED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", cell: candidate.assignmentCell, reason: "Police escort roadside waypoint became unreachable; assignment released for retry" });
       }
       continue;
@@ -153,6 +158,7 @@ export function stepPolice(
       system.assignment[unit] = candidate.assignmentCell;
       system.taskKind[unit] = PoliceTaskKind.Escort;
       system.taskSubject[unit] = candidate.subject;
+      system.escortArrived[unit] = 0;
       system.target[unit] = candidate.targetCell;
       system.routes[unit] = { cells: Int32Array.from(path), cursor: 1, target: candidate.targetCell, navVersion };
       system.state[unit] = path.length > 1 ? VehicleState.Moving : VehicleState.Idle;
@@ -241,6 +247,7 @@ export function stepPolice(
       system.assignment[unit] = -1;
       system.taskKind[unit] = PoliceTaskKind.None;
       system.taskSubject[unit] = -1;
+      system.escortArrived[unit] = 0;
       system.state[unit] = VehicleState.Idle;
       events.push({ tick, type: "COMMIT_CANCELLED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", cell: route.target, reason: "Police vehicle route became unsafe; assignment released for retry" });
       continue;
@@ -256,17 +263,25 @@ export function stepPolice(
     if (route.cursor >= route.cells.length) {
       system.state[unit] = VehicleState.Idle;
       system.routes[unit] = null;
-      if (system.taskKind[unit] === PoliceTaskKind.Escort) {
-        const candidate = escortCandidates.find((item) => item.subject === system.taskSubject[unit]);
-        if (candidate) events.push({ tick, type: "ARRIVED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", target: candidate.civilianId as SimEvent["target"], targetKind: "npc", cell: system.cell[unit], reason: "Police escort reached a safe roadside waypoint beside the civilian group's existing route" });
-      } else if (system.assignment[unit] === -1) system.target[unit] = -1;
+      if (system.taskKind[unit] !== PoliceTaskKind.Escort && system.assignment[unit] === -1) system.target[unit] = -1;
     }
   }
   for (let unit = 0; unit < system.count; unit++) {
     const target = system.assignment[unit];
     if (system.taskKind[unit] === PoliceTaskKind.TrafficControl && target >= 0 && system.cell[unit] === target && traffic.gridlock[target] === 1) controlled[target] = 1;
   }
-  return { events, controlled };
+  const escortGuidance = new Set<number>();
+  for (let unit = 0; unit < system.count; unit++) {
+    if (system.taskKind[unit] !== PoliceTaskKind.Escort || !system.available[unit] || system.assignment[unit] < 0) continue;
+    const candidate = escortCandidates.find((item) => item.subject === system.taskSubject[unit]);
+    if (!candidate || system.cell[unit] !== system.target[unit]) continue;
+    for (const member of candidate.members) escortGuidance.add(member);
+    if (!system.escortArrived[unit]) {
+      events.push({ tick, type: "ARRIVED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", target: candidate.civilianId as SimEvent["target"], targetKind: "npc", cell: system.cell[unit], reason: "Police escort reached a safe roadside waypoint beside the civilian group's existing route" });
+      system.escortArrived[unit] = 1;
+    }
+  }
+  return { events, controlled, escortGuidance };
 }
 
 export function policeSnapshot(system: PoliceSystem): {

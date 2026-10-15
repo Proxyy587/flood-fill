@@ -158,9 +158,11 @@ export function handoffRescuedCivilian(a: AgentSystem, npc: number, cell: number
   return true;
 }
 
-function walkingSpeed(a: AgentSystem, i: number): number {
+const POLICE_ESCORT_SPEED_FACTOR = 1.1;
+
+function walkingSpeed(a: AgentSystem, i: number, escorted = false): number {
   const n = a.population.npcs;
-  return 0.35 * n.speed[i] * (n.mobility[i] === 2 ? 0.35 : n.mobility[i] === 1 ? 0.65 : 1) * (1 - 0.5 * n.fatigue[i]);
+  return 0.35 * n.speed[i] * (n.mobility[i] === 2 ? 0.35 : n.mobility[i] === 1 ? 0.65 : 1) * (1 - 0.5 * n.fatigue[i]) * (escorted ? POLICE_ESCORT_SPEED_FACTOR : 1);
 }
 function cachedField(grid: NavGrid, goal: number, cache: Routing["footFields"], routing: Routing) {
   let field = cache.get(goal);
@@ -211,8 +213,9 @@ function plan(a: AgentSystem, i: number, goal: number, routing: Routing): AgentR
 }
 
 /** One deterministic second. All entry checks use the current hazard graph. */
-export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tick: number, blocked: Uint8Array, traffic: TrafficState, policeControlled?: Uint8Array): SimEvent[] {
+export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tick: number, blocked: Uint8Array, traffic: TrafficState, policeControlled?: Uint8Array, escortGuidance?: ReadonlySet<number>): SimEvent[] {
   if (!Number.isSafeInteger(tick) || tick !== a.lastTick + 1) throw new RangeError("Agents require consecutive one-second ticks");
+  for (const npc of escortGuidance ?? []) if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Police escort guidance contains an invalid civilian index");
   const foot = buildHazardGrid(world, scenario, "foot", blocked);
   beginTrafficTick(traffic, world, policeControlled);
   const road = buildHazardGrid(world, scenario, "car", blocked, congestionFactors(traffic));
@@ -387,7 +390,7 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
       if (n.state[i] === NpcState.Stranded) n.state[i] = a.intent[i] === 1 ? NpcState.Commute : NpcState.ReturnHome;
       assertMovementEntry(world, route.cells[route.cursor - 1], target, driving ? "car" : "foot", blocked);
       if (driving && route.progress === 0 && !tryEnterTraffic(traffic, target)) { markTrafficWaiting(traffic, target); break; }
-      const speed = (driving ? 2 : walkingSpeed(a, i)) / (grid.costs?.[target] ?? 1);
+      const speed = (driving ? 2 : walkingSpeed(a, i, escortGuidance?.has(i) === true)) / (grid.costs?.[target] ?? 1);
       const used = Math.min(remaining, (1 - route.progress) / speed);
       route.progress = Math.min(1, route.progress + used * speed); remaining -= used;
       const source = route.cells[route.cursor - 1];

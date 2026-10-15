@@ -55,6 +55,41 @@ it("chooses the lowest-index reachable road beside the civilian route", () => {
   expect(escortWaypoint(group, fixture.world, fixture.scenario, fixture.blocked, fixture.police.cell[0])).toBe(17);
 });
 
+it("withholds behavioral guidance until the police car reaches the roadside waypoint", () => {
+  const fixture = escortFixture(1);
+  activateEvacuationRoute(fixture.agents, 0, [9, 10, 11, 19, 27, 35, 43, 44, 45, 46], 46);
+  const [group] = stepEscortGroups(fixture.escort, fixture.agents, 1);
+  const tasks = escortCandidates([group], fixture.agents, fixture.world, fixture.scenario, fixture.blocked, fixture.police.cell);
+  tasks[0].targetCell = 35;
+  const first = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1, tasks);
+  expect(first.escortGuidance.size).toBe(0);
+  let arrived = false;
+  for (let tick = 2; tick <= 10; tick++) {
+    const result = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, tick, tasks);
+    if (result.escortGuidance.has(0)) {
+      arrived = result.events.some((event) => event.type === "ARRIVED" && event.targetKind === "npc");
+      break;
+    }
+  }
+  expect(arrived).toBe(true);
+});
+
+it("does not dispatch an escort over a newly unsafe civilian route", () => {
+  const fixture = escortFixture(1);
+  activateEvacuationRoute(fixture.agents, 0, [9, 10, 11, 19, 27, 35, 43, 44, 45, 46], 46);
+  fixture.world.water[19] = 0.6;
+  const groups = stepEscortGroups(fixture.escort, fixture.agents, 1);
+  expect(escortCandidates(groups, fixture.agents, fixture.world, fixture.scenario, fixture.blocked, fixture.police.cell)).toEqual([]);
+});
+
+it("does not dispatch an escort when the civilian's current tile has become unsafe", () => {
+  const fixture = escortFixture(1);
+  activateEvacuationRoute(fixture.agents, 0, [9, 10, 11, 19, 27, 35, 43, 44, 45, 46], 46);
+  fixture.world.water[9] = 0.6;
+  const groups = stepEscortGroups(fixture.escort, fixture.agents, 1);
+  expect(escortCandidates(groups, fixture.agents, fixture.world, fixture.scenario, fixture.blocked, fixture.police.cell)).toEqual([]);
+});
+
 it("assigns only a police car and leaves civilian route and shelter ownership unchanged", () => {
   const fixture = escortFixture(1);
   activateEvacuationRoute(fixture.agents, 0, [9, 10, 11, 19, 27, 35, 43, 44, 45, 46], 46);
