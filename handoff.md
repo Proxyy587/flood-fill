@@ -1,8 +1,8 @@
 # AJ Integration Handoff: AK Simulation + Worker 1 Assets
 
-**Prepared:** 2026-10-15  
-**Source branch:** `codex/ak-m3-reports`  
-**Pushed commit:** `7bbf932` (`Merge branch 'w1/assets-and-templates' into codex/ak-m3-reports`)  
+**Prepared:** 2026-10-15
+**Source branch:** `codex/ak-m3-reports`
+**Included implementation commit:** `7bbf932` (`Merge branch 'w1/assets-and-templates' into codex/ak-m3-reports`)
 **Status:** AK simulation and W1 deliverables are committed on this branch. Browser/runtime integration by AJ is still pending. This is not a release-readiness sign-off.
 
 ## What is included
