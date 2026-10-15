@@ -33,18 +33,18 @@ Everything the human clicks that isn't the 3D canvas or the charts: the sandbox 
 
 ## Task C: NPC and scenario sliders (hours 7–11)
 `src/ui/panels/ParamsPanel.tsx`:
-- Sliders for every field of `NpcParams` (ranges, tooltips, "what this does" text taken from `SIM_SPEC.md` §2).
+- Sliders for every field of `NpcParams` (ranges, tooltips, "what this does" text taken from `docs/SIM_SPEC.md` §2).
 - Fleet controls (ambulances, boats, police cars, helicopters, staff counts), population count and car-ownership %.
-- Weather controls: rain timeline editor (draggable points), flood kind (growing/flash/compound), warning delay, wind.
+- Weather controls: rain timeline editor (draggable points), flood kind (growing/flash/compound), warning delay, wind speed.
 - **Presets:** "Calm and compliant", "Panicky", "Understaffed", "Worst night".
 - A **seed** input and a "randomise seed" button. Show the seed next to every run.
 - Dispatch mode toggle: Negotiation / Centralised.
 
 ## Task D: Run controls and HUD (hours 11–14)
 - Play/pause, speed (1x/4x/16x), step 1 tick, restart with the same seed, "Branch from here" (optional).
-- Sim clock (day/time as HH:MM), current rain intensity, live counters (flooded %, stranded, hospitals' utilisation bars).
-- Inspector panel for `InspectorData`: attributes, assignment, route toggle, belief, and **lastDecision with alternatives** (top-2 utilities or bids). This panel is the key explainer for judges, so make it clean.
-- Injected-event panel: buttons for each injected event (bridge closed, boat failure, shelter overflow, substation flooded, comms outage, false report burst, helicopter grounded) that call `inject(...)`. Mark which scenarios are "stress" ones.
+- Sim clock (day/time as HH:MM), current rain intensity and wind speed, live counters (flooded %, % unpowered, stranded, helicopter sorties/rescues, hospitals' utilisation and generator status bars).
+- Inspector panel for `InspectorData`: attributes, assignment, route toggle, belief, power state / generator fuel ticks (for buildings), flight/fuel status (for helicopters), and **lastDecision with alternatives** (top-2 utilities or bids). This panel is the key explainer for judges, so make it clean.
+- Injected-event panel: buttons for each injected event (bridge closed, boat failure, shelter overflow, substation flooded/trip, comms outage, false report burst, helicopter grounded by wind) that call `inject(...)`. Mark which scenarios are "stress" ones.
 
 ## Task E: Save/load (hours 14–16)
 - Save/load scenario JSON (download/upload plus IndexedDB slots), validated through the Zod schema, with friendly errors.

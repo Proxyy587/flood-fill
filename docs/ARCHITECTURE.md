@@ -37,15 +37,15 @@ Snapshots use **transferable typed arrays** (positions, headings, states, water 
 
 1. **Weather**: advance rain intensity, wind; spawn flood sources (river overflow, flash burst).
 2. **Flood**: shallow-water cellular update; drainage removal; evaporation/soak.
-3. **Power**: recompute energised nodes from the grid graph; flooded substations trip; generators drain fuel.
-4. **Hazard map**: derive passability per mode (foot, car, boat, air) from depth, power (signals), blockages. Mark changed edges and bump `navVersion` if anything crossed a threshold.
+3. **Power**: recompute energised nodes from the grid graph; flooded substations trip; cascading blackouts turn traffic signals into 4-way stops; unpowered pumps throttle; hospital backup generators engage and drain fuel.
+4. **Hazard map**: derive passability per mode (foot, car, boat, air) from depth, power (unpowered signals), blockages, wind gusts (helicopter no-fly). Mark changed edges and bump `navVersion` if anything crossed a threshold.
 5. **Perception**: each agent updates its *belief* (see §5). Reports are generated with delay and noise.
-6. **Decisions**: NPC behaviour, dispatch (negotiation or centralised), hospital balancing, helicopter tasking.
+6. **Decisions**: NPC behaviour, dispatch (negotiation or centralised), hospital balancing with generator/power checks, helicopter rooftop rescue and medevac tasking.
 7. **Movement**: agents advance along paths with speed modifiers (depth, congestion, panic).
-8. **Invariants + metrics**: check invariants, append metrics.
+8. **Invariants + metrics**: check invariants (safe operating limits, no double-allocated helicopter seats/beds, zero unpowered hospitals without generator), append metrics.
 9. **Emit**: events, snapshot.
 
-Order matters because of determinism. Do not reorder without an ADR in `CHANGELOG.md`.
+Order matters because of determinism. Do not reorder without an ADR in `docs/CHANGELOG.md`.
 
 ## 4. World model (`src/sim/world`)
 

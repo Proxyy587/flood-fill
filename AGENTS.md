@@ -32,7 +32,7 @@ Problem-statement mapping (Flood Rescue Dispatch, PS 27). Judges will look for t
 | Capacity constraints, fairness, explicit safety invariants | `src/sim/invariants`, `src/sim/metrics` |
 | Decentralised negotiation vs **centralised baseline** | `src/sim/dispatch/{negotiation,centralised}.ts` |
 | Time to service, unmet requests, idle time, route violations, fairness, recovery | `src/sim/metrics` |
-| Simultaneous bridge closure + boat failure + shelter overflow | `scenarios/stress-*.json` |
+| Simultaneous bridge closure + boat failure + shelter overflow + blackout + helicopter grounding | `scenarios/stress-*.json` |
 | Time-stepped sim, injected events, assignment log, reroute explanation, after-action replay | event log + `src/ui/replay` |
 | Synthetic data only, no live feeds | everything is generated |
 
@@ -115,6 +115,7 @@ pnpm lint           # eslint incl. sim-purity + determinism rules
   - no double-allocation of a unit, bed or helicopter seat
   - no patient routed to a hospital with zero capacity, unless in declared overflow mode
   - no boat or helicopter dispatched beyond its safe-operating limit (draft, wind)
+  - no hospital operated without grid power or active backup generator
   - a unit that loses its assignment is always re-queued, never silently dropped
 
 ## 8. Definition of done (for any task)

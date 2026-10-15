@@ -46,7 +46,7 @@ Write a generator script `scripts/gen-scenarios.ts` that **procedurally produces
 1. `riverside-town.json`: 64×64. A river with one bridge, two hospitals on different sides, a shelter, a police station, a flood HQ, a boat depot. A teaching example.
 2. `coastal-grid.json`: 96×96. A flat grid street layout, poor drainage, a flash-flood-prone low zone.
 3. `dense-basin-city.json`: 96×96. A bowl-shaped terrain (the centre is lowest), 3 hospitals, a power-critical substation in a low cell, 2 helipads, 6 districts.
-4. `stress-triple.json`: based on #3 with injected events: bridge closure + boat failure + shelter overflow at the same time.
+4. `stress-triple.json`: based on #3 with injected events: bridge closure + boat failure + shelter overflow + substation flood blackout + helicopter grounding gale wind.
 
 Requirements for every template:
 - Validates against the `Scenario` Zod schema (`pnpm validate`).

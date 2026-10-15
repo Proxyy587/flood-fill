@@ -1,6 +1,6 @@
 # SIM_SPEC
 
-Everything here is the **intended behaviour**. Build the numbered milestone in `ROADMAP.md` first, then extend.
+Everything here is the **intended behaviour**. Build the numbered milestone in `docs/ROADMAP.md` first, then extend.
 
 ## 1. Blocks
 

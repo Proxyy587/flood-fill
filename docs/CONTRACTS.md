@@ -98,9 +98,9 @@ export type SimEventType =
   | 'REPORT_CREATED' | 'REPORT_VERIFIED' | 'REPORT_FALSE'
   | 'REQUEST_CREATED' | 'BID' | 'ASSIGNED' | 'COMMIT_CANCELLED' | 'REROUTE' | 'SERVED'
   | 'HOSPITAL_ASSIGN' | 'HOSPITAL_DIVERT' | 'HOSPITAL_DIVERSION_ON' | 'SHELTER_OVERFLOW'
-  | 'POWER_TRIP' | 'POWER_RESTORED' | 'GENERATOR_FUEL_LOW'
+  | 'POWER_TRIP' | 'POWER_RESTORED' | 'BLACKOUT_ZONE' | 'GENERATOR_START' | 'GENERATOR_FUEL_LOW' | 'GENERATOR_EXHAUSTED' | 'SIGNAL_DARK'
   | 'GRIDLOCK' | 'VEHICLE_STALLED' | 'EVAC_ORDER' | 'NPC_STRANDED'
-  | 'HELI_DISPATCH' | 'HELI_PICKUP' | 'HELI_GROUNDED'
+  | 'HELI_DISPATCH' | 'HELI_PICKUP' | 'HELI_DROPOFF' | 'HELI_GROUNDED' | 'ROOFTOP_RESCUE' | 'MEDEVAC'
   | 'INJECTED' | 'INVARIANT_VIOLATION';
 
 export interface SimEvent {
@@ -145,6 +145,7 @@ export interface MetricsFrame {
   hospitals: { id: BuildingId; util: number; diversion: boolean; onGenerator: boolean }[];
   evacDonePct: number; stranded: number; gridlockCells: number;
   floodedCells: number; maxDepth: number; unpoweredPopPct: number;
+  heliRescues: number;
   routeViolations: number;
 }
 
