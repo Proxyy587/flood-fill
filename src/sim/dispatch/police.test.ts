@@ -3,6 +3,8 @@ import { BlockType, VehicleKind, VehicleState } from "../../contracts/types";
 import type { Scenario } from "../../contracts/types";
 import { livingFixture } from "../agents/living-fixture";
 import { assertMovementEntry } from "../invariants/movement";
+import { findPath } from "../nav";
+import { buildHazardGrid } from "../nav/hazards";
 import { beginTrafficTick, createTraffic } from "../traffic";
 import { createWorld } from "../world/grid";
 import { createPolice, planPoliceRoute, policeSnapshot, stepPolice } from "./police";
@@ -145,43 +147,25 @@ it("cancels and clears ownership when the route becomes unreachable", () => {
   expect(police.state[0]).toBe(VehicleState.Moving);
 });
 
-it("assigns only unowned gridlocked intersections in stable priority order", () => {
-  const run = () => {
-    const fixture = trafficFixture({ policeCars: 2, policeOfficers: 2 });
-    fixture.world.block[34] = BlockType.Road;
-    fixture.scenario.blocks[34] = BlockType.Road;
-    fixture.traffic.intersections[26] = 1;
-    fixture.traffic.gridlock[26] = 1;
-    fixture.traffic.waited[26] = 10;
-    fixture.traffic.lastDemand[26] = 9;
-    fixture.traffic.intersections[27] = 1;
-    fixture.traffic.gridlock[27] = 1;
-    fixture.traffic.waited[27] = 20;
-    fixture.traffic.lastDemand[27] = 2;
-    fixture.traffic.gridlock[25] = 1;
-    fixture.traffic.gridlock[35] = 1;
-    fixture.traffic.waited[35] = 100;
-    stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
-    return [Array.from(fixture.police.assignment), Array.from(fixture.police.target)];
-  };
-
-  expect(run()).toEqual(run());
-  expect(run()).toEqual([[26, 27], [26, 27]]);
-});
-
-it("assigns the next demand and cell tie-breakers after waited time", () => {
-  const fixture = trafficFixture({ policeCars: 2, policeOfficers: 2 });
+it.each([
+  { description: "higher waited time", waited26: 5, demand26: 99, waited27: 6, demand27: 0, expected: 27 },
+  { description: "higher demand after waited-time tie", waited26: 5, demand26: 3, waited27: 5, demand27: 4, expected: 27 },
+  { description: "lower cell after waited-time and demand tie", waited26: 5, demand26: 4, waited27: 5, demand27: 4, expected: 26 },
+])("assigns the highest-priority reachable target by $description with one unit", ({ waited26, demand26, waited27, demand27, expected }) => {
+  const fixture = trafficFixture();
   fixture.world.block[34] = BlockType.Road;
   fixture.scenario.blocks[34] = BlockType.Road;
-  for (const cell of [26, 27]) {
+  for (const [cell, waited, demand] of [[26, waited26, demand26], [27, waited27, demand27]]) {
     fixture.traffic.intersections[cell] = 1;
     fixture.traffic.gridlock[cell] = 1;
-    fixture.traffic.waited[cell] = 5;
+    fixture.traffic.waited[cell] = waited;
+    fixture.traffic.lastDemand[cell] = demand;
   }
-  fixture.traffic.lastDemand[27] = 8;
-  fixture.traffic.lastDemand[26] = 3;
+
   stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
-  expect(Array.from(fixture.police.assignment)).toEqual([26, 27]);
+
+  expect(Array.from(fixture.police.assignment)).toEqual([expected]);
+  expect(fixture.police.assignment).not.toContain(expected === 26 ? 27 : 26);
 });
 
 it("breaks equal target priority by cell and equal routes by vehicle ID", () => {
@@ -194,8 +178,29 @@ it("breaks equal target priority by cell and equal routes by vehicle ID", () => 
     fixture.traffic.waited[cell] = 7;
     fixture.traffic.lastDemand[cell] = 4;
   }
+  expect(fixture.police.cell[0]).toBe(17);
+  expect(fixture.police.cell[1]).toBe(19);
   stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
   expect(Array.from(fixture.police.assignment)).toEqual([26, 27]);
+});
+
+it("selects the shortest reachable police route, then lower vehicle ID for equal routes", () => {
+  const nearest = trafficFixture({ policeCars: 2, policeOfficers: 2 });
+  nearest.traffic.intersections[27] = 1;
+  nearest.traffic.gridlock[27] = 1;
+  stepPolice(nearest.police, nearest.traffic, nearest.world, nearest.scenario, nearest.blocked, 0, 1);
+  expect(Array.from(nearest.police.assignment)).toEqual([-1, 27]);
+
+  const tied = trafficFixture({ policeCars: 2, policeOfficers: 2 });
+  tied.world.block[34] = BlockType.Road;
+  tied.scenario.blocks[34] = BlockType.Road;
+  tied.traffic.intersections[26] = 1;
+  tied.traffic.gridlock[26] = 1;
+  const grid = buildHazardGrid(tied.world, tied.scenario, "car", tied.blocked);
+  expect(findPath(grid, tied.police.cell[0], 26)).toHaveLength(3);
+  expect(findPath(grid, tied.police.cell[1], 26)).toHaveLength(3);
+  stepPolice(tied.police, tied.traffic, tied.world, tied.scenario, tied.blocked, 0, 1);
+  expect(Array.from(tied.police.assignment)).toEqual([26, -1]);
 });
 
 it("never assigns a non-intersection or a cleared intersection", () => {
@@ -213,6 +218,14 @@ it("dispatches to a gridlocked intersection and controls it only on arrival", ()
   fixture.traffic.intersections[27] = 1;
   fixture.traffic.gridlock[27] = 1;
   const first = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
+  expect(first.events).toContainEqual(expect.objectContaining({
+    tick: 1,
+    type: "ASSIGNED",
+    actor: fixture.police.id[0],
+    actorKind: "vehicle",
+    cell: 27,
+    reason: expect.stringMatching(/gridlock/i),
+  }));
   const second = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 2);
   const third = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 3);
   expect(fixture.police.assignment[0]).toBe(27);
@@ -230,6 +243,14 @@ it("releases a cleared target and makes the arrived unit reusable", () => {
   expect(released.controlled[27]).toBe(0);
   expect(fixture.police.assignment[0]).toBe(-1);
   expect(fixture.police.target[0]).toBe(-1);
+  expect(released.events).toContainEqual(expect.objectContaining({
+    tick: 5,
+    type: "COMMIT_CANCELLED",
+    actor: fixture.police.id[0],
+    actorKind: "vehicle",
+    cell: 27,
+    reason: expect.stringMatching(/gridlock.*clear|clear.*gridlock/i),
+  }));
   fixture.traffic.intersections[26] = 1;
   fixture.traffic.gridlock[26] = 1;
   stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 6);
@@ -269,7 +290,14 @@ it("cancels a closed dispatch route, clears ownership, and retries safely", () =
   fixture.blocked[25] = 1;
   fixture.blocked[19] = 1;
   const failed = stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 1, 2);
-  expect(failed.events.some((event) => event.type === "COMMIT_CANCELLED")).toBe(true);
+  expect(failed.events).toContainEqual(expect.objectContaining({
+    tick: 2,
+    type: "COMMIT_CANCELLED",
+    actor: fixture.police.id[0],
+    actorKind: "vehicle",
+    reason: expect.stringMatching(/route/i),
+  }));
+  expect(failed.events.find((event) => event.type === "COMMIT_CANCELLED")?.reason.length).toBeGreaterThan(0);
   expect(fixture.police.assignment[0]).toBe(-1);
   expect(fixture.police.target[0]).toBe(-1);
   expect(fixture.police.routes[0]).toBeNull();

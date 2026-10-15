@@ -107,6 +107,14 @@ export function stepPolice(
   for (let unit = 0; unit < system.count; unit++) {
     const assigned = system.assignment[unit];
     if (assigned < 0 || traffic.gridlock[assigned] === 1) continue;
+    events.push({
+      tick,
+      type: "COMMIT_CANCELLED",
+      actor: system.id[unit] as VehicleId,
+      actorKind: "vehicle",
+      cell: assigned,
+      reason: "Gridlock cleared at the assigned intersection; police traffic-control assignment released",
+    });
     system.assignment[unit] = -1;
     system.target[unit] = -1;
     system.routes[unit] = null;
@@ -146,6 +154,15 @@ export function stepPolice(
     system.routes[selected] = { cells: Int32Array.from(selectedPath), cursor: 1, target, navVersion };
     system.state[selected] = selectedPath.length > 1 ? VehicleState.Moving : VehicleState.Idle;
     owned[target] = 1;
+    events.push({
+      tick,
+      type: "ASSIGNED",
+      actor: system.id[selected] as VehicleId,
+      actorKind: "vehicle",
+      cell: target,
+      data: { targetCell: target },
+      reason: `Police vehicle dispatched to gridlocked intersection ${target}`,
+    });
   }
 
   for (let unit = 0; unit < system.count; unit++) {
