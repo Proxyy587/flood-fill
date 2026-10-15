@@ -1,6 +1,6 @@
 import { BlockType, NpcState, VehicleState } from "../contracts/types";
 import type { Scenario, DispatchMode, RunOptions, RenderSnapshot, MetricsFrame, RunSummary, SimEvent, EntitySelection, RequestId, VehicleId, BuildingId } from "../contracts/types";
-import { DispatchModeSchema, RunOptionsSchema, ScenarioSchema, SeedSchema } from "../contracts/schemas";
+import { DispatchModeSchema, RunOptionsSchema, ScenarioSchema, SeedSchema } from "../contracts/sim-schemas";
 import { z } from "zod";
 import { createRng } from "./rng";
 import { createWorld } from "./world/grid";

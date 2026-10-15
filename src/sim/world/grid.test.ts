@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
-import { mockScenario } from "../../contracts/mocks";
+import { mockScenario } from "../../contracts/mocks/ak";
 import { createWorld, neighbours } from "./grid";
-import { BlockType } from "../../contracts";
+import { BlockType } from "../../contracts/types";
 
 it("stores explicit bridge decks with a one-metre legacy fallback", () => {
   const s = mockScenario(); s.blocks[24] = BlockType.Bridge; s.blocks[25] = BlockType.Bridge;

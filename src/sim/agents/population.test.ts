@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { mockScenario } from "../../contracts/mocks";
+import { mockScenario } from "../../contracts/mocks/ak";
 import { NpcRole } from "../../contracts/types";
 import { createPopulation } from "./population";
 

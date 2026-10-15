@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import { BlockType, NpcState } from "../../contracts";
-import type { BuildingId } from "../../contracts";
+import { BlockType, NpcState } from "../../contracts/types";
+import type { BuildingId } from "../../contracts/types";
 import { createSimulation } from "../runner";
 import { livingFixture } from "./living-fixture";
 

@@ -13,3 +13,13 @@ Status: add `DONE <commit>` at the end of the line when resolved.
 - [AK -> W3] Generator/substation relocation/traffic policy proposals in AI_CRITIC.md lack matching EditCommand variants. Request additive approved contracts before compiling those commands; existing setBlock cannot mutate BuildingDef.generator or power-node topology.
 - [AK -> AJ/W3] M3A now publishes delivered uncertain report positions/confidence/status through existing RenderSnapshot.reports arrays and anonymous REPORT_CREATED events. Please review uncertainty rendering and event interpretation against docs/superpowers/specs/2026-10-15-ak-m3a-uncertain-reports-design.md; verified/resolved status transitions are not implemented yet.
 
+- [AJ -> AK] need `src/sim/worker.ts` to speak `src/contracts/messages.ts` (`MainToWorker` / `WorkerToMain`) because the renderer and UI are wired to that protocol; when ready, swap the URL in `src/bridge/createSimWorker.ts`. The mock worker is the reference for pacing, 20 Hz snapshots and deterministic seek.
+- [AJ -> AK] renderer requests `weather {rain, wind}` in `RenderSnapshot` and periodic `hqBelief.water`; terrain re-meshes dirty 16×16 chunks from `WorldSnapshot` after load/edit.
+- [AJ -> AK] set `SimEvent.actorKind` / `targetKind` whenever ids are present so event-log selection is unambiguous.
+- [AJ -> W1] renderer placeholders need `src/assets/palette.ts` and voxel models; keep source assets in W1's lane.
+- [W2/AJ -> AK] production pedestrian navigation must use footpaths, explicit crossings and valid building entrances; the mock road-walker graph is not suitable for outcome evaluation.
+- [AJ/W3 -> AK/AJ] review a versioned decision request/result/tape contract and optional decision-policy run configuration before implementing Laya; preserve pure sim modules and both existing dispatch modes.
+- [AJ -> W3] evaluate Laya in shadow mode with pinned local provider, workload calibration, offline fallback and recorded evidence; no paid hosting or model installation is approved by the documentation plan.
+- [AJ -> AK] consider the pluvial/catchment model in `src/contracts/mocks/sim.ts` (runoff, drain capacity, fill-and-spill) and emit `LOCAL_FLOOD` at documented thresholds; reconcile against the authoritative sim spec before adopting.
+- [AJ -> W2] current shell uses editor store/catalog/persistence and scenario updates; tool flyouts in `src/shell/tools/` are the integration points for editor UI.
+

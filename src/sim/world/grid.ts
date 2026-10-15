@@ -1,4 +1,4 @@
-import { ScenarioSchema } from "../../contracts/schemas";
+import { ScenarioSchema } from "../../contracts/sim-schemas";
 import type { Scenario } from "../../contracts/types";
 import { BlockType } from "../../contracts/types";
 

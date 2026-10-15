@@ -1,6 +1,6 @@
 import { BlockType, NpcRole, NpcState, VehicleKind, VehicleState } from "../../contracts/types";
 import type { Scenario, RunOptions, NpcParams, BuildingDef, NpcId, BuildingId, SimEvent } from "../../contracts/types";
-import { ScenarioSchema, RunOptionsSchema } from "../../contracts/schemas";
+import { ScenarioSchema, RunOptionsSchema } from "../../contracts/sim-schemas";
 import { createRng } from "../rng";
 
 export interface NpcTable {

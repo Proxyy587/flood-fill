@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
-import { BlockType, NpcState, RenderSnapshotSchema } from "../../contracts";
+import { BlockType, NpcState } from "../../contracts/types";
+import { RenderSnapshotSchema } from "../../contracts/sim-schemas";
 import { createSimulation, runBatch } from "../runner";
 import { livingFixture } from "./living-fixture";
 

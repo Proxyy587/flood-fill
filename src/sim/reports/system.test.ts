@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import { NpcState } from "../../contracts";
-import type { SimEvent } from "../../contracts";
+import { NpcState } from "../../contracts/types";
+import type { SimEvent } from "../../contracts/types";
 import { createPopulation, defaultNpcParams } from "../agents/population";
 import { createReportSystem, injectFalseReport, reportSnapshot, stepReports } from "./system";
 import { livingFixture } from "../agents/living-fixture";

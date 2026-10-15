@@ -5,7 +5,7 @@ import { createAmbulances, stepAmbulances } from "./ambulances";
 import { createHospitalSystem } from "./hospitals";
 import { createWorld } from "../world/grid";
 import { createHotspotSystem, hotspotZoneForCell, stageIdleAmbulances, updateHotspots } from "./hotspots";
-import { mockScenario } from "../../contracts/mocks";
+import { mockScenario } from "../../contracts/mocks/ak";
 
 it("maps edge cells into fixed 8x8 zones and scores uncovered severe demand plus recent admissions", () => {
   const hotspots = createHotspotSystem(17, 9);

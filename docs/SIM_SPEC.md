@@ -242,3 +242,17 @@ See `AGENTS.md` §7. Each is a pure function `(prevState, state) → Violation[]
 2. `coastal-grid` (flash flood plus bad drainage): flat, storm-surge style.
 3. `dense-basin-city` (large, compound): bowl-shaped, a power-critical substation, 3 hospitals, helipads.
 4. `stress-triple` (legacy name, full PS stress test): simultaneous bridge closure + boat failure + shelter overflow + flooded substation/cascading blackout + gale-wind helicopter grounding. All five failures are MUST scope.
+
+## 13. Proposed Laya decision-policy extension (2026-10-15)
+
+Implementation status and phase gates are in [LAYA_MIGRATION_PLAN.md](LAYA_MIGRATION_PLAN.md); the current runtime has no Laya policy.
+
+- Keep deterministic role state machines, A*/flow fields, flood/power solvers, traffic rules and resource accounting. Laya may select from feasible high-level actions; it does not compute movement or certify safety.
+- Start with at most five feasible hospitals and a defer/escalate option. Reject hospitals without capacity, safe route or active grid/generator power before shortlisting; recheck and reserve at commit time. If candidates disappear, replan or re-queue.
+- Observe through agent beliefs, with report age/confidence and missing information explicit. Do not silently give decentralised agents HQ truth.
+- Preserve negotiation and centralized dispatch. Rules, shadow and assisted decision policies remain a separate experimental dimension.
+- Keep pedestrian decisions above a real footpath/crossing graph. Enforce valid spawns, entrances and crossings in the simulator regardless of policy.
+- Use event-triggered inference with cooldowns and budgets. Hazards, operating limits, route invalidation and reservation conflicts trigger deterministic safety handling.
+- Log proposals, feasible alternatives, probability evidence, safety rechecks, fallback and reason. Do not present policy scores as probabilities or claim explanations reveal private model reasoning.
+- Record a versioned decision tape for assisted runs. Replay reads it without inference; stale or duplicate responses never commit. Existing safety invariants remain mandatory.
+- Evaluate rules and assisted policies with held-out synthetic scenarios and paired seeds; publish regressions as well as improvements.

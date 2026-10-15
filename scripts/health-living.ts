@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
-import { BlockType, RenderSnapshotSchema, RunSummarySchema, VehicleKind, VehicleState } from "../src/contracts";
+import { BlockType, VehicleKind, VehicleState } from "../src/contracts/types";
+import { RenderSnapshotSchema, RunSummarySchema } from "../src/contracts/sim-schemas";
 import { createSimulation, runBatch } from "../src/sim";
 import { livingFixture } from "../src/sim/agents/living-fixture";
 import { defaultNpcParams } from "../src/sim/agents/population";

@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
-import { ScenarioSchema, RunOptionsSchema, SimEventSchema } from "./schemas";
+import { ScenarioSchema, RunOptionsSchema, SimEventSchema } from "./sim-schemas";
 import { BlockType } from "./types";
-import { mockScenario } from "./mocks";
+import { mockScenario } from "./mocks/ak";
 
 it("validates explicit bridge decks and rejects wrong/duplicate cells and low decks", () => {
   const s = { ...mockScenario(), bridges: [{ cell: 24, deckHeight: 2 }] };

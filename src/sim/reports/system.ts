@@ -1,5 +1,5 @@
-import { NpcState, ReportStatus } from "../../contracts";
-import type { RenderSnapshot, SimEvent } from "../../contracts";
+import { NpcState, ReportStatus } from "../../contracts/types";
+import type { RenderSnapshot, SimEvent } from "../../contracts/types";
 import { createRng } from "../rng";
 import type { PopulationState } from "../agents/population";
 

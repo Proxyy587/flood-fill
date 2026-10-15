@@ -104,6 +104,18 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
+    },
+  },
+  {
+    files: ["src/render/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: ["**/sim/**", "**/contracts/mocks/**"] }],
+    },
+  },
+  {
     name: "sim/determinism",
     files: simFiles,
     plugins: { sim: { rules: { "import-boundary": importBoundary, "deterministic-math": deterministicMath } } },

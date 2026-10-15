@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mockScenario } from "../../contracts/mocks";
+import { mockScenario } from "../../contracts/mocks/ak";
 import { BlockType } from "../../contracts/types";
 import { createWorld, type World } from "../world/grid";
 import { buildHazardGrid, canEnter, roadDepth, type TravelMode } from "./hazards";

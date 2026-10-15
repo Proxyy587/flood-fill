@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { parseRunArgs, loadScenario, validateScenarioFiles } from "./cli";
-import { mockScenario } from "../src/contracts/mocks";
+import { mockScenario } from "../src/contracts/mocks/ak";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

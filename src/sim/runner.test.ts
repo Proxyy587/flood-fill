@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
-import { mockScenario } from "../contracts/mocks";
-import { BlockType, RenderSnapshotSchema, RunSummarySchema, VehicleKind } from "../contracts";
+import { mockScenario } from "../contracts/mocks/ak";
+import { BlockType, VehicleKind } from "../contracts/types";
+import { RenderSnapshotSchema, RunSummarySchema } from "../contracts/sim-schemas";
 import { createSimulation, runBatch } from "./runner";
 import { defaultNpcParams } from "./agents/population";
 

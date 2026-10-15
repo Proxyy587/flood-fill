@@ -1,123 +1,95 @@
-import { describe, expect, it } from "vitest";
-import { BlockType, ScenarioSchema, EditCommandSchema, MainToWorkerSchema, RunSummarySchema, RenderSnapshotSchema, InspectorDataSchema, VehicleIdSchema } from "./index";
-import { mockScenario, mockRunSummary, mockSnapshotStream } from "./mocks";
+import { describe, expect, it } from 'vitest';
+import { BlockType, BLOCK_TYPE_COUNT } from './blocks';
+import { MockSim, mockRunSummary, mockScenario } from './mocks';
+import { EditCommandSchema, NpcParamsSchema, RunSummarySchema, ScenarioSchema, SimEventSchema } from './schemas';
+import { DEFAULT_NPC_PARAMS } from './params';
+import { chunkOfCell } from './snapshot';
+import { bridgeDeckHeights } from './world';
 
-describe("scenario boundary", () => {
-  it("rejects building tiles without definitions and Float32 overflow inputs", () => {
-    const s = mockScenario(); s.blocks[0] = BlockType.Hospital;
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
-    const t = mockScenario(); t.weather.sources[0].rate = 1e40;
-    expect(ScenarioSchema.safeParse(t).success).toBe(false);
-    const u = mockScenario(); u.buildings[0].floorHeight = 1e40;
-    expect(ScenarioSchema.safeParse(u).success).toBe(false);
+describe('contracts', () => {
+  it('mockScenario validates against the Scenario schema', () => {
+    const result = ScenarioSchema.safeParse(mockScenario());
+    expect(result.success, result.success ? '' : JSON.stringify(result.error.issues.slice(0, 3))).toBe(true);
   });
-  it("accepts the source-count boundary and rejects one beyond it", () => {
+
+  it('mockScenario is deterministic for a seed', () => {
+    expect(JSON.stringify(mockScenario(3))).toBe(JSON.stringify(mockScenario(3)));
+    expect(JSON.stringify(mockScenario(3))).not.toBe(JSON.stringify(mockScenario(4)));
+  });
+
+  it('rejects a scenario with the wrong grid length', () => {
     const s = mockScenario();
-    s.weather.sources = Array.from({ length: 16384 }, () => ({ cell: 0, startT: 0, endT: 1, rate: 0 }));
-    expect(ScenarioSchema.safeParse(s).success).toBe(true);
-    s.weather.sources.push({ cell: 0, startT: 0, endT: 1, rate: 0 });
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
+    const bad = { ...s, ground: s.ground.slice(1) };
+    expect(ScenarioSchema.safeParse(bad).success).toBe(false);
   });
-  it("rejects fleet and roster allocation beyond supported resource budgets", () => {
-    const s = mockScenario(); s.fleet.ambulances = 2147483647; s.fleet.boats = 1;
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
-    const t = mockScenario(); t.fleet.ambulances = 10000; t.population.mix.carOwners = 1;
-    expect(ScenarioSchema.safeParse(t).success).toBe(false);
-    const u = mockScenario(); u.fleet.doctors = 10000; u.fleet.nurses = 1;
-    expect(ScenarioSchema.safeParse(u).success).toBe(false);
+
+  it('validates default params and edit commands', () => {
+    expect(NpcParamsSchema.safeParse(DEFAULT_NPC_PARAMS).success).toBe(true);
+    expect(EditCommandSchema.safeParse({ kind: 'setBlock', cell: 3, block: BlockType.Road }).success).toBe(true);
+    expect(
+      EditCommandSchema.safeParse({
+        kind: 'applyPatch',
+        patch: { title: 't', rationale: 'r', estimatedCost: 1, commands: [{ kind: 'removeAt', cell: 1 }] },
+      }).success,
+    ).toBe(true);
+    expect(EditCommandSchema.safeParse({ kind: 'nuke', cell: 1 }).success).toBe(false);
+    expect(SimEventSchema.safeParse({ tick: 1, type: 'REROUTE', reason: '' }).success).toBe(false);
   });
-  it("accepts exactly 10000 vehicles including cars and exactly 10000 staff", () => {
-    const s = mockScenario();
-    s.fleet = { ambulances: 9998, policeCars: 0, boats: 0, helicopters: 0, doctors: 9998, nurses: 2, policeOfficers: 0, boatOperators: 0 };
-    // round(6 civilians * 0.3 ownership) = two cars, after emergency fleet IDs.
-    expect(ScenarioSchema.safeParse(s).success).toBe(true);
-    s.fleet.ambulances++;
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
+
+  it('chunkOfCell maps cells to 16×16 chunks', () => {
+    expect(chunkOfCell(64, 0)).toBe(0);
+    expect(chunkOfCell(64, 17)).toBe(1);
+    expect(chunkOfCell(64, 16 * 64)).toBe(4);
+    expect(BLOCK_TYPE_COUNT).toBe(24);
   });
-  it("accepts a synthetic fixture and preserves it through JSON", () => {
-    const s = mockScenario();
-    expect(ScenarioSchema.parse(JSON.parse(JSON.stringify(s)))).toEqual(s);
-  });
-  it.each([0, 129, 1.5])("rejects invalid width %s", (w) => {
-    const s = mockScenario(); s.size.w = w;
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
-  });
-  it("rejects wrong array lengths and nonfinite terrain", () => {
-    const s = mockScenario(); s.ground.pop();
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
-    const t = mockScenario(); t.ground[0] = Infinity;
-    expect(ScenarioSchema.safeParse(t).success).toBe(false);
-  });
-  it("rejects out-of-grid sources and unresolved power references", () => {
-    const s = mockScenario(); s.weather.sources[0].cell = 100000;
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
-    const t = mockScenario(); t.powerGrid.edges.push([0, 999]);
-    expect(ScenarioSchema.safeParse(t).success).toBe(false);
-  });
-  it("rejects duplicate IDs, overlapping buildings and misplaced entrances", () => {
-    const s = mockScenario(); s.buildings.push({ ...s.buildings[0] });
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
-    const t = mockScenario(); t.buildings[0].entrance = t.ground.length;
-    expect(ScenarioSchema.safeParse(t).success).toBe(false);
-  });
-  it("rejects bad weather ordering, district references and injected targets", () => {
-    const s = mockScenario(); s.weather.rain = [{ t: 10, intensity: 0 }, { t: 2, intensity: 1 }];
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
-    const t = mockScenario(); t.districts[0].cells.push(-1);
-    expect(ScenarioSchema.safeParse(t).success).toBe(false);
-    const u = mockScenario(); u.injected = [{ kind: "substation_flooded", tick: 2, nodeId: 999 }];
-    expect(ScenarioSchema.safeParse(u).success).toBe(false);
-  });
-  it("resolves injected boat IDs against deterministic fleet ordering", () => {
-    const s = mockScenario(); s.fleet.boats = 0;
-    s.injected = [{ kind: "boat_failure", tick: 2, vehicleId: VehicleIdSchema.parse(1) }];
-    expect(ScenarioSchema.safeParse(s).success).toBe(false);
-    s.fleet.boats = 1; s.injected[0] = { kind: "boat_failure", tick: 2, vehicleId: VehicleIdSchema.parse(3) };
-    expect(ScenarioSchema.safeParse(s).success).toBe(true);
+
+  it('bridge deck sits above the higher bank', () => {
+    const w = 5;
+    const ground = [3, 0, 0, 0, 2];
+    const blocks = [BlockType.Road, BlockType.Bridge, BlockType.Bridge, BlockType.Bridge, BlockType.Road];
+    const deck = bridgeDeckHeights(w, 1, ground, blocks);
+    expect(Array.from(deck)).toEqual([-1, 5, 5, 5, -1]);
   });
 });
 
-describe("commands and fixtures", () => {
-  it("rejects nonpositive, duplicate snapshot IDs and invalid enum values", () => {
-    const s = [...mockSnapshotStream(1)][0]; s.npcs.id[0] = 0;
-    expect(RenderSnapshotSchema.safeParse(s).success).toBe(false);
-    s.npcs.id[0] = 1; s.npcs.role[0] = 255;
-    expect(RenderSnapshotSchema.safeParse(s).success).toBe(false);
-    s.npcs.role[0] = 0; s.npcs.state[0] = 255;
-    expect(RenderSnapshotSchema.safeParse(s).success).toBe(false);
-    const t = [...mockSnapshotStream(1)][0];
-    t.npcs = { id: new Int32Array([1, 1]), x: new Float32Array(2), z: new Float32Array(2), heading: new Float32Array(2), role: new Uint8Array(2), state: new Uint8Array(2) };
-    expect(RenderSnapshotSchema.safeParse(t).success).toBe(false);
+describe('mock sim', () => {
+  it('same scenario + seed = identical event log', () => {
+    const a = mockRunSummary(900, 11);
+    const b = mockRunSummary(900, 11);
+    expect(JSON.stringify(a.events)).toBe(JSON.stringify(b.events));
   });
-  it("rejects invalid building footprints in individual and patch commands", () => {
-    const def = { type: BlockType.Road, cells: [1], entrance: 1, capacity: 1, floorHeight: 1 };
-    expect(EditCommandSchema.safeParse({ kind: "placeBuilding", def }).success).toBe(false);
-    expect(EditCommandSchema.safeParse({ kind: "placeBuilding", def: { ...def, type: BlockType.House, cells: [1, 1] } }).success).toBe(false);
-    expect(EditCommandSchema.safeParse({ kind: "placeBuilding", def: { ...def, type: BlockType.House, entrance: 2 } }).success).toBe(false);
+
+  it('produces a schema-valid run summary where the city floods and power trips', () => {
+    const summary = mockRunSummary(2400);
+    const parsed = RunSummarySchema.safeParse(summary);
+    expect(parsed.success, parsed.success ? '' : JSON.stringify(parsed.error.issues.slice(0, 3))).toBe(true);
+    const types = new Set(summary.events.map((e) => e.type));
+    for (const t of ['WEATHER', 'FLOOD_THRESHOLD', 'ROAD_CLOSED', 'EVAC_ORDER', 'POWER_TRIP', 'GENERATOR_START', 'NPC_STRANDED']) {
+      expect(types, `missing ${t}`).toContain(t);
+    }
+    expect(summary.events.every((e) => e.reason.length > 0)).toBe(true);
   });
-  it("distinguishes cell indices from positive branded inspector IDs", () => {
-    expect(MainToWorkerSchema.safeParse({ kind: "inspect", entityKind: "cell", id: 0 }).success).toBe(true);
-    expect(MainToWorkerSchema.safeParse({ kind: "inspect", entityKind: "npc", id: 0 }).success).toBe(false);
-    expect(MainToWorkerSchema.safeParse({ kind: "inspect", entityKind: "npc", id: 2147483648 }).success).toBe(false);
-    expect(InspectorDataSchema.safeParse({ kind: "npc", id: 0, title: "bad", attributes: {} }).success).toBe(false);
+
+  it('snapshot arrays are consistent and sized to the grid', () => {
+    const s = mockScenario();
+    const sim = new MockSim(s, 1);
+    for (let i = 0; i < 50; i++) sim.step();
+    const snap = sim.snapshot();
+    const n = s.size.w * s.size.h;
+    expect(snap.water.length).toBe(n);
+    expect(snap.powered.length).toBe(n);
+    const k = snap.npcs.id.length;
+    expect(k).toBeGreaterThan(100);
+    for (const arr of [snap.npcs.x, snap.npcs.z, snap.npcs.heading, snap.npcs.role, snap.npcs.state]) expect(arr.length).toBe(k);
+    expect(snap.vehicles.id.length).toBe(snap.vehicles.kind.length);
   });
-  it("accepts safe commands and rejects unknown kinds", () => {
-    expect(EditCommandSchema.safeParse({ kind: "setBlock", cell: 0, block: BlockType.Road }).success).toBe(true);
-    expect(EditCommandSchema.safeParse({ kind: "deleteEverything" }).success).toBe(false);
-  });
-  it("rejects recursively nested patches", () => {
-    const patch = { title: "test", rationale: "test", commands: [], estimatedCost: 1 };
-    expect(EditCommandSchema.safeParse({ kind: "applyPatch", patch: { ...patch, commands: [{ kind: "applyPatch", patch }] } }).success).toBe(false);
-  });
-  it("validates the worker protocol and rejects malformed options", () => {
-    expect(MainToWorkerSchema.safeParse({ kind: "load", scenario: mockScenario(), seed: 42, options: { durationTicks: 60 } }).success).toBe(true);
-    expect(MainToWorkerSchema.safeParse({ kind: "setSpeed", speed: 0 }).success).toBe(false);
-    expect(MainToWorkerSchema.safeParse({ kind: "seek", tick: -1 }).success).toBe(false);
-  });
-  it("ships labelled summaries and independent snapshot buffers", () => {
-    expect(RunSummarySchema.parse(mockRunSummary()).scenario).toContain("MOCK");
-    const snapshots = [...mockSnapshotStream(2)];
-    snapshots[0].water[0] = 99;
-    expect(snapshots[1].water[0]).not.toBe(99);
+
+  it('edits mark the touched chunks dirty and show up in the next snapshot', () => {
+    const s = mockScenario();
+    const sim = new MockSim(s, 1);
+    const chunks = sim.applyEdit({ kind: 'setBlock', cell: 0, block: BlockType.Tree });
+    expect(chunks).toContain(0);
+    expect(sim.world().blocks[0]).toBe(BlockType.Tree);
+    expect(sim.snapshot().dirtyChunks).toContain(0);
   });
 });

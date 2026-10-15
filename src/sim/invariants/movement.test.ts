@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import { BlockType } from "../../contracts";
-import { mockScenario } from "../../contracts/mocks";
+import { BlockType } from "../../contracts/types";
+import { mockScenario } from "../../contracts/mocks/ak";
 import { createWorld } from "../world/grid";
 import { assertMovementEntry } from "./movement";
 

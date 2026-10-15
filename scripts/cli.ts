@@ -2,8 +2,8 @@ import { parseArgs } from "node:util";
 import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { DispatchModeSchema, RunOptionsSchema, ScenarioSchema, SeedSchema } from "../src/contracts";
-import { mockScenario } from "../src/contracts/mocks";
+import { DispatchModeSchema, RunOptionsSchema, ScenarioSchema, SeedSchema } from "../src/contracts/sim-schemas";
+import { mockScenario } from "../src/contracts/mocks/ak";
 import { livingFixture } from "../src/sim/agents/living-fixture";
 
 export function parseRunArgs(args: string[]) {

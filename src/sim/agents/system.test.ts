@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
-import { BlockType, NpcState, VehicleState, NpcRole, RenderSnapshotSchema } from "../../contracts";
-import type { BuildingId, NpcId, Scenario } from "../../contracts";
+import { BlockType, NpcState, VehicleState, NpcRole } from "../../contracts/types";
+import { RenderSnapshotSchema } from "../../contracts/sim-schemas";
+import type { BuildingId, NpcId, Scenario } from "../../contracts/types";
 import { createWorld } from "../world/grid";
 import { createPopulation } from "./population";
 import { createAgentSystem, stepAgents, agentSnapshot, inspectAgent } from "./system";

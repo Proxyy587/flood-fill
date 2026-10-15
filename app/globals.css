@@ -1,26 +1,156 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: rgba(247, 249, 248, 0.9);
+  --paper-solid: #f4f6f5;
+  --ink: #15232d;
+  --ink-2: #33444f;
+  --muted: #5e6e78;
+  --faint: #8a979f;
+  --hair: #d5dcdf;
+  --hair-soft: rgba(21, 35, 45, 0.08);
+  --blue: #1e6fd9;
+  --blue-soft: rgba(30, 111, 217, 0.1);
+  --amber: #c98a06;
+  --amber-soft: rgba(232, 163, 23, 0.14);
+  --danger: #d93a2b;
+  --danger-soft: rgba(217, 58, 43, 0.1);
+  --green: #1f9d63;
+  --green-soft: rgba(31, 157, 99, 0.12);
+  --shadow: 0 1px 2px rgba(21, 35, 45, 0.06), 0 10px 28px rgba(21, 35, 45, 0.1);
+  --radius: 12px;
+  --background: #d8e4ea;
+  --foreground: var(--ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-ui);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  overscroll-behavior: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* ---------- map labels (drawn by src/render/overlays/LabelLayer) ---------- */
+
+.fs-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fs-labels > * {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  will-change: transform;
+  white-space: nowrap;
+}
+
+.fs-district {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(21, 35, 45, 0.78);
+  text-shadow:
+    0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+.fs-pin {
+  --cat: #1f9d63;
+  z-index: 1;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(21, 35, 45, 0.1);
+  background: rgba(250, 251, 251, 0.94);
+  box-shadow: 0 1px 2px rgba(21, 35, 45, 0.12), 0 4px 12px rgba(21, 35, 45, 0.1);
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ink);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.fs-pin::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  border-right: 1px solid rgba(21, 35, 45, 0.1);
+  border-bottom: 1px solid rgba(21, 35, 45, 0.1);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.fs-pin:hover {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(21, 35, 45, 0.14), 0 6px 16px rgba(21, 35, 45, 0.16);
+}
+
+.fs-pin[data-cat="medical"] { --cat: #1f9d63; }
+.fs-pin[data-cat="shelter"] { --cat: #0e9aa7; }
+.fs-pin[data-cat="police"] { --cat: #3559c7; }
+.fs-pin[data-cat="command"] { --cat: #e86a17; }
+.fs-pin[data-cat="fire"] { --cat: #d93a2b; }
+.fs-pin[data-cat="power"] { --cat: #d99a00; }
+.fs-pin[data-cat="boats"] { --cat: #1e6fd9; }
+.fs-pin[data-cat="air"] { --cat: #7a5af8; }
+
+.fs-pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--cat);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.55);
+  flex: none;
+}
+
+.fs-pin-status:empty {
+  display: none;
+}
+
+.fs-pin-status {
+  font-weight: 600;
+  padding-left: 6px;
+  border-left: 1px solid var(--hair);
+}
+
+.fs-pin[data-tone="warn"] .fs-pin-status { color: var(--amber); }
+.fs-pin[data-tone="bad"] .fs-pin-status { color: var(--danger); }
+.fs-pin[data-tone="bad"] { border-color: rgba(217, 58, 43, 0.45); }
+.fs-pin[data-tone="warn"] { border-color: rgba(232, 163, 23, 0.5); }
+
+.fs-pin[data-compact="true"] {
+  padding: 3px;
+}
+
+.fs-pin[data-compact="true"] .fs-pin-name {
+  display: none;
 }

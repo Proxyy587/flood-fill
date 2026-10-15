@@ -1,6 +1,6 @@
 import { BlockType } from "../../contracts/types";
 import type { BuildingId, Scenario } from "../../contracts/types";
-import { mockScenario } from "../../contracts/mocks";
+import { mockScenario } from "../../contracts/mocks/ak";
 
 /** Small synthetic demo/test town; W1 owns real scenario templates. */
 export function livingFixture(): Scenario {
