@@ -4,7 +4,7 @@ import { RenderSnapshotSchema } from "../../contracts/sim-schemas";
 import type { BuildingId, NpcId, Scenario } from "../../contracts/types";
 import { createWorld } from "../world/grid";
 import { createPopulation } from "./population";
-import { createAgentSystem, stepAgents, agentSnapshot, inspectAgent } from "./system";
+import { createAgentSystem, handoffRescuedCivilian, reserveRescuedShelter, stepAgents, agentSnapshot, inspectAgent } from "./system";
 import { createTraffic } from "../traffic";
 import { livingFixture } from "./living-fixture";
 
@@ -102,6 +102,30 @@ it("evicts a sheltered civilian when floodwater makes the shelter unsafe", () =>
   step(31);
   expect(p.npcs.state[0]).toBe(NpcState.Stranded);
   expect(a.shelterAssignment[0]).toBe(-1);
+});
+it("atomically assigns a boat-rescued civilian to reachable shelter capacity", () => {
+  const s = town(); s.buildings.find((building) => building.type === BlockType.Shelter)!.capacity = 1;
+  const { a, p, w, blocked } = setup(s);
+  expect(handoffRescuedCivilian(a, 0, 24, w, s, blocked, true)).toBe(true);
+  expect(a.shelterAssignment[0]).toBe(0);
+  expect(p.npcs.state[0]).toBe(NpcState.Evacuate);
+  expect(p.npcs.cell[0]).toBe(24);
+  expect(handoffRescuedCivilian(a, 0, 24, w, s, blocked, true)).toBe(true);
+  expect(a.shelterAssignment.filter((shelter) => shelter === 0)).toHaveLength(1);
+});
+it("does not overbook a shelter when multiple boat passengers reserve before boarding", () => {
+  const s = town(); s.population.count = 2; s.buildings.find((building) => building.type === BlockType.Shelter)!.capacity = 1;
+  const { a, w, blocked } = setup(s);
+  expect(reserveRescuedShelter(a, 0, 24, w, s, blocked)).toBe(true);
+  expect(reserveRescuedShelter(a, 1, 24, w, s, blocked)).toBe(false);
+  expect(Array.from(a.shelterAssignment).filter((assignment) => assignment === 0)).toHaveLength(1);
+});
+it("returns an uninjured boat-rescued civilian toward a safe assigned home", () => {
+  const s = town();
+  const { a, p, w, blocked } = setup(s);
+  expect(handoffRescuedCivilian(a, 0, 24, w, s, blocked, false)).toBe(true);
+  expect(p.npcs.state[0]).toBe(NpcState.ReturnHome);
+  expect(p.npcs.cell[0]).toBe(24);
 });
 it("marks an interrupted edge stranded, holds position and resumes without teleporting", () => {
   const { p, a, blocked, step } = setup(town()); step(1);

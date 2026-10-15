@@ -1,9 +1,28 @@
 import { expect, it } from "vitest";
 import { mockScenario } from "../contracts/mocks/ak";
 import { BlockType, VehicleKind } from "../contracts/types";
+import type { VehicleId } from "../contracts/types";
 import { RenderSnapshotSchema, RunSummarySchema } from "../contracts/sim-schemas";
 import { createSimulation, runBatch } from "./runner";
 import { defaultNpcParams } from "./agents/population";
+
+function boatHospitalScenario(populationCount: number, boatCount = 1) {
+  const scenario = mockScenario();
+  scenario.population.count = populationCount;
+  scenario.fleet.boats = boatCount;
+  scenario.fleet.boatOperators = boatCount;
+  scenario.blocks[2] = BlockType.BoatDepot;
+  scenario.buildings.push({ id: 3 as never, type: BlockType.BoatDepot, cells: [2], entrance: 2, capacity: boatCount, floorHeight: 0 });
+  scenario.blocks[22] = BlockType.Road;
+  scenario.ground[22] = 2;
+  scenario.ground[14] = 2;
+  scenario.buildings[1].floorHeight = 2;
+  scenario.buildings[1].generator = { fuelTicks: 200 };
+  scenario.weather.warningDelay = 0;
+  scenario.weather.sources = [{ cell: 9, startT: 0, endT: 120, rate: 1.5 }];
+  scenario.injected = [{ kind: "false_report", tick: 32, cell: 9, confidence: 1 }];
+  return scenario;
+}
 
 it("replays a batch byte-identically without mutating the input", () => {
   const s = mockScenario(); const original = JSON.stringify(s);
@@ -140,4 +159,146 @@ it("triages a flood-stranded civilian, reserves a powered hospital bed and admit
   expect(events.some((event) => event.type === "HOSPITAL_ASSIGN")).toBe(true);
   expect(events.some((event) => event.type === "SERVED")).toBe(true);
   expect(sim.summary().metrics.at(-1)!.unmet).toBe(0);
+});
+
+it("uses a boat only when the delivered report has no safe ambulance route", () => {
+  const scenario = mockScenario();
+  scenario.fleet.boats = 2;
+  scenario.fleet.boatOperators = 2;
+  scenario.blocks[9] = BlockType.BoatDepot;
+  scenario.buildings[0].type = BlockType.BoatDepot;
+  scenario.buildings[0].capacity = 1;
+  for (let cell = 24; cell <= 31; cell++) scenario.blocks[cell] = BlockType.Grass;
+  scenario.weather.sources = [8, 16, 24].map((cell) => ({ cell, startT: 0, endT: 12, rate: 2 }));
+  scenario.injected = [{ kind: "false_report", tick: 0, cell: 24, confidence: 1 }];
+  const options = { durationTicks: 20, npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, commsDelay: 0 } };
+  const sim = createSimulation(scenario, 42, "centralised", options);
+  for (let tick = 0; tick < 20; tick++) sim.step();
+
+  const events = sim.summary().events;
+  expect(events.some((event) => event.type === "ASSIGNED" && event.actorKind === "vehicle" && event.actor === 3 && /boat/i.test(event.reason))).toBe(true);
+  expect(events.filter((event) => event.type === "ASSIGNED" && event.data?.mode === "boat")).toHaveLength(1);
+  expect(events.some((event) => event.type === "REPORT_FALSE" && /Boat field search/.test(event.reason))).toBe(true);
+  expect(sim.snapshot().vehicles.kind).toContain(VehicleKind.Boat);
+  expect(JSON.stringify(sim.summary())).toBe(JSON.stringify(runBatch(scenario, [42], "centralised", options)[0]));
+  const centralRuns = runBatch(scenario, [42, 43, 44], "centralised", options);
+  const negotiationRuns = runBatch(scenario, [42, 43, 44], "negotiation", options);
+  for (let index = 0; index < centralRuns.length; index++) {
+    expect(negotiationRuns[index].metrics).toEqual(centralRuns[index].metrics);
+    expect(negotiationRuns[index].events.filter((event) => event.type === "REPORT_VERIFIED" || event.type === "REPORT_FALSE"))
+      .toEqual(centralRuns[index].events.filter((event) => event.type === "REPORT_VERIFIED" || event.type === "REPORT_FALSE"));
+  }
+});
+
+it("does not hand an injured passenger off at a road closed by debris", () => {
+  const scenario = boatHospitalScenario(1);
+  scenario.injected.push({ kind: "road_blocked_by_debris", tick: 32, cell: 22 });
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 70,
+    npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, awarenessMean: 0, commsDelay: 0 } });
+  for (let tick = 0; tick < 70; tick++) sim.step();
+
+  const events = sim.summary().events;
+  expect(events.some((event) => event.reason?.includes("handed off at a safe road-accessible shore"))).toBe(false);
+  expect(sim.summary().metrics.at(-1)!.unmet).toBeGreaterThan(0);
+});
+
+it("repeat-trips a five-casualty incident and admits every boat-transported patient", () => {
+  const scenario = boatHospitalScenario(5);
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 100,
+    npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, awarenessMean: 0, commsDelay: 0 } });
+  for (let tick = 0; tick < 100; tick++) sim.step();
+
+  const events = sim.summary().events;
+  const boardings = events.filter((event) => event.reason?.includes("civilian boarded"));
+  const handoffs = events.filter((event) => event.reason?.includes("handed off at a safe road-accessible shore"));
+  const hospitalAssignments = events.filter((event) => event.type === "HOSPITAL_ASSIGN");
+  const admissions = events.filter((event) => event.type === "SERVED" && event.reason?.includes("admitted"));
+  expect(boardings).toHaveLength(5);
+  expect(new Set(boardings.map((event) => event.tick)).size).toBeGreaterThan(1);
+  expect(Math.max(...Array.from(new Set(boardings.map((event) => event.tick)), (tick) => boardings.filter((event) => event.tick === tick).length))).toBeLessThanOrEqual(4);
+  expect(handoffs).toHaveLength(5);
+  expect(hospitalAssignments).toHaveLength(5);
+  expect(admissions).toHaveLength(5);
+  expect(sim.summary().metrics.at(-1)!.unmet).toBe(0);
+});
+
+it("handles two rescue boats arriving at distinct incident scenes in the same tick", () => {
+  const scenario = boatHospitalScenario(2, 2);
+  scenario.buildings[0].capacity = 1;
+  scenario.blocks[11] = BlockType.House;
+  scenario.buildings.push({ id: 4 as never, type: BlockType.House, cells: [11], entrance: 11, capacity: 1, floorHeight: 1 });
+  scenario.weather.sources = [9, 11].map((cell) => ({ cell, startT: 0, endT: 120, rate: 1.5 }));
+  scenario.injected = [
+    { kind: "false_report", tick: 32, cell: 9, confidence: 1 },
+    { kind: "false_report", tick: 32, cell: 11, confidence: 1 },
+  ];
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 100,
+    npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, awarenessMean: 0, commsDelay: 0 } });
+  for (let tick = 0; tick < 100; tick++) sim.step();
+
+  const events = sim.summary().events;
+  const boatAssignments = events.filter((event) => event.type === "ASSIGNED" && event.data?.mode === "boat" && event.tick === 32);
+  const boardings = events.filter((event) => event.reason?.includes("civilian boarded"));
+  const handoffs = events.filter((event) => event.reason?.includes("handed off at a safe road-accessible shore"));
+  expect(boatAssignments).toHaveLength(2);
+  expect(new Set(boatAssignments.map((event) => event.actor)).size).toBe(2);
+  expect(boardings).toHaveLength(2);
+  expect(new Set(boardings.map((event) => event.tick)).size).toBe(1);
+  expect(new Set(boardings.map((event) => event.target)).size).toBe(2);
+  expect(handoffs).toHaveLength(2);
+  expect(events.filter((event) => event.type === "SERVED" && event.reason?.includes("admitted"))).toHaveLength(2);
+  expect(sim.summary().metrics.at(-1)!.unmet).toBe(0);
+});
+
+it("applies boat failure at tick zero and removes the failed boat from snapshots", () => {
+  const scenario = mockScenario();
+  scenario.injected = [{ kind: "boat_failure", tick: 0, vehicleId: 3 as VehicleId }];
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 1 });
+  expect(sim.summary().events.some((event) => event.type === "INJECTED" && event.actor === 3)).toBe(true);
+  expect(sim.snapshot().vehicles.kind).not.toContain(VehicleKind.Boat);
+  expect(RunSummarySchema.safeParse(sim.summary()).success).toBe(true);
+});
+
+it("ignores a scheduled failure for a configured boat without an operator", () => {
+  const scenario = mockScenario();
+  scenario.fleet.boats = 2;
+  scenario.fleet.boatOperators = 1;
+  scenario.injected = [{ kind: "boat_failure", tick: 0, vehicleId: 4 as VehicleId }];
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 1 });
+  expect(sim.summary().events.some((event) => event.type === "INJECTED" && event.actor === 4)).toBe(true);
+  expect(sim.snapshot().vehicles.kind).not.toContain(VehicleKind.Boat);
+});
+
+it("keeps a safely routed incident ambulance-owned instead of racing a boat", () => {
+  const scenario = mockScenario();
+  scenario.blocks[9] = BlockType.BoatDepot;
+  scenario.buildings[0].type = BlockType.BoatDepot;
+  scenario.buildings[0].capacity = 1;
+  for (const cell of [13, 21, 29, 37, 38, 39, 32]) scenario.blocks[cell] = BlockType.Road;
+  scenario.weather.sources = [8, 16, 24].map((cell) => ({ cell, startT: 0, endT: 12, rate: 2 }));
+  scenario.injected = [{ kind: "false_report", tick: 0, cell: 24, confidence: 1 }];
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 1,
+    npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, commsDelay: 0 } });
+  sim.step();
+  const assignments = sim.summary().events.filter((event) => event.type === "ASSIGNED");
+  expect(assignments).toHaveLength(1);
+  expect(assignments[0].actor).toBe(1);
+  expect(assignments[0].reason).toMatch(/ambulance/i);
+});
+
+it("requeues a boat-owned incident when its boat fails en route", () => {
+  const scenario = mockScenario();
+  scenario.blocks[9] = BlockType.BoatDepot;
+  scenario.buildings[0].type = BlockType.BoatDepot;
+  scenario.buildings[0].capacity = 1;
+  for (let cell = 24; cell <= 31; cell++) scenario.blocks[cell] = BlockType.Grass;
+  scenario.weather.sources = [8, 16, 24].map((cell) => ({ cell, startT: 0, endT: 12, rate: 2 }));
+  scenario.injected = [{ kind: "false_report", tick: 0, cell: 24, confidence: 1 }, { kind: "boat_failure", tick: 7, vehicleId: 3 as VehicleId }];
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 8,
+    npcParams: { ...defaultNpcParams(scenario), falseReportRate: 0, commsDelay: 0 } });
+  for (let tick = 0; tick < 8; tick++) sim.step();
+  const events = sim.summary().events;
+  expect(events.some((event) => event.type === "ASSIGNED" && event.actor === 3)).toBe(true);
+  expect(events.some((event) => event.type === "INJECTED" && event.actor === 3)).toBe(true);
+  expect(events.some((event) => event.type === "COMMIT_CANCELLED" && event.actor === 3 && /Boat failed/.test(event.reason))).toBe(true);
 });

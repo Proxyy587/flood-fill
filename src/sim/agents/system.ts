@@ -1,7 +1,7 @@
 import { BlockType, NpcRole, NpcState, VehicleState } from "../../contracts/types";
 import type { EntitySelection, InspectorData, NpcId, RenderSnapshot, Scenario, SimEvent, VehicleId } from "../../contracts/types";
 import type { World } from "../world/grid";
-import { buildFlowField, type NavGrid } from "../nav";
+import { buildFlowField, findPath, type NavGrid } from "../nav";
 import { buildHazardGrid } from "../nav/hazards";
 import { beginTrafficTick, congestionFactors, finishTrafficTick, markTrafficWaiting, tryEnterTraffic, type TrafficState } from "../traffic";
 import type { PopulationState } from "./population";
@@ -66,6 +66,91 @@ function discardRoute(a: AgentSystem, i: number): void {
   const route = a.routes.get(i);
   if (route) a.routeCells -= route.cells.length + route.modes.length;
   a.routes.delete(i);
+}
+
+/** Atomically reserves shelter capacity before a rescue boat boards a civilian. */
+export function reserveRescuedShelter(a: AgentSystem, npc: number, cell: number, world: World, scenario: Scenario, blocked: Uint8Array): boolean {
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount || !Number.isInteger(cell) || cell < 0 || cell >= world.width * world.height) {
+    throw new RangeError("Rescued civilian or landing cell is outside the simulation");
+  }
+  const foot = buildHazardGrid(world, scenario, "foot", blocked);
+  const existing = a.shelterAssignment[npc];
+  if (existing >= 0) {
+    const shelter = a.shelters[existing];
+    if (shelter && shelter.capacity > 0 && !shelter.cells.some((candidate) => world.water[candidate] > shelter.floorHeight) && findPath(foot, cell, shelter.entrance)) return true;
+    a.shelterAssignment[npc] = -1;
+  }
+  const reservations = new Int32Array(a.shelters.length);
+  for (const assignment of a.shelterAssignment) if (assignment >= 0) reservations[assignment]++;
+  let selected = -1;
+  let bestLength = Infinity;
+  for (let index = 0; index < a.shelters.length; index++) {
+    const shelter = a.shelters[index];
+    if (shelter.capacity <= reservations[index] || shelter.cells.some((candidate) => world.water[candidate] > shelter.floorHeight)) continue;
+    const path = findPath(foot, cell, shelter.entrance);
+    if (!path) continue;
+    if (selected < 0 || path.length < bestLength || path.length === bestLength && shelter.id < a.shelters[selected].id) {
+      selected = index;
+      bestLength = path.length;
+    }
+  }
+  if (selected < 0) return false;
+  a.shelterAssignment[npc] = selected;
+  return true;
+}
+
+export function releaseRescuedShelter(a: AgentSystem, npc: number): boolean {
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Rescued civilian is outside the shelter reservation table");
+  if (a.shelterAssignment[npc] < 0) return false;
+  a.shelterAssignment[npc] = -1;
+  if (a.population.npcs.state[npc] === NpcState.Respond) {
+    a.intent[npc] = 0;
+    a.population.npcs.state[npc] = NpcState.Stranded;
+  }
+  return true;
+}
+
+/** Removes an aboard civilian from foot-route processing until shore handoff. */
+export function markRescuedAboard(a: AgentSystem, npc: number): void {
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Rescued civilian is outside the agent table");
+  discardRoute(a, npc);
+  a.intent[npc] = 0;
+  a.planningQueued[npc] = 0;
+  a.population.npcs.state[npc] = NpcState.Respond;
+}
+
+export function requeueFailedRescue(a: AgentSystem, npc: number): void {
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Rescued civilian is outside the agent table");
+  discardRoute(a, npc);
+  a.intent[npc] = 0;
+  a.planningQueued[npc] = 0;
+  a.population.npcs.state[npc] = NpcState.Stranded;
+}
+
+/** Transfers a shore-landed civilian to a reachable home or one reserved shelter place. */
+export function handoffRescuedCivilian(a: AgentSystem, npc: number, cell: number, world: World, scenario: Scenario, blocked: Uint8Array, shelterRequired: boolean): boolean {
+  const n = a.population.npcs;
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount || !Number.isInteger(cell) || cell < 0 || cell >= world.width * world.height) {
+    throw new RangeError("Rescued civilian or landing cell is outside the simulation");
+  }
+  const foot = buildHazardGrid(world, scenario, "foot", blocked);
+  if (shelterRequired) {
+    if (!reserveRescuedShelter(a, npc, cell, world, scenario, blocked)) return false;
+    a.intent[npc] = 3;
+    n.state[npc] = NpcState.Evacuate;
+  } else {
+    const home = scenario.buildings.find((building) => building.id === n.homeBuilding[npc]);
+    if (!home || home.cells.some((candidate) => world.water[candidate] > home.floorHeight) || !findPath(foot, cell, home.entrance)) return false;
+    a.intent[npc] = 2;
+    n.state[npc] = NpcState.ReturnHome;
+  }
+  discardRoute(a, npc);
+  a.planningQueued[npc] = 0;
+  a.retry[npc] = 0;
+  n.cell[npc] = cell;
+  n.x[npc] = cell % world.width + 0.5;
+  n.z[npc] = Math.floor(cell / world.width) + 0.5;
+  return true;
 }
 
 function walkingSpeed(a: AgentSystem, i: number): number {

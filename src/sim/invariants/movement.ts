@@ -2,13 +2,20 @@ import { BlockType } from "../../contracts/types";
 import type { World } from "../world/grid";
 
 /** Independent entry assertion; intentionally does not reuse the route planner. */
-export function assertMovementEntry(world: World, from: number, to: number, mode: "foot" | "car", blocked: Uint8Array): void {
+export function assertMovementEntry(world: World, from: number, to: number, mode: "foot" | "car" | "boat", blocked: Uint8Array): void {
   const count = world.width * world.height;
   if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= count || to >= count ||
       Math.abs(from % world.width - to % world.width) + Math.abs(Math.floor(from / world.width) - Math.floor(to / world.width)) !== 1) throw new Error("Movement must enter an adjacent cell");
   if (blocked[to]) throw new Error("Movement entered an explicitly closed cell");
   const depth = world.water[to];
   if (!Number.isFinite(depth) || depth < 0) throw new Error("Invalid movement depth");
+  if (mode === "boat") {
+    if (world.block[to] === BlockType.Bridge) throw new Error("Boat movement cannot enter a bridge cell");
+    if (world.block[to] === BlockType.Tree || world.block[to] === BlockType.Levee || world.buildingId[to] !== 0 ||
+        world.block[to] >= BlockType.House && world.block[to] <= BlockType.Substation) throw new Error("Boat movement entered an obstacle");
+    if (depth < Math.fround(0.6)) throw new Error("Boat movement is below minimum draft depth");
+    return;
+  }
   if (world.block[to] === BlockType.Bridge) {
     const deck = world.bridgeDeck[to];
     if (!Number.isFinite(deck) || deck <= world.ground[to] || world.ground[to] + depth >= deck) throw new Error("Movement entered an overtopped bridge deck");

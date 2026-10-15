@@ -39,13 +39,15 @@ function distance(a: number, b: number, width: number): number {
   return Math.abs(a % width - b % width) + Math.abs(Math.floor(a / width) - Math.floor(b / width));
 }
 
-export function nearestSafeRoadRoute(fromCell: number, targetCell: number, world: World, scenario: Scenario, blocked: Uint8Array): { accessCell: number; route: Int32Array } | undefined {
+export function nearestSafeRoadRoute(fromCell: number, targetCell: number, world: World, scenario: Scenario, blocked: Uint8Array, maxAccessDistance = Infinity): { accessCell: number; route: Int32Array } | undefined {
   if (!Number.isInteger(targetCell) || targetCell < 0 || targetCell >= world.width * world.height) throw new RangeError("Target cell is outside the ambulance map");
+  if (!(maxAccessDistance >= 0) || Number.isNaN(maxAccessDistance)) throw new RangeError("Maximum ambulance access distance must be nonnegative");
   const grid = buildHazardGrid(world, scenario, "car", blocked);
   const roads = safeRoadCells(world, scenario, blocked).sort((a, b) => distance(a, targetCell, world.width) - distance(b, targetCell, world.width) || a - b);
   let best: { accessCell: number; route: Int32Array; distance: number; eta: number } | undefined;
   for (const accessCell of roads) {
     const geometricDistance = distance(accessCell, targetCell, world.width);
+    if (geometricDistance > maxAccessDistance) break;
     if (best && geometricDistance > best.distance) break;
     const path = findPath(grid, fromCell, accessCell);
     if (!path) continue;
