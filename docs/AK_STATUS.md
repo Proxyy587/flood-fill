@@ -1,17 +1,18 @@
 # AK execution checkpoints
 
-## Active M1 continuation — stages A/B/C (2026-10-15)
+## M1 checkpoint; active M2 continuation (2026-10-15)
 
 Local source checkpoint: **b5ad965** on codex/ak-foundation. Source, tests and stage
 docs committed together. It is a progress checkpoint, not aggregate review approval.
-Next AK slice: M2 evacuation/shelter allocation and uncertain-report prerequisites,
-while preserving the pending review/tooling and browser/template integration gates.
+Next AK slice builds on M2 evacuation; uncertain reports belong to M3. M1 and M2
+verification records appear below. Browser/template integration and independent
+review gates remain open.
 
 Bridge metadata/custom schedules/run parameters are schema-checked. Seeded population,
 hazard mode grids and traffic primitives are implemented. Continuous walk-drive-walk
 commuting, failed-car obstruction, dynamic retry/reroute, medical workplace reassignment
 and copied snapshot/inspector outputs now run through the headless API. Both policy
-labels still use the same non-dispatch core; rescue/evacuation effectiveness is unavailable.
+labels still use the same non-dispatch core; comparative policy effectiveness is unavailable.
 
 Stage B/C evidence: missing-module RED observed before movement implementation;
 329-test health passed before runner integration. Runner integration tests then
@@ -36,6 +37,21 @@ Initial primitive reviewer hit usage limits; subsequent review ran. Luna-medium
 QA/quality/security substantive rechecks pass, but goal/context could not complete
 CodeRabbit prerequisites and the security-review skill is absent. Aggregate review
 is INCONCLUSIVE, not approved. See AK_REVIEW.md. No merge/push/PR or release claim.
+
+### M2 stage A: warnings and shelter evacuation (implemented; broader roadmap active)
+
+TDD observed missing behavior for delayed warnings, shelter reservations, tick-zero
+overflow and warnings during a partial commute edge. Implemented global HQ warning
+delay plus local exposure utility, per-civilian reservations, continuous rerouting,
+stranded retries, boundary overflow and measured evacuation completion. Regressions
+cover mid-edge diversion, overflow while traveling, occupied-shelter flooding, and
+capacity reopening after water recedes. Full health passes 356 tests, lint, strict
+types and schema-only validation; production build passes. The three-seed [0,42,77]
+one-seat contention smoke deterministically produces one evacuation order and one
+stranded civilian per run. Synthetic population probes pass 12/1000/10000 residents;
+the 10000-resident/30-tick run takes about 2.7s. This is not full rescue stress or
+proof of the 8ms target. Dispatch comparison and worker/template release gates remain
+unavailable; M3 reports and rescue dispatch are still pending.
 
 ## 2026-10-15 baseline
 
@@ -108,10 +124,11 @@ review results and the inherited development-tool advisory are in AK_REVIEW.md.
 The final docs checkpoint records this evidence; source remains unchanged since
 the 209-test health/build pass. No merge, push or PR was requested or performed.
 
-Remaining: full M1 living-city agents/traffic, mode-specific hazard routing and
-replanning; M3 uncertain reports/dispatch/hospital allocation/aircraft and safety
-invariants; M4 patch verification; M5 full stress integration. AJ's worker/render
-and W1 templates remain separate ownership dependencies. Goal remains active.
+At the foundation checkpoint, M1 agents/traffic were pending. Current progress is
+recorded above. M3 uncertain reports/dispatch/hospital allocation/aircraft and
+remaining invariants; M4 patch verification; and M5 full stress integration remain.
+AJ's worker/render and W1 templates remain separate ownership dependencies.
+Goal remains active.
 
 ## M1 planning baseline (historical)
 

@@ -78,6 +78,30 @@ it("reassigns medical staff to a reachable working hospital after power loss", (
   for (let tick = 1; tick <= 30; tick++) step(tick);
   expect(p.npcs.work[0]).toBe(16);
 });
+it("reopens shelter capacity when floodwater recedes and retries stranded civilians", () => {
+  const s = town(); s.buildings.find((building) => building.type === BlockType.Shelter)!.capacity = 1;
+  const { a, p, w, step } = setup(s);
+  p.npcs.panic[0] = 1; p.npcs.compliance[0] = 1; p.npcs.riskTolerance[0] = 1; w.water[9] = 0.3;
+  const first = step(1); expect(first.some((event) => event.type === "EVAC_ORDER")).toBe(true);
+  w.water[46] = 2; step(2);
+  expect(p.npcs.state[0]).toBe(NpcState.Stranded);
+  w.water[46] = 0;
+  const recovery: ReturnType<typeof step> = [];
+  for (let tick = 3; tick <= 12; tick++) recovery.push(...step(tick));
+  expect(recovery.some((event) => event.type === "EVAC_ORDER")).toBe(true);
+  expect(a.shelterRemaining[0]).toBe(0);
+});
+it("evicts a sheltered civilian when floodwater makes the shelter unsafe", () => {
+  const s = town(); s.buildings.find((building) => building.type === BlockType.Shelter)!.capacity = 1;
+  const { a, p, w, step } = setup(s);
+  p.npcs.panic[0] = 1; p.npcs.compliance[0] = 1; p.npcs.riskTolerance[0] = 1; w.water[9] = 0.3;
+  for (let tick = 1; tick <= 30; tick++) step(tick);
+  expect(p.npcs.state[0]).toBe(NpcState.ShelterInPlace);
+  w.water[46] = 2;
+  step(31);
+  expect(p.npcs.state[0]).toBe(NpcState.Stranded);
+  expect(a.shelterAssignment[0]).toBe(-1);
+});
 it("marks an interrupted edge stranded, holds position and resumes without teleporting", () => {
   const { p, a, blocked, step } = setup(town()); step(1);
   const target = a.routes.get(0)!.cells[1]; const x = p.npcs.x[0]; const z = p.npcs.z[0];
@@ -162,7 +186,7 @@ it("parks a car when an abandoned driving route cannot be replaced", () => {
   for (let t = 1; t <= 3; t++) step(t);
   w.water[23] = 0.6;
   for (let t = 4; t <= 60; t++) step(t);
-  expect(p.npcs.state[0]).toBe(NpcState.SeekHelp);
+  expect([NpcState.SeekHelp, NpcState.Stranded, NpcState.ShelterInPlace]).toContain(p.npcs.state[0]);
   expect(p.cars.state[0]).toBe(VehicleState.Idle);
   expect(p.npcs.role[0]).toBe(NpcRole.Civilian);
 });

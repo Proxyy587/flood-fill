@@ -8,9 +8,10 @@ emergency-planning authority.
 ## Current state
 
 AK headless core: frozen contracts/mocks, seeded population, weighted A*/flow fields,
-weather/flood/power, continuous walking/driving commutes, hazard rerouting and traffic.
+weather/flood/power, walking/driving commutes, hazard rerouting, traffic and
+capacity-reserved shelter evacuation after delayed synthetic flood warnings.
 Snapshots and inspectors expose live civilians, staff and civilian cars. The browser
-still displays the Next.js starter page. Rescue dispatch, evacuation, reports,
+still displays the Next.js starter page. Rescue dispatch and uncertain reports,
 aircraft, editor, renderer, replay and critic integration remain pending.
 See docs/AK_STATUS.md for checkpoint evidence and incomplete review gates.
 
@@ -51,7 +52,8 @@ mode labels but explicitly declares dispatch unavailable. Water/power, stranded
 commuters and gridlock are measured. idleFrac.car is the current idle-car fraction,
 not cumulative duty utilization. unpoweredPopPct counts actual NPC current cells,
 including staff/unhoused people, not housing capacity or district outage exposure.
-Response TTS, unmet rescue requests, fairness, evacuation and aerial rescue metrics
+Evacuation completion, stranded residents, power, flood and traffic are measured.
+Response TTS, unmet rescue requests, fairness, casualties and aerial rescue metrics
 remain zero placeholders. Mode labels must not be interpreted as policy evidence.
 
 No Worker 1 templates exist yet. `pnpm validate` checks the contract fixture and

@@ -18,6 +18,10 @@ class PlanningDeferred extends Error {}
 export interface AgentSystem {
   population: PopulationState;
   routes: Map<number, Route>;
+  shelters: Scenario["buildings"];
+  shelterRemaining: Int32Array;
+  shelterAssignment: Int32Array;
+  hazardSince: number;
   intent: Uint8Array;
   retry: Int32Array;
   decisions: Map<number, NonNullable<InspectorData["lastDecision"]>>;
@@ -53,7 +57,9 @@ export function createAgentSystem(population: PopulationState, world: World, sce
     if (path) cars.cell[i] = path[path.length - 1];
     cars.x[i] = cars.cell[i] % world.width + 0.5; cars.z[i] = Math.floor(cars.cell[i] / world.width) + 0.5;
   }
-  return { population, routes: new Map(), intent: new Uint8Array(population.npcs.id.length), retry: new Int32Array(population.npcs.id.length), decisions: new Map(), version: 0, lastTick: 0,
+  const shelters = scenario.buildings.filter((building) => building.type === BlockType.Shelter).sort((a, b) => a.id - b.id);
+  return { population, routes: new Map(), shelters, shelterRemaining: Int32Array.from(shelters.map((b) => b.capacity)), shelterAssignment: new Int32Array(population.npcs.id.length).fill(-1), hazardSince: -1,
+    intent: new Uint8Array(population.npcs.id.length), retry: new Int32Array(population.npcs.id.length), decisions: new Map(), version: 0, lastTick: 0,
     planningQueued: new Uint8Array(population.npcs.id.length), planningStats: { fields: 0, plans: 0, deferred: 0, retainedBytes: 0 }, routeCells: 0 };
 }
 function discardRoute(a: AgentSystem, i: number): void {
@@ -124,9 +130,25 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
   a.planningStats = { fields: 0, plans: 0, deferred: 0, retainedBytes: 0 };
   a.lastTick = tick;
   const { npcs: n, cars } = a.population; const events: SimEvent[] = [];
+  const shelterDeficit = new Int32Array(a.shelters.length);
+  const floodStarted = a.hazardSince >= 0 || world.water.some((depth) => depth > 0.05);
+  if (a.hazardSince < 0 && floodStarted) a.hazardSince = tick;
+  const officialWarning = a.hazardSince >= 0 && tick - a.hazardSince >= a.population.params.warningDelay;
   const hospitals = scenario.buildings.filter((b) => b.type === BlockType.Hospital).sort((x, y) => x.id - y.id);
   const operational = hospitals.filter((b) => b.capacity > 0 && world.powered[b.entrance] > 0 && !b.cells.some((cell) => world.water[cell] > b.floorHeight));
   const operationalCells = new Set(operational.map((b) => b.entrance));
+  for (let shelter = 0; shelter < a.shelters.length; shelter++) {
+    const building = a.shelters[shelter];
+    if (building.capacity === 0 || building.cells.some((cell) => world.water[cell] > building.floorHeight)) shelterDeficit[shelter] = 1;
+  }
+  const reserved = new Int32Array(a.shelters.length);
+  for (const shelter of a.shelterAssignment) if (shelter >= 0) reserved[shelter]++;
+  for (let shelter = 0; shelter < a.shelters.length; shelter++) {
+    a.shelterRemaining[shelter] = shelterDeficit[shelter] ? 0 : Math.max(0, a.shelters[shelter].capacity - reserved[shelter]);
+  }
+  const civilians = Math.max(1, a.population.civilianCount);
+  let evacuees = 0;
+  for (let i = 0; i < n.id.length; i++) if (n.state[i] === NpcState.Evacuate || n.state[i] === NpcState.ShelterInPlace) evacuees++;
   function event(i: number, type: SimEvent["type"], reason: string) {
     events.push({ tick, type, actor: n.id[i] as NpcId, actorKind: "npc", cell: n.cell[i], reason });
     a.decisions.set(i, { tick, chosen: type, alternatives: [], reason });
@@ -145,6 +167,50 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
     const i = (offset + tick % n.id.length) % n.id.length;
     try {
     const medical = n.baseRole[i] === NpcRole.Doctor || n.baseRole[i] === NpcRole.Nurse;
+    const isCivilian = n.baseRole[i] === NpcRole.Civilian;
+    if (isCivilian && n.state[i] !== NpcState.ShelterInPlace && a.intent[i] !== 3) {
+      let localDepth = world.water[n.cell[i]];
+      const x = n.cell[i] % world.width; const z = Math.floor(n.cell[i] / world.width);
+      if (z > 0) localDepth = Math.max(localDepth, world.water[n.cell[i] - world.width]);
+      if (x + 1 < world.width) localDepth = Math.max(localDepth, world.water[n.cell[i] + 1]);
+      if (z + 1 < world.height) localDepth = Math.max(localDepth, world.water[n.cell[i] + world.width]);
+      if (x > 0) localDepth = Math.max(localDepth, world.water[n.cell[i] - 1]);
+      const threat = Math.min(1, localDepth / 0.5);
+      const official = officialWarning ? 1 : 0;
+      const evacuationUtility = 0.4 * threat + 0.9 * official * n.compliance[i] +
+        0.25 * (evacuees / civilians) + 0.2 * n.panic[i] -
+        0.55 * threat * (1 - n.riskTolerance[i]) - 0.08;
+      if ((officialWarning || localDepth >= 0.3) && evacuationUtility >= 0.35) {
+        const origin = cachedField(foot, n.cell[i], routing.footFields, routing);
+        let selected = -1; let bestCost = Infinity;
+        for (let shelter = 0; shelter < a.shelters.length; shelter++) {
+          if (a.shelterRemaining[shelter] <= 0 || shelterDeficit[shelter]) continue;
+          const building = a.shelters[shelter];
+          const cost = origin.distance[building.entrance] - (foot.costs?.[n.cell[i]] ?? 1) + (foot.costs?.[building.entrance] ?? 1);
+          if (Number.isFinite(cost) && cost < bestCost) { selected = shelter; bestCost = cost; }
+        }
+        if (selected >= 0) {
+          a.shelterRemaining[selected]--; a.shelterAssignment[i] = selected; a.intent[i] = 3;
+          const shelter = a.shelters[selected];
+          events.push({ tick, type: "NPC_STATE", actor: n.id[i] as NpcId, actorKind: "npc", cell: n.cell[i], data: { state: NpcState.Warned }, reason: officialWarning ? "Delayed synthetic flood alert reached this civilian" : "Nearby water triggered a local hazard warning" });
+          events.push({ tick, type: "EVAC_ORDER", actor: n.id[i] as NpcId, actorKind: "npc", target: shelter.id, targetKind: "building", cell: n.cell[i], data: { official: Boolean(officialWarning), utility: evacuationUtility }, reason: "Civilian accepted a flood evacuation order and reserved one reachable shelter place" });
+          n.state[i] = NpcState.Evacuate;
+          if (!a.routes.has(i) || a.routes.get(i)!.progress === 0) discardRoute(a, i);
+          a.planningQueued[i] = 0; evacuees++;
+        } else if (officialWarning || localDepth >= 0.3) {
+          if (n.state[i] !== NpcState.Stranded) events.push({ tick, type: "NPC_STRANDED", actor: n.id[i] as NpcId, actorKind: "npc", cell: n.cell[i], reason: "No reachable shelter place is currently available" });
+          n.state[i] = NpcState.Stranded; a.intent[i] = 3;
+        }
+      }
+    }
+    if (a.shelterAssignment[i] >= 0) {
+      const shelter = a.shelterAssignment[i];
+      if (shelterDeficit[shelter]) {
+        a.shelterRemaining[shelter] = 0;
+        a.shelterAssignment[i] = -1;
+        n.state[i] = NpcState.Stranded; a.intent[i] = 3; a.retry[i] = tick;
+      }
+    }
     const needsMedicalRoute = a.intent[i] === 1 || n.state[i] === NpcState.SeekHelp || n.state[i] === NpcState.AtHome && tick >= n.departTick[i];
     if (medical && (n.work[i] < 0 || !operationalCells.has(n.work[i]) || needsMedicalRoute && !Number.isFinite(cachedField(foot, n.cell[i], routing.footFields, routing).distance[n.work[i]]))) {
       let chosen = -1; let distance = Infinity;
@@ -167,7 +233,21 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
     }
     if (n.state[i] === NpcState.AtHome && tick >= n.departTick[i] && n.work[i] >= 0) { a.intent[i] = 1; n.state[i] = NpcState.Commute; }
     if (a.intent[i] === 0) continue;
-    const goal = a.intent[i] === 1 ? n.work[i] : n.home[i];
+    const shelterTrip = a.intent[i] === 3;
+    if (shelterTrip && a.shelterAssignment[i] < 0 && tick < a.retry[i]) continue;
+    if (shelterTrip && a.shelterAssignment[i] < 0 && tick >= a.retry[i]) {
+      const origin = cachedField(foot, n.cell[i], routing.footFields, routing);
+      let selected = -1; let bestCost = Infinity;
+      for (let shelter = 0; shelter < a.shelters.length; shelter++) {
+        if (a.shelterRemaining[shelter] <= 0 || shelterDeficit[shelter]) continue;
+        const building = a.shelters[shelter]; const cost = origin.distance[building.entrance] - (foot.costs?.[n.cell[i]] ?? 1) + (foot.costs?.[building.entrance] ?? 1);
+        if (Number.isFinite(cost) && cost < bestCost) { selected = shelter; bestCost = cost; }
+      }
+      if (selected < 0) { a.retry[i] = tick + 8; continue; }
+      a.shelterRemaining[selected]--; a.shelterAssignment[i] = selected; n.state[i] = NpcState.Evacuate;
+      events.push({ tick, type: "EVAC_ORDER", actor: n.id[i] as NpcId, actorKind: "npc", target: a.shelters[selected].id, targetKind: "building", cell: n.cell[i], reason: "Reserved the first reachable shelter place that became available" });
+    }
+    const goal = shelterTrip ? a.shelters[a.shelterAssignment[i]].entrance : a.intent[i] === 1 ? n.work[i] : n.home[i];
     if (goal < 0) { n.state[i] = NpcState.SeekHelp; continue; }
     let route = a.routes.get(i);
     if (route) {
@@ -188,15 +268,21 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
       }
     }
     if (!route && tick >= a.retry[i] && goal >= 0) {
-      route = plan(a, i, goal, routing) ?? undefined;
+        route = plan(a, i, goal, routing) ?? undefined;
       a.planningQueued[i] = 0;
       if (route) {
         route.version = ++a.version; a.routeCells += route.cells.length + route.modes.length;
-        a.routes.set(i, route); n.state[i] = a.intent[i] === 1 ? NpcState.Commute : NpcState.ReturnHome;
+        a.routes.set(i, route); n.state[i] = shelterTrip ? NpcState.Evacuate : a.intent[i] === 1 ? NpcState.Commute : NpcState.ReturnHome;
         event(i, "ROUTE_PLANNED", "Selected the fastest currently reachable walking or walk-drive-walk route");
       } else {
-        if (n.state[i] !== NpcState.SeekHelp) event(i, "NPC_STATE", "Destination is unreachable; waiting safely and retrying in eight seconds");
-        n.state[i] = NpcState.SeekHelp; a.retry[i] = tick + 8;
+        if (shelterTrip) {
+          const shelter = a.shelterAssignment[i]; a.shelterRemaining[shelter]++; a.shelterAssignment[i] = -1;
+          n.state[i] = NpcState.Stranded; a.retry[i] = tick + 8;
+          events.push({ tick, type: "NPC_STRANDED", actor: n.id[i] as NpcId, actorKind: "npc", cell: n.cell[i], reason: "Reserved shelter became unreachable; releasing capacity and retrying" });
+        } else {
+          if (n.state[i] !== NpcState.SeekHelp) event(i, "NPC_STATE", "Destination is unreachable; waiting safely and retrying in eight seconds");
+          n.state[i] = NpcState.SeekHelp; a.retry[i] = tick + 8;
+        }
       }
     }
     if (!route) continue;
@@ -231,7 +317,8 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
       }
     }
     if (route.cursor === route.cells.length && route.goal === goal) {
-      if (a.intent[i] === 1) { n.state[i] = NpcState.Work; n.workUntil[i] = tick + n.workDuration[i]; }
+      if (shelterTrip) { n.state[i] = NpcState.ShelterInPlace; a.intent[i] = 0; }
+      else if (a.intent[i] === 1) { n.state[i] = NpcState.Work; n.workUntil[i] = tick + n.workDuration[i]; }
       else { n.state[i] = NpcState.AtHome; while (n.departTick[i] <= tick) n.departTick[i] += 86400; }
       a.intent[i] = 0; discardRoute(a, i); n.role[i] = n.baseRole[i];
       const car = n.car[i]; if (car >= 0 && cars.state[car] !== VehicleState.Failed) cars.state[car] = VehicleState.Idle;

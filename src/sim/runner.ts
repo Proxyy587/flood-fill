@@ -12,7 +12,7 @@ import { createAgentSystem, stepAgents, agentSnapshot, inspectAgent } from "./ag
 import { createTraffic, gridlockCells } from "./traffic";
 import { canEnter } from "./nav/hazards";
 
-export const SIM_CAPABILITIES = { weather: true, flood: true, power: true, agents: true, commuting: true, traffic: true, evacuation: false, reports: false, dispatch: false, aircraft: false } as const;
+export const SIM_CAPABILITIES = { weather: true, flood: true, power: true, agents: true, commuting: true, traffic: true, evacuation: true, reports: false, dispatch: false, aircraft: false } as const;
 /** Compatibility alias for existing headless clients. */
 export const FOUNDATION_CAPABILITIES = SIM_CAPABILITIES;
 
@@ -22,13 +22,13 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   const mode = DispatchModeSchema.parse(modeInput); const parsed = RunOptionsSchema.parse(options);
   const duration = parsed.durationTicks ?? 600; const every = parsed.metricsEvery ?? 10;
   for (const event of scenario.injected) {
-    if (event.kind !== "substation_flooded" && event.kind !== "bridge_closed" && event.kind !== "road_blocked_by_debris") throw new Error(`Injected action ${event.kind} not implemented in living-city runner`);
+    if (event.kind !== "substation_flooded" && event.kind !== "bridge_closed" && event.kind !== "road_blocked_by_debris" && event.kind !== "shelter_overflow") throw new Error(`Injected action ${event.kind} not implemented in M2 runner`);
     if (event.kind === "bridge_closed" && scenario.blocks[event.cell] !== BlockType.Bridge) throw new Error("bridge_closed requires a bridge cell");
     if (event.kind === "road_blocked_by_debris" && scenario.blocks[event.cell] !== BlockType.Road && scenario.blocks[event.cell] !== BlockType.Bridge) throw new Error("road_blocked_by_debris requires a road or bridge cell");
   }
   const world = createWorld(scenario); const power = createPowerState(scenario);
   const rng = createRng(seed);
-  const events: SimEvent[] = [{ tick: 0, type: "RUN_STARTED", data: { stage: "living-city", seed, agentsImplemented: true, dispatchImplemented: false }, reason: "Weather, flood, power, commuting and traffic implemented; evacuation, reports, dispatch, aircraft and response metrics remain unavailable" }];
+  const events: SimEvent[] = [{ tick: 0, type: "RUN_STARTED", data: { stage: "evacuation", seed, agentsImplemented: true, evacuationImplemented: true, dispatchImplemented: false }, reason: "Weather, flood, power, commuting, traffic and capacity-reserved shelter evacuation implemented; reports, rescue dispatch, aircraft and response metrics remain unavailable" }];
   const frames: MetricsFrame[] = [];
   let tick = 0; let navVersion = 0; let lastRain = -1; let lastWind = -1;
   const blocked = new Uint8Array(world.water.length);
@@ -38,12 +38,17 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
       if (event.kind === "bridge_closed" || event.kind === "road_blocked_by_debris") {
         blocked[event.cell] = 1;
         events.push({ tick: boundary, type: "INJECTED", cell: event.cell, data: { kind: event.kind }, reason: "Scheduled synthetic permanent road closure" });
+      } else if (event.kind === "shelter_overflow") {
+        const shelter = scenario.buildings.find((building) => building.id === event.buildingId)!;
+        shelter.capacity = 0;
+        events.push({ tick: boundary, type: "INJECTED", actor: event.buildingId, actorKind: "building", data: { kind: event.kind }, reason: "Scheduled synthetic shelter capacity failure" });
+        events.push({ tick: boundary, type: "SHELTER_OVERFLOW", actor: event.buildingId, actorKind: "building", reason: "Shelter failed and can accept no further evacuees" });
       } else if (event.kind === "substation_flooded") {
-      events.push({ tick: boundary, type: "INJECTED", data: { kind: event.kind, nodeId: event.nodeId }, reason: "Scheduled synthetic substation flood fault" });
-      if (!power.tripped.has(event.nodeId)) {
-        power.tripped.add(event.nodeId);
-        events.push({ tick: boundary, type: "POWER_TRIP", data: { nodeId: event.nodeId }, reason: "Substation latched off by injected flood fault" });
-      }
+        events.push({ tick: boundary, type: "INJECTED", data: { kind: event.kind, nodeId: event.nodeId }, reason: "Scheduled synthetic substation flood fault" });
+        if (!power.tripped.has(event.nodeId)) {
+          power.tripped.add(event.nodeId);
+          events.push({ tick: boundary, type: "POWER_TRIP", data: { nodeId: event.nodeId }, reason: "Substation latched off by injected flood fault" });
+        }
       }
     }
   }
@@ -76,7 +81,8 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
     for (const state of population.cars.state) if (state === VehicleState.Idle) idle++;
     return { tick, tts: { mean: 0, p50: 0, p90: 0 }, unmet: 0, idleFrac: population.cars.id.length ? { car: idle / population.cars.id.length } : {}, gini: 0,
       hospitals: scenario.buildings.filter((b) => b.type === BlockType.Hospital).map((b) => ({ id: b.id, util: 0, diversion: power.diversion.has(b.id), onGenerator: world.powered[b.entrance] === 2 })),
-      evacDonePct: 0, stranded, gridlockCells: gridlockCells(traffic), floodedCells, maxDepth,
+      evacDonePct: population.civilianCount > 0 ? population.npcs.state.slice(0, population.civilianCount).filter((state) => state === NpcState.ShelterInPlace).length / population.civilianCount * 100 : 0,
+      stranded, gridlockCells: gridlockCells(traffic), floodedCells, maxDepth,
       unpoweredPopPct: population.npcs.id.length ? unpowered / population.npcs.id.length * 100 : 0,
       heliRescues: 0, routeViolations: 0 };
   }

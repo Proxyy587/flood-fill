@@ -40,11 +40,26 @@ Everything here is the **intended behaviour**. Build the numbered milestone in `
 - Route planning uses bounded caches/search work and retained route entries (see
   ARCHITECTURE). Queue delay under high load is explicit; it is not unreachable-path
   evidence. Inspector planningQueued and decision reasons distinguish this case.
-  Panic/compliance/awareness are seeded attributes only until M2 evacuation logic;
-  initial run sliders work, live mutation and partial-information beliefs do not yet.
-- runBatch measures water/power, stranded commuters, current idle cars and gridlock.
-  Response TTS/unmet/fairness/evacuation/aircraft metrics remain zero placeholders.
-  substation_flooded, bridge_closed and road_blocked_by_debris injections are supported;
+-  Initial run sliders work; live mutation and partial-information beliefs do not yet.
+- M2 flood warning begins when any cell exceeds 0.05m; each civilian receives the
+  synthetic global alert after `weather.warningDelay` seconds. Adjacent local water
+  can influence decisions earlier. A utility of threat, compliance, nearby evacuees,
+  panic and risk tolerance selects evacuation. This uses a ground-truth HQ broadcast,
+  not the partial-information reports/beliefs planned for M3.
+- Evacuating civilians reserve one place at the nearest currently reachable shelter.
+  Reservations persist in transit and while sheltered. Unsafe/full shelters release
+  assignments; affected civilians retry and remain stranded until safe capacity opens.
+  Flooding above a shelter floor closes it. `shelter_overflow` sets capacity to zero
+  at its scheduled boundary, including tick 0. Mid-edge warnings finish the current
+  movement edge before a new route takes over.
+- `evacDonePct` is sheltered civilians divided by all civilians. Stranded includes
+  residents seeking help or waiting without a reachable shelter. Staff evacuation,
+  bus evacuation, casualties and live reports are pending. Mode labels do not select
+  evacuation policies.
+- runBatch measures water/power, evacuation completion, stranded residents, current
+  idle cars and gridlock. Response TTS/unmet/fairness/casualty/aircraft metrics remain
+  zero placeholders. substation_flooded, bridge_closed, road_blocked_by_debris and
+  shelter_overflow injections are supported;
   other actions reject. Closures latch; repair actions are not implemented.
 - Injected faults apply at the named state boundary, including tick 0, before
   power propagation. Generator activation, blackout state and event timestamps agree.
