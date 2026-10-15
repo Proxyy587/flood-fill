@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know
@@ -8,7 +7,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
-=======
 # AGENTS.md — FloodSim (Code-E-Manipal 2.0, PS 27 + city-planning sandbox)
 
 Read this file fully before touching anything. Then read your own `workers/WORKER_*.md`.
@@ -100,10 +98,10 @@ pnpm lint           # eslint incl. sim-purity + determinism rules
 - Grid coordinates are `(x, z)` with `y` as height, matching three.js. Cell index `i = z * W + x`.
 - 1 cell = 1 voxel footprint = 4 m. 1 voxel of height = 1 m. Say so in any UI that shows units.
 - 1 sim tick = 1 simulated second. The renderer interpolates between ticks. Speed multipliers (1x, 4x, 16x) change ticks per wall-second.
-- IDs are branded strings (`NpcId`, `VehicleId`, `BuildingId`). Never raw numbers across the worker boundary.
+- IDs are branded positive integers (`NpcId`, `VehicleId`, `BuildingId`, `RequestId`), matching the frozen contracts and Int32Array snapshots. Validate raw JSON IDs at the boundary.
 - Every sim decision that matters emits an `SimEvent` with a human-readable `reason`.
 - Hot loops use typed arrays (`Float32Array`, `Uint8Array`), not arrays of objects.
-- No `any`. No default exports except Next.js pages.
+- No `any`. No default exports except Next.js pages/layouts and tool configuration files that require them.
 
 ## 7. Safety and scope guardrails (these are judged)
 
@@ -134,4 +132,3 @@ pnpm lint           # eslint incl. sim-purity + determinism rules
 - When unsure whether something belongs in `sim` or `render`: if it affects outcomes, it is `sim`; if it only affects pixels, it is `render`.
 - Never call `Math.random` in `src/sim`. Use `ctx.rng`.
 - When you finish, state what you ran to verify it.
->>>>>>> 9b39065c20c16f309e8f4e2ac2cf81185f42c77c
