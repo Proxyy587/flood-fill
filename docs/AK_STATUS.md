@@ -53,7 +53,7 @@ the 10000-resident/30-tick run takes about 2.7s. This is not full rescue stress 
 proof of the 8ms target. Dispatch comparison and worker/template release gates remain
 unavailable.
 
-### M3A: uncertain reports and HQ belief (implemented in AK core; UI integration pending)
+### M3A: reports implemented; M3B dispatch design under review
 
 Detailed reports-first design and inline plan are committed in 1f9c471. The managed
 worktree `codex/ak-m3-reports` excludes active untracked W1 assets. Frozen-lockfile
@@ -72,6 +72,11 @@ the living-city script pass. Its three-seed report smoke confirms 15,000 determi
 deliveries/run at 10,000 civilians without exceeding capacity. No contract, renderer,
 or W1 files have been changed. M3B rescue requests/dispatch, aircraft, full stress
 scenario and UI integration remain pending.
+
+M3B design: ambulance-first dispatch with hospital balancing and adaptive hot-zone
+response, using one provisional incident per report cluster and field-only triage.
+User approved the architecture and operating policy. Detailed spec is committed for
+user review; no implementation or shared-contract changes have started.
 
 ## 2026-10-15 baseline
 
