@@ -166,6 +166,23 @@ it("keeps police outside rescue assignments and omits unstaffed police from snap
   expect(empty.summary().events.some((event) => event.actorKind === "vehicle" && event.actor === 2)).toBe(false);
 });
 
+it("integrates independent police guidance for an evacuating civilian", () => {
+  const scenario = policeStationScenario();
+  scenario.population.count = 1;
+  scenario.weather.warningDelay = 0;
+  scenario.weather.sources = [{ cell: 0, startT: 0, endT: 90, rate: 0.1 }];
+  const sim = createSimulation(scenario, 42, "centralised", { durationTicks: 70,
+    npcParams: { ...defaultNpcParams(scenario), panicMean: 1, complianceMean: 1, riskToleranceMean: 0, awarenessMean: 1, falseReportRate: 0 } });
+  for (let tick = 0; tick < 70; tick++) sim.step();
+  const events = sim.summary().events;
+  const policeId = scenario.fleet.ambulances + 1;
+  expect(events).toContainEqual(expect.objectContaining({ type: "ASSIGNED", actor: policeId, actorKind: "vehicle", targetKind: "npc" }));
+  expect(events).toContainEqual(expect.objectContaining({ type: "ARRIVED", actor: policeId, actorKind: "vehicle", targetKind: "npc" }));
+  expect(events.filter((event) => event.type === "EVAC_ORDER")).toHaveLength(1);
+  expect(events.some((event) => event.type === "SERVED" || event.type === "HOSPITAL_ASSIGN")).toBe(false);
+  expect(sim.snapshot().vehicles.kind).toContain(VehicleKind.PoliceCar);
+});
+
 it("replays police vehicles, events and metrics identically for the same seed", () => {
   const scenario = policeStationScenario();
   const first = createSimulation(scenario, 73, "centralised", { durationTicks: 8 });

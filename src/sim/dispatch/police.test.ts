@@ -7,7 +7,7 @@ import { findPath } from "../nav";
 import { buildHazardGrid } from "../nav/hazards";
 import { beginTrafficTick, createTraffic } from "../traffic";
 import { createWorld } from "../world/grid";
-import { createPolice, planPoliceRoute, policeSnapshot, stepPolice } from "./police";
+import { createPolice, planPoliceRoute, policeSnapshot, PoliceTaskKind, stepPolice } from "./police";
 
 type PoliceFixtureOptions = { ambulances?: number; policeCars?: number; policeOfficers?: number; safeStationRoad?: boolean };
 
@@ -95,6 +95,27 @@ it("spawns only on safe road cells adjacent to a police station", () => {
   expect(police.available[0]).toBe(1);
   expect(police.cell[0]).toBe(17);
   expect(policeSnapshot(police)).toMatchObject({ kind: new Uint8Array([VehicleKind.PoliceCar]), state: new Uint8Array([VehicleState.Idle]) });
+});
+
+it("labels existing gridlock ownership as a traffic task", () => {
+  const fixture = trafficFixture();
+  fixture.traffic.intersections[27] = 1;
+  fixture.traffic.gridlock[27] = 1;
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
+  expect(fixture.police.assignment[0]).toBe(27);
+  expect(fixture.police.taskKind[0]).toBe(PoliceTaskKind.TrafficControl);
+  expect(fixture.police.taskSubject[0]).toBe(-1);
+});
+
+it("keeps an escort roadside cell from claiming an independent gridlock task", () => {
+  const fixture = trafficFixture({ policeCars: 2, policeOfficers: 2 });
+  fixture.traffic.intersections[26] = 1;
+  fixture.traffic.gridlock[26] = 1;
+  stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1, [
+    { kind: PoliceTaskKind.Escort, subject: 0, civilianId: 1, assignmentCell: 10, targetCell: 19, urgency: 0, critical: false, eligibleSince: 1 },
+  ]);
+  expect(Array.from(fixture.police.taskKind)).toEqual([PoliceTaskKind.Escort, PoliceTaskKind.TrafficControl]);
+  expect(Array.from(fixture.police.assignment)).toEqual([10, 26]);
 });
 
 it("leaves the configured unit unavailable when no safe adjacent station road exists", () => {
@@ -235,6 +256,8 @@ it("never assigns a non-intersection or a cleared intersection", () => {
   fixture.traffic.gridlock[27] = 0;
   stepPolice(fixture.police, fixture.traffic, fixture.world, fixture.scenario, fixture.blocked, 0, 1);
   expect(fixture.police.assignment[0]).toBe(-1);
+  expect(fixture.police.taskKind[0]).toBe(PoliceTaskKind.None);
+  expect(fixture.police.taskSubject[0]).toBe(-1);
   expect(fixture.police.target[0]).toBe(-1);
 });
 

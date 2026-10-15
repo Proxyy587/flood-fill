@@ -7,7 +7,7 @@ import { beginTrafficTick, congestionFactors, finishTrafficTick, markTrafficWait
 import type { PopulationState } from "./population";
 import { assertMovementEntry } from "../invariants/movement";
 
-interface Route { cells: number[]; modes: number[]; cursor: number; progress: number; goal: number; version: number }
+export interface AgentRoute { cells: number[]; modes: number[]; cursor: number; progress: number; goal: number; version: number }
 interface Routing {
   foot: NavGrid; road: NavGrid;
   footFields: Map<number, ReturnType<typeof buildFlowField>>;
@@ -17,12 +17,13 @@ interface Routing {
 class PlanningDeferred extends Error {}
 export interface AgentSystem {
   population: PopulationState;
-  routes: Map<number, Route>;
+  routes: Map<number, AgentRoute>;
   shelters: Scenario["buildings"];
   shelterRemaining: Int32Array;
   shelterAssignment: Int32Array;
   hazardSince: number;
   intent: Uint8Array;
+  rescueHandoff: Uint8Array;
   retry: Int32Array;
   decisions: Map<number, NonNullable<InspectorData["lastDecision"]>>;
   version: number;
@@ -59,7 +60,7 @@ export function createAgentSystem(population: PopulationState, world: World, sce
   }
   const shelters = scenario.buildings.filter((building) => building.type === BlockType.Shelter).sort((a, b) => a.id - b.id);
   return { population, routes: new Map(), shelters, shelterRemaining: Int32Array.from(shelters.map((b) => b.capacity)), shelterAssignment: new Int32Array(population.npcs.id.length).fill(-1), hazardSince: -1,
-    intent: new Uint8Array(population.npcs.id.length), retry: new Int32Array(population.npcs.id.length), decisions: new Map(), version: 0, lastTick: 0,
+    intent: new Uint8Array(population.npcs.id.length), rescueHandoff: new Uint8Array(population.npcs.id.length), retry: new Int32Array(population.npcs.id.length), decisions: new Map(), version: 0, lastTick: 0,
     planningQueued: new Uint8Array(population.npcs.id.length), planningStats: { fields: 0, plans: 0, deferred: 0, retainedBytes: 0 }, routeCells: 0 };
 }
 function discardRoute(a: AgentSystem, i: number): void {
@@ -115,6 +116,7 @@ export function markRescuedAboard(a: AgentSystem, npc: number): void {
   if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Rescued civilian is outside the agent table");
   discardRoute(a, npc);
   a.intent[npc] = 0;
+  a.rescueHandoff[npc] = 0;
   a.planningQueued[npc] = 0;
   a.population.npcs.state[npc] = NpcState.Respond;
 }
@@ -123,6 +125,7 @@ export function requeueFailedRescue(a: AgentSystem, npc: number): void {
   if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Rescued civilian is outside the agent table");
   discardRoute(a, npc);
   a.intent[npc] = 0;
+  a.rescueHandoff[npc] = 0;
   a.planningQueued[npc] = 0;
   a.population.npcs.state[npc] = NpcState.Stranded;
 }
@@ -137,11 +140,13 @@ export function handoffRescuedCivilian(a: AgentSystem, npc: number, cell: number
   if (shelterRequired) {
     if (!reserveRescuedShelter(a, npc, cell, world, scenario, blocked)) return false;
     a.intent[npc] = 3;
+    a.rescueHandoff[npc] = 0;
     n.state[npc] = NpcState.Evacuate;
   } else {
     const home = scenario.buildings.find((building) => building.id === n.homeBuilding[npc]);
     if (!home || home.cells.some((candidate) => world.water[candidate] > home.floorHeight) || !findPath(foot, cell, home.entrance)) return false;
     a.intent[npc] = 2;
+    a.rescueHandoff[npc] = 1;
     n.state[npc] = NpcState.ReturnHome;
   }
   discardRoute(a, npc);
@@ -169,7 +174,7 @@ function cachedField(grid: NavGrid, goal: number, cache: Routing["footFields"], 
   }
   return field;
 }
-function plan(a: AgentSystem, i: number, goal: number, routing: Routing): Route | null {
+function plan(a: AgentSystem, i: number, goal: number, routing: Routing): AgentRoute | null {
   if (routing.plans >= 256) throw new PlanningDeferred();
   routing.plans++;
   const { foot, road, footFields, carFields } = routing;
@@ -404,7 +409,7 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
     if (route.cursor === route.cells.length && route.goal === goal) {
       if (shelterTrip) { n.state[i] = NpcState.ShelterInPlace; a.intent[i] = 0; }
       else if (a.intent[i] === 1) { n.state[i] = NpcState.Work; n.workUntil[i] = tick + n.workDuration[i]; }
-      else { n.state[i] = NpcState.AtHome; while (n.departTick[i] <= tick) n.departTick[i] += 86400; }
+      else { n.state[i] = NpcState.AtHome; a.rescueHandoff[i] = 0; while (n.departTick[i] <= tick) n.departTick[i] += 86400; }
       a.intent[i] = 0; discardRoute(a, i); n.role[i] = n.baseRole[i];
       const car = n.car[i]; if (car >= 0 && cars.state[car] !== VehicleState.Failed) cars.state[car] = VehicleState.Idle;
       event(i, "ARRIVED", "Completed the planned journey through safe adjacent cells");

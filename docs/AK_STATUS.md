@@ -1,12 +1,12 @@
 # AK execution checkpoints
 
-## Current AK status (2026-10-15): M3A-M3D implemented; follow-ons remain
+## Current AK status (2026-10-15): M3A-M3E implemented; follow-ons remain
 
 The AK headless core now includes M3C boat rescue and M3D independent police
-gridlock traffic control, in addition to M3A reports and M3B ambulance dispatch,
+gridlock traffic control and M3E civilian escort, in addition to M3A reports and M3B ambulance dispatch,
 field triage, hospital balancing and adaptive hot-zone staging. M3D police work is
-limited to gridlock control and remains separate from rescue dispatch. Still planned
-are M3E civilian escort, M3F crowd control, helicopter rooftop rescue/medevac and
+limited to gridlock control and civilian route guidance and remains separate from rescue dispatch. Still planned
+are M3F crowd control, helicopter rooftop rescue/medevac and
 weather constraints, and the full compound stress scenario. Browser/worker integration,
 independent review, remaining invariants and later M4-M6 work also remain open; this
 status is not release approval.
@@ -87,6 +87,16 @@ deliveries/run at 10,000 civilians without exceeding capacity. No contract, rend
 or W1 files were changed in this M3A/M3B checkpoint. At that point, boats, police,
 helicopters, the full stress scenario and UI integration were pending; M3C boat rescue
 and M3D police gridlock control have since been implemented as summarized above.
+
+### M3E: independent police civilian escort implemented
+
+Finite staffed police cars can guide eligible evacuation groups and safe boat-to-home
+handoffs beside their existing safe walking routes. Escort grouping preserves civilian
+destinations, route arrays, shelter reservations and rescue ownership; police do not
+carry passengers or enter the traffic-control mask. Arrival and assignment use existing
+event shapes. Focused unit and runner coverage verifies escort dispatch, arrival,
+unchanged civilian route/reservation, and M3D police behavior. M3F crowd control,
+helicopters, and broader integration/review gates remain outstanding.
 
 M3B design and implementation plan are approved and committed:
 `docs/superpowers/specs/2026-10-15-ak-m3b-ambulance-dispatch-hospital-design.md` and

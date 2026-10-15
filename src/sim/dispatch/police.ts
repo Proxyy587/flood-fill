@@ -13,6 +13,9 @@ export interface PoliceRoute {
   navVersion: number;
 }
 
+export enum PoliceTaskKind { None, TrafficControl, Escort }
+export interface PoliceTaskCandidate { kind: PoliceTaskKind.Escort; subject: number; civilianId: number; assignmentCell: number; targetCell: number; urgency: number; critical: false; eligibleSince: number }
+
 export interface PoliceSystem {
   count: number;
   id: Int32Array;
@@ -23,6 +26,8 @@ export interface PoliceSystem {
   z: Float32Array;
   heading: Float32Array;
   assignment: Int32Array;
+  taskKind: Uint8Array;
+  taskSubject: Int32Array;
   target: Int32Array;
   routes: (PoliceRoute | null)[];
 }
@@ -69,6 +74,8 @@ export function createPolice(scenario: Scenario, world: World, blocked: Uint8Arr
     z,
     heading: new Float32Array(count),
     assignment: new Int32Array(count).fill(-1),
+    taskKind: new Uint8Array(count),
+    taskSubject: new Int32Array(count).fill(-1),
     target: new Int32Array(count).fill(-1),
     routes: Array.from({ length: count }, () => null),
   };
@@ -81,6 +88,8 @@ export function planPoliceRoute(system: PoliceSystem, unit: number, target: numb
     system.routes[unit] = null;
     system.target[unit] = -1;
     system.assignment[unit] = -1;
+    system.taskKind[unit] = PoliceTaskKind.None;
+    system.taskSubject[unit] = -1;
     system.state[unit] = VehicleState.Idle;
     return false;
   }
@@ -98,6 +107,7 @@ export function stepPolice(
   blocked: Uint8Array,
   navVersion: number,
   tick: number,
+  escortCandidates: readonly PoliceTaskCandidate[] = [],
 ): { events: SimEvent[]; controlled: Uint8Array } {
   const events: SimEvent[] = [];
   const controlled = new Uint8Array(world.width * world.height);
@@ -106,26 +116,56 @@ export function stepPolice(
   // new work is considered. A unit at scene is available again immediately.
   for (let unit = 0; unit < system.count; unit++) {
     const assigned = system.assignment[unit];
-    if (assigned < 0 || traffic.gridlock[assigned] === 1) continue;
+    const kind = system.taskKind[unit] as PoliceTaskKind;
+    if (assigned < 0 || kind === PoliceTaskKind.Escort && escortCandidates.some((candidate) => candidate.subject === system.taskSubject[unit]) || kind === PoliceTaskKind.TrafficControl && traffic.gridlock[assigned] === 1) continue;
     events.push({
       tick,
       type: "COMMIT_CANCELLED",
       actor: system.id[unit] as VehicleId,
       actorKind: "vehicle",
       cell: assigned,
-      reason: "Gridlock cleared at the assigned intersection; police traffic-control assignment released",
+      reason: kind === PoliceTaskKind.Escort ? "Civilian escort group is no longer eligible; police assignment released" : "Gridlock cleared at the assigned intersection; police traffic-control assignment released",
     });
     system.assignment[unit] = -1;
+    system.taskKind[unit] = PoliceTaskKind.None;
+    system.taskSubject[unit] = -1;
     system.target[unit] = -1;
     system.routes[unit] = null;
     system.state[unit] = VehicleState.Idle;
+  }
+
+  for (const candidate of escortCandidates) {
+    let unit = -1;
+    for (let index = 0; index < system.count; index++) if (system.taskKind[index] === PoliceTaskKind.Escort && system.taskSubject[index] === candidate.subject) unit = index;
+    if (unit >= 0) {
+      system.assignment[unit] = candidate.assignmentCell;
+      if (system.target[unit] !== candidate.targetCell && !planPoliceRoute(system, unit, candidate.targetCell, world, scenario, blocked, navVersion)) {
+        system.taskKind[unit] = PoliceTaskKind.None; system.taskSubject[unit] = -1;
+        events.push({ tick, type: "COMMIT_CANCELLED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", cell: candidate.assignmentCell, reason: "Police escort roadside waypoint became unreachable; assignment released for retry" });
+      }
+      continue;
+    }
+    for (let candidateUnit = 0; candidateUnit < system.count; candidateUnit++) {
+      if (!system.available[candidateUnit] || system.state[candidateUnit] !== VehicleState.Idle || system.assignment[candidateUnit] !== -1 || system.target[candidateUnit] !== -1 || system.routes[candidateUnit] !== null) continue;
+      const path = findPath(buildHazardGrid(world, scenario, "car", blocked), system.cell[candidateUnit], candidate.targetCell);
+      if (!path) continue;
+      unit = candidateUnit;
+      system.assignment[unit] = candidate.assignmentCell;
+      system.taskKind[unit] = PoliceTaskKind.Escort;
+      system.taskSubject[unit] = candidate.subject;
+      system.target[unit] = candidate.targetCell;
+      system.routes[unit] = { cells: Int32Array.from(path), cursor: 1, target: candidate.targetCell, navVersion };
+      system.state[unit] = path.length > 1 ? VehicleState.Moving : VehicleState.Idle;
+      events.push({ tick, type: "ASSIGNED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", target: candidate.civilianId as SimEvent["target"], targetKind: "npc", cell: candidate.assignmentCell, data: { targetCell: candidate.targetCell }, reason: "Police vehicle assigned to guide an evacuating civilian group along its existing safe route" });
+      break;
+    }
   }
 
   const owned = new Uint8Array(traffic.gridlock.length);
   let remainingUnits = 0;
   for (let unit = 0; unit < system.count; unit++) {
     const assigned = system.assignment[unit];
-    if (assigned >= 0 && assigned < owned.length) owned[assigned] = 1;
+    if (system.taskKind[unit] === PoliceTaskKind.TrafficControl && assigned >= 0 && assigned < owned.length) owned[assigned] = 1;
     if (system.available[unit] && system.state[unit] === VehicleState.Idle && assigned === -1 &&
         system.target[unit] === -1 && system.routes[unit] === null) remainingUnits++;
   }
@@ -154,6 +194,8 @@ export function stepPolice(
       }
       if (selected < 0 || selectedPath === null) continue;
       system.assignment[selected] = target;
+      system.taskKind[selected] = PoliceTaskKind.TrafficControl;
+      system.taskSubject[selected] = -1;
       system.target[selected] = target;
       system.routes[selected] = { cells: Int32Array.from(selectedPath), cursor: 1, target, navVersion };
       system.state[selected] = selectedPath.length > 1 ? VehicleState.Moving : VehicleState.Idle;
@@ -178,6 +220,8 @@ export function stepPolice(
     if (!route) continue;
     if (route.navVersion !== navVersion) {
       if (!planPoliceRoute(system, unit, route.target, world, scenario, blocked, navVersion)) {
+        system.taskKind[unit] = PoliceTaskKind.None;
+        system.taskSubject[unit] = -1;
         events.push({ tick, type: "COMMIT_CANCELLED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", cell: route.target, reason: "Police vehicle route became unreachable after the road graph changed; assignment released for retry" });
         continue;
       }
@@ -187,7 +231,7 @@ export function stepPolice(
     if (route.cursor >= route.cells.length) {
       system.state[unit] = VehicleState.Idle;
       system.routes[unit] = null;
-      if (system.assignment[unit] === -1) system.target[unit] = -1;
+      if (system.taskKind[unit] !== PoliceTaskKind.Escort && system.assignment[unit] === -1) system.target[unit] = -1;
       continue;
     }
     const next = route.cells[route.cursor];
@@ -195,6 +239,8 @@ export function stepPolice(
       system.routes[unit] = null;
       system.target[unit] = -1;
       system.assignment[unit] = -1;
+      system.taskKind[unit] = PoliceTaskKind.None;
+      system.taskSubject[unit] = -1;
       system.state[unit] = VehicleState.Idle;
       events.push({ tick, type: "COMMIT_CANCELLED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", cell: route.target, reason: "Police vehicle route became unsafe; assignment released for retry" });
       continue;
@@ -210,12 +256,15 @@ export function stepPolice(
     if (route.cursor >= route.cells.length) {
       system.state[unit] = VehicleState.Idle;
       system.routes[unit] = null;
-      if (system.assignment[unit] === -1) system.target[unit] = -1;
+      if (system.taskKind[unit] === PoliceTaskKind.Escort) {
+        const candidate = escortCandidates.find((item) => item.subject === system.taskSubject[unit]);
+        if (candidate) events.push({ tick, type: "ARRIVED", actor: system.id[unit] as VehicleId, actorKind: "vehicle", target: candidate.civilianId as SimEvent["target"], targetKind: "npc", cell: system.cell[unit], reason: "Police escort reached a safe roadside waypoint beside the civilian group's existing route" });
+      } else if (system.assignment[unit] === -1) system.target[unit] = -1;
     }
   }
   for (let unit = 0; unit < system.count; unit++) {
     const target = system.assignment[unit];
-    if (target >= 0 && system.cell[unit] === target && traffic.gridlock[target] === 1) controlled[target] = 1;
+    if (system.taskKind[unit] === PoliceTaskKind.TrafficControl && target >= 0 && system.cell[unit] === target && traffic.gridlock[target] === 1) controlled[target] = 1;
   }
   return { events, controlled };
 }

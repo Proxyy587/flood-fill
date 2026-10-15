@@ -23,6 +23,7 @@ import { runNegotiation } from "./dispatch/negotiation";
 import type { DispatchAssignment, DispatchDemand, DispatchUnit } from "./dispatch/policy-common";
 import { boatSnapshot, createBoats, loadBoatPassenger, planBoatRoute, stepBoats, BOAT_SEATS } from "./dispatch/boats";
 import { createPolice, policeSnapshot, stepPolice } from "./dispatch/police";
+import { createEscortSystem, escortCandidates, stepEscortGroups } from "./dispatch/police-escort";
 import { handoffRescuedCivilian, reserveRescuedShelter, releaseRescuedShelter, markRescuedAboard, requeueFailedRescue } from "./agents/system";
 
 export const SIM_CAPABILITIES = { weather: true, flood: true, power: true, agents: true, commuting: true, traffic: true, evacuation: true, reports: true, dispatch: true, hospitals: true, aircraft: false } as const;
@@ -58,7 +59,7 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   }
   const world = createWorld(scenario); const power = createPowerState(scenario);
   const rng = createRng(seed);
-  const events: SimEvent[] = [{ tick: 0, type: "RUN_STARTED", data: { stage: "dispatch", seed, agentsImplemented: true, evacuationImplemented: true, reportsImplemented: true, dispatchImplemented: true }, reason: "Weather, flood, power, commuting, evacuation, reports, ambulance and boat rescue, shelter handoff, hospital balancing, and police gridlock control are implemented; civilian escort, crowd control, and aircraft remain follow-ons" }];
+  const events: SimEvent[] = [{ tick: 0, type: "RUN_STARTED", data: { stage: "dispatch", seed, agentsImplemented: true, evacuationImplemented: true, reportsImplemented: true, dispatchImplemented: true }, reason: "Weather, flood, power, commuting, evacuation, reports, ambulance and boat rescue, shelter handoff, hospital balancing, police gridlock control and civilian escort are implemented; crowd control and aircraft remain follow-ons" }];
   const frames: MetricsFrame[] = [];
   let tick = 0; let navVersion = 0; let lastRain = -1; let lastWind = -1;
   const blocked = new Uint8Array(world.water.length);
@@ -155,6 +156,7 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   const hospitals = createHospitalSystem(scenario, population.civilianCount);
   const ambulances = createAmbulances(scenario, world, blocked);
   const police = createPolice(scenario, world, blocked);
+  const escorts = createEscortSystem(population.civilianCount, world.width);
   const hotspots = createHotspotSystem(world.width, world.height);
   const sceneTarget = new Int32Array(incidents.capacity).fill(-1);
   const sceneWaterTarget = new Int32Array(incidents.capacity).fill(-1);
@@ -752,7 +754,9 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
       applyReportInjections(tick + 1);
       events.push(...stepPower(world, scenario, power, tick + 1));
       updateClosures(tick + 1);
-      const policeStep = stepPolice(police, traffic, world, scenario, blocked, navVersion, tick + 1);
+      const groups = stepEscortGroups(escorts, agents, tick + 1);
+      const escortTasks = escortCandidates(groups, agents, world, scenario, blocked, police.cell);
+      const policeStep = stepPolice(police, traffic, world, scenario, blocked, navVersion, tick + 1, escortTasks);
       events.push(...policeStep.events);
       events.push(...stepAgents(agents, world, scenario, tick + 1, blocked, traffic, policeStep.controlled));
       tick++;

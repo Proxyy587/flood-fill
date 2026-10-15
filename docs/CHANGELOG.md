@@ -1,6 +1,8 @@
 # CHANGELOG
 One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order changes are marked **[ADR]**.
 
+- 2026-10-15 (AK, M3E): added finite independent police escort guidance for eligible evacuation/shore-handoff groups along existing safe civilian routes. Police use safe roadside waypoints, do not transport or reroute civilians, and remain outside rescue ownership and M3D traffic-control effects. Focused escort and runner regressions cover grouping, safe access, assignment/arrival, unchanged shelter ownership and deterministic M3D behavior. M3F crowd control remains pending; this checkpoint is not release approval.
+
 - 2026-10-15 (AK, M3D design checkpoint): approved an independent finite police dispatch for sustained gridlock traffic control, explicitly separate from rescue teams and ambulance policies. Police cars use safe station access and existing routing/events/snapshots; arrival enables the existing dark-intersection 0.8 throughput hook. User-confirmed follow-ons are M3E civilian escort, then M3F crowd control; neither expands M3D. No shared-contract changes. Written design: `docs/superpowers/specs/2026-10-15-ak-m3d-police-traffic-control-design.md`.
 
 - 2026-10-15 **[ADR]** (AK, M3D): added finite officer-staffed police cars with safe police-station road launch, deterministic ranked gridlock assignments, and an arrival-only control mask that raises dark-intersection capacity while powered intersections remain at 1.0. Runner events and copied vehicle snapshots include police independently of rescue dispatch. M3E civilian escort and M3F crowd control remain explicit follow-ons; aircraft are later work. Local verification/checkpoint only; this slice is not a production-readiness claim.
