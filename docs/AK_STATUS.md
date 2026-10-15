@@ -73,10 +73,13 @@ deliveries/run at 10,000 civilians without exceeding capacity. No contract, rend
 or W1 files have been changed. M3B rescue requests/dispatch, aircraft, full stress
 scenario and UI integration remain pending.
 
-M3B design: ambulance-first dispatch with hospital balancing and adaptive hot-zone
-response, using one provisional incident per report cluster and field-only triage.
-User approved the architecture and operating policy. Detailed spec is committed for
-user review; no implementation or shared-contract changes have started.
+M3B design and implementation plan are approved and committed:
+`docs/superpowers/specs/2026-10-15-ak-m3b-ambulance-dispatch-hospital-design.md` and
+`docs/superpowers/plans/2026-10-15-ak-m3b-ambulance-dispatch.md`. Scope is ambulance-
+first dispatch with hospital balancing and adaptive hot-zone response, one
+provisional request per report cluster, field-only triage, multiple casualties per
+incident and a finite fleet. No implementation or shared-contract changes have
+started; implementation awaits the user's choice of execution mode.
 
 ## 2026-10-15 baseline
 
