@@ -67,11 +67,11 @@
 
 **Files:** extend `incidents.ts`, `hospitals.ts`, `ambulances.ts`, and their focused tests.
 
-- [ ] **Step 1: Write tests** for bounded uncertainty-footprint search only at ambulance arrival; false/unmatched reports resolve false; one cluster discovers multiple distressed civilians exactly once in stable ambulance order; separate patient allocations; excess casualties remain unmet; reports resolve only after all patients admitted; atomic reservation before transport; severe chooses minimum safe ETA; lower severity can choose farther low-utilization hospital; full/flooded/unpowered/diverted/unreachable hospitals are excluded; invalid reservations release/retry; no safe bed retains patient and retries.
-- [ ] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/incidents.test.ts src/sim/dispatch/hospitals.test.ts src/sim/dispatch/ambulances.test.ts`.
-- [ ] **Step 3: Implement** `discoverIncidentAtScene` with radius `ceil((1-confidence)*4)` Manhattan cells per report estimate, reading civilian truth/health only in this arrival function. Store patient links/allocation flags in bounded typed arrays. Track occupied and in-transit beds; reserve/release/admit atomically. Severe patients choose minimum safe ETA; others minimize `ETA + 60 * (1 - severityScore) * projectedUtilization`, tie-breaking by hospital ID. Keep patients attached to their incident/ambulance while no safe destination exists.
-- [ ] **Step 4: Run GREEN**: `pnpm exec vitest run src/sim/dispatch`.
-- [ ] **Step 5: Commit** with `feat(sim): verify incidents and balance hospital beds`.
+- [x] **Step 1: Write tests** for bounded uncertainty-footprint search only at ambulance arrival; false/unmatched reports resolve false; one cluster discovers multiple distressed civilians exactly once; persistent separate casualty records; reports resolve only after all patients admitted; atomic reservation before transport; severe chooses minimum safe ETA; lower severity can choose farther low-utilization hospital; full/flooded/unpowered hospitals are excluded; invalid reservations release/retry; no safe bed retains the patient for retry.
+- [x] **Step 2: Run RED**: focused incident/hospital tests failed on the missing scene-discovery and hospital-reservation APIs.
+- [x] **Step 3: Implement** `discoverIncidentAtScene` with radius `ceil((1-confidence)*4)` Manhattan cells per report estimate, reading civilian state/health only in this arrival function. Store patient links, severity and admission state in bounded typed arrays. Track occupied and in-transit beds; reserve/release/admit atomically. Severe patients choose minimum safe ETA; others minimize `ETA + 60 * (1 - severityScore) * projectedUtilization`, tie-breaking by hospital ID. Keep unadmitted patients in incident state for retry/accounting.
+- [x] **Step 4: Run GREEN**: dispatch, report and movement-invariant suites pass, 43 tests; strict TypeScript passes.
+- [x] **Step 5: Commit** with `feat(sim): verify incidents and balance hospital beds` (committed with this checkpoint).
 
 ## Task 6: Hot-zone scoring and idle-unit staging
 

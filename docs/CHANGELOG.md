@@ -19,6 +19,8 @@ One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order 
 
 - 2026-10-15 **[ADR]** (AK, M3B task 4): added information-limited demand/unit inputs, shared ETA candidate enumeration and distinct unit-proposal negotiation versus priority-first centralized greedy matching. Stable priority/tie rules and multi-casualty finite allocation are tested; focused suites pass 35 tests and strict TypeScript passes. Runner event projection is in Task 7; no contract changes.
 
+- 2026-10-15 **[ADR]** (AK, M3B task 5): added field-arrival-only uncertainty-footprint searches, deterministic multi-casualty discovery, report verification/falsification and resolution only after all admissions. Added reachable powered/flood-safe hospital routing, severity-aware destination selection, atomic bed reservations, admission, diversion release and retry state. Focused dispatch/report/movement tests pass (43); strict TypeScript passes. No contract changes.
+
 - 2026-10-15 (AK, checkpoint record): source/tests/stage docs saved in b5ad965 on codex/ak-foundation. Verified 348-test health/build and deterministic smoke; no publication. Next M2 slice is evacuation/shelter allocation; aggregate M1 review approval and external integration gates remain pending.
 
 - 2026-10-15 (AK, M1 local checkpoint gate): final health passes 348 tests, lint, strict types and schema validation; production build and 3-seed/600-tick batch/compare pass. Synthetic 12/1000/10000-civilian movement/load smoke and independent route-retention counter probes pass. Review remains INCONCLUSIVE; 8ms target, missing templates/browser integration and rescue roadmap remain open. Local progress commit only, no merge/push/PR.

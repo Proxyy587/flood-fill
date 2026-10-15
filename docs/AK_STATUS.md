@@ -84,8 +84,10 @@ cluster-bridge coalescing); Task 2 adds deterministic synthetic flood exposure a
 field triage; Task 3 adds a finite typed-array ambulance fleet, safe road access
 bases, hazard-aware routes and deterministic replanning; Task 4 adds distinct
 negotiation and centralized dispatch over a shared candidate set without access to
-hidden truth. RED was observed before each module; current focused
-incident/report/hospital/ambulance/policy/movement suites pass 35 tests and strict
+hidden truth. Task 5 adds bounded scene verification, multi-casualty records, report
+resolution after all admissions, severity-aware destination selection and atomic
+bed reservation/release/retry. RED was observed before each module; current focused
+incident/report/hospital/ambulance/policy/movement suites pass 43 tests and strict
 TypeScript passes. Hospital building cells are represented by their nearest safe
 adjacent road cell for ambulance staging. No shared-contract changes.
 
