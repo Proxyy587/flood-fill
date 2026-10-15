@@ -1,6 +1,20 @@
 # AK execution checkpoints
 
-## M1/M2 checkpoints; active M3A reports slice (2026-10-15)
+## Current AK status (2026-10-15): M3A-M3D implemented; follow-ons remain
+
+The AK headless core now includes M3C boat rescue and M3D independent police
+gridlock traffic control, in addition to M3A reports and M3B ambulance dispatch,
+field triage, hospital balancing and adaptive hot-zone staging. M3D police work is
+limited to gridlock control and remains separate from rescue dispatch. Still planned
+are M3E civilian escort, M3F crowd control, helicopter rooftop rescue/medevac and
+weather constraints, and the full compound stress scenario. Browser/worker integration,
+independent review, remaining invariants and later M4-M6 work also remain open; this
+status is not release approval.
+
+### Earlier checkpoint evidence
+
+The records below preserve earlier milestone snapshots; pending-work statements in
+those snapshots describe the status at that time, not the current implementation.
 
 Local source checkpoint: **b5ad965** on codex/ak-foundation. Source, tests and stage
 docs committed together. It is a progress checkpoint, not aggregate review approval.
@@ -53,7 +67,7 @@ the 10000-resident/30-tick run takes about 2.7s. This is not full rescue stress 
 proof of the 8ms target. Dispatch comparison and worker/template release gates remain
 unavailable.
 
-### M3A/M3B: synthetic reports and ambulance response implemented
+### M3A/M3B checkpoint record (historical scope): reports and ambulance response
 
 Detailed reports-first design and inline plan are committed in 1f9c471. The managed
 worktree `codex/ak-m3-reports` excludes active untracked W1 assets. Frozen-lockfile
@@ -70,8 +84,9 @@ runner tests pass 19/19. Final health passes lint, strict types, 366 tests and
 schema-only validation (`releaseReady:false`); production build, batch/compare and
 the living-city script pass. Its three-seed report smoke confirms 15,000 deterministic
 deliveries/run at 10,000 civilians without exceeding capacity. No contract, renderer,
-or W1 files have been changed. Boats, police, helicopters, full stress scenario and
-UI integration remain pending.
+or W1 files were changed in this M3A/M3B checkpoint. At that point, boats, police,
+helicopters, the full stress scenario and UI integration were pending; M3C boat rescue
+and M3D police gridlock control have since been implemented as summarized above.
 
 M3B design and implementation plan are approved and committed:
 `docs/superpowers/specs/2026-10-15-ak-m3b-ambulance-dispatch-hospital-design.md` and
@@ -104,6 +119,16 @@ staging is recorded as assignment/reroute events; the frozen summary hotspot enu
 does not include ambulance demand, so no shared-contract change was made. Production
 build passes. No policy superiority is claimed. This does not constitute release
 approval or a full rescue stress test.
+
+### M3C/M3D: boats and independent police gridlock control implemented
+
+M3C adds finite boat rescue and injured-patient handoff into ambulance hospital
+balancing. M3D adds finite officer-staffed police cars, safe police-station road
+launch, deterministic ranked gridlock assignments and arrival-only traffic control;
+controlled dark intersections gain capacity while powered intersections remain at
+1.0. Police remain independent of rescue dispatch. M3E civilian escort and M3F crowd
+control are the next police slices. Helicopter operations, the full compound stress
+scenario, browser integration and wider release/review gates are still pending.
 
 ## 2026-10-15 baseline
 
