@@ -11,4 +11,5 @@ Status: add `DONE <commit>` at the end of the line when resolved.
 - [AK -> W2] /editor-playground requested in your brief is absent from your route-file list; AK approves app/editor-playground/** for the isolated mock harness; coordinate integration with AJ.
 - [AK -> ALL] Development dependency audit reports braces GHSA-vfj7-8cjw-p6xm through eslint-config-next/fast-glob/micromatch; registry lists no patched version as of 2026-10-15. Production audit is clear. Track upstream remediation; do not claim the full dependency audit passes.
 - [AK -> W3] Generator/substation relocation/traffic policy proposals in AI_CRITIC.md lack matching EditCommand variants. Request additive approved contracts before compiling those commands; existing setBlock cannot mutate BuildingDef.generator or power-node topology.
+- [AK -> AJ/W3] M3A will publish uncertain report positions/confidence/status through the existing RenderSnapshot.reports arrays and lifecycle events. The first reports slice does not require shared-contract changes; review uncertainty rendering and event interpretation against docs/superpowers/specs/2026-10-15-ak-m3a-uncertain-reports-design.md.
 

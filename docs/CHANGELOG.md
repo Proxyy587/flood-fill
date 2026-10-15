@@ -5,6 +5,8 @@ One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order 
 
 - 2026-10-15 (AK, M2 checkpoint): full health passes 356 tests, lint, strict types and schema-only validation; production build passes. Synthetic 12/1000/10000-resident movement/load probes and deterministic three-seed warning/shelter contention smoke pass. Added coverage and handling for occupied shelters flooding; reservations release and stranded residents retry after water recedes. This is not the full five-failure rescue stress test or release approval.
 
+- 2026-10-15 (AK, M3A design checkpoint): documented reports-first design for synthetic uncertainty, delayed communications, HQ belief, false/duplicate reports, deterministic bounds and acceptance tests. Existing frozen snapshot/event/injection contracts are sufficient; request creation and dispatch remain a separate M3B slice. Implementation awaits spec review.
+
 - 2026-10-15 (AK, checkpoint record): source/tests/stage docs saved in b5ad965 on codex/ak-foundation. Verified 348-test health/build and deterministic smoke; no publication. Next M2 slice is evacuation/shelter allocation; aggregate M1 review approval and external integration gates remain pending.
 
 - 2026-10-15 (AK, M1 local checkpoint gate): final health passes 348 tests, lint, strict types and schema validation; production build and 3-seed/600-tick batch/compare pass. Synthetic 12/1000/10000-civilian movement/load smoke and independent route-retention counter probes pass. Review remains INCONCLUSIVE; 8ms target, missing templates/browser integration and rescue roadmap remain open. Local progress commit only, no merge/push/PR.
