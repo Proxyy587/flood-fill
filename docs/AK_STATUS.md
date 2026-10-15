@@ -78,8 +78,11 @@ M3B design and implementation plan are approved and committed:
 `docs/superpowers/plans/2026-10-15-ak-m3b-ambulance-dispatch.md`. Scope is ambulance-
 first dispatch with hospital balancing and adaptive hot-zone response, one
 provisional request per report cluster, field-only triage, multiple casualties per
-incident and a finite fleet. No implementation or shared-contract changes have
-started; implementation awaits the user's choice of execution mode.
+incident and a finite fleet. Inline implementation is in progress. Task 1 adds
+bounded incident requests/provenance over delivered M3A clusters (including late
+cluster-bridge coalescing); Task 2 adds deterministic synthetic flood exposure and
+field triage. RED was observed before both modules; focused report/dispatch health
+passes 21 tests and strict TypeScript passes. No shared-contract changes.
 
 ## 2026-10-15 baseline
 

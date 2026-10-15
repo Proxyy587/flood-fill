@@ -26,21 +26,21 @@
 
 **Files:** create `src/sim/dispatch/incidents.ts`, `src/sim/dispatch/incidents.test.ts`; consume existing report arrays from `src/sim/reports/system.ts`.
 
-- [ ] **Step 1: Write behavior tests** for delivered reports at same/adjacent Manhattan cells within 30 ticks: one request with earliest report ID, all provenance retained, max confidence retained; after-window report creates a new incident; undelivered reports create none; repeated updates are idempotent.
-- [ ] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/incidents.test.ts`; expect missing-module/export failures.
-- [ ] **Step 3: Implement** `IncidentSystem` with typed arrays bounded by `reports.id.length`, a report-to-incident `Int32Array` initialized to `-1`, and bounded report provenance storage. Export `createIncidentSystem(reports)`, `updateIncidents(system,reports,tick)`, and `incidentSnapshot(system)`. Dispatch-facing data is limited to request ID, estimated cell, confidence, created tick and lifecycle state; do not expose truth/source/true cell.
-- [ ] **Step 4: Run GREEN**: rerun the focused Vitest file; expect all cluster/provenance tests to pass.
-- [ ] **Step 5: Commit**: `git add src/sim/dispatch/incidents.ts src/sim/dispatch/incidents.test.ts; git commit -m "feat(sim): create incidents from report clusters"`.
+- [x] **Step 1: Write behavior tests** for delivered reports at same/adjacent Manhattan cells within 30 ticks: one request with earliest report ID, all provenance retained, max confidence retained; after-window report creates a new incident; undelivered reports create none; repeated updates are idempotent.
+- [x] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/incidents.test.ts`; expected missing-module failure observed.
+- [x] **Step 3: Implement** `IncidentSystem` with typed arrays bounded by `reports.id.length`, a report-to-incident `Int32Array` initialized to `-1`, and bounded report provenance storage. Export `createIncidentSystem(reports)`, `updateIncidents(system,reports,tick)`, and `incidentSnapshot(system)`. Dispatch-facing data is limited to request ID, estimated cell, confidence, created tick and lifecycle state; do not expose truth/source/true cell.
+- [x] **Step 4: Run GREEN**: report/incident suites pass, 13 tests; strict TypeScript passes.
+- [x] **Step 5: Commit**: `c97e194 feat(sim): create incidents from report clusters`.
 
 ## Task 2: Synthetic exposure, field evidence and triage
 
 **Files:** create `src/sim/dispatch/hospitals.ts`, `src/sim/dispatch/hospitals.test.ts` (exposure and triage exports first).
 
-- [ ] **Step 1: Write tests**: health remains 100 outside `SeekHelp`/`Stranded` or at depth `<=0.3`; at depth 1.3 one tick loses 0.75; health clamps at zero; loaded patients stop exposure; triage thresholds are minor `>75`, moderate `(50,75]`, severe `<=50`; report-only dispatch receives no identity/severity.
-- [ ] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/hospitals.test.ts`; expect missing exports.
-- [ ] **Step 3: Implement** pure `stepExposure(population,world,loaded)` and `triageHealth(health)`. Use existing NPC health/state and world water arrays; add no RNG and expose triage only to the scene-arrival call path.
-- [ ] **Step 4: Run GREEN** with the focused test file.
-- [ ] **Step 5: Commit** with `feat(sim): model deterministic field triage`.
+- [x] **Step 1: Write tests**: health remains 100 outside `SeekHelp`/`Stranded` or at depth `<=0.3`; at depth 1.3 one tick loses 0.75; health clamps at zero; loaded patients stop exposure; triage thresholds are minor `>75`, moderate `(50,75]`, severe `<=50`; report-only dispatch receives no identity/severity.
+- [x] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/hospitals.test.ts`; expected missing-module failure observed.
+- [x] **Step 3: Implement** pure `stepExposure(population,world,loaded)` and `triageHealth(health)`. Use existing NPC health/state and world water arrays; add no RNG and expose triage only to the scene-arrival call path.
+- [x] **Step 4: Run GREEN**: hospital, incident and M3A report suites pass, 21 tests; strict TypeScript passes.
+- [x] **Step 5: Commit** with `feat(sim): model deterministic field triage` (committed with this checkpoint).
 
 ## Task 3: Finite ambulance fleet and safe movement
 
