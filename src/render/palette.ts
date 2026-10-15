@@ -113,17 +113,41 @@ export const UI_COLORS = {
   highlight: 0xd6336c,
 } as const;
 
-export const SKY = { clear: 0xd8e4ea, storm: 0x6d7880, golden: 0xf2b27e, night: 0x0c1524, nightStorm: 0x080d15 } as const;
+/**
+ * Horizon / fog. Morning is a clear sky blue, afternoon a warm haze,
+ * night a deep readable navy (not black).
+ */
+export const SKY = {
+  morning: 0xd4eeff,
+  afternoon: 0xd4cbbd,
+  clear: 0xd4eeff,
+  storm: 0x6e7a84,
+  golden: 0xf0b48a,
+  night: 0x1a3f86,
+  midnight: 0x143572,
+  nightStorm: 0x152038,
+} as const;
 
-/** Light colours across the day. */
+/** Overhead sky (horizon uses `SKY`). */
+export const ZENITH = {
+  morning: 0x3d9aee,
+  afternoon: 0x9aabba,
+  clear: 0x3d9aee,
+  golden: 0x6e84a8,
+  night: 0x0c2468,
+  midnight: 0x081848,
+  storm: 0x3e4852,
+} as const;
+
+/** Day key is bright and cool; night fill stays blue so the city stays readable. */
 export const DAYLIGHT = {
-  sun: 0xfff4e0,
-  sunLow: 0xffa860,
-  moon: 0x8fa6d8,
-  hemiSkyDay: 0xcfe6ff,
-  hemiSkyNight: 0x41588f,
-  hemiGroundDay: 0x5a4a3a,
-  hemiGroundNight: 0x1a1c26,
-  /** Window material multiplier at night: lit glass turns warm. */
-  windowsNight: 0xffd08a,
+  sun: 0xfff6ea,
+  sunLow: 0xffb070,
+  moon: 0xc5d4ff,
+  hemiSkyDay: 0xd8f0ff,
+  hemiSkyNight: 0x4a6cb8,
+  hemiGroundDay: 0x7a6a58,
+  hemiGroundNight: 0x1a3058,
+  /** Window material multiplier at night: warm cabin light. */
+  windowsNight: 0xffc56a,
 } as const;

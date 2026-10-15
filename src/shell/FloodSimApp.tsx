@@ -17,10 +17,11 @@ import { BLOCK_META } from '../editor/catalog';
 import { daylightAt } from '../render/effects/daylight';
 import { SoundDirector } from '../ui/audio/SoundDirector';
 import { NewsTicker } from '../ui/news/NewsTicker';
+import { IncidentBoard } from '../ui/showcase/IncidentBoard';
 import { ScoreRecorder } from '../ui/score/ScoreCard';
 import { useEditorStore, type EditorTool } from '../ui/store/editorStore';
 import { describeCity, useCityStore } from './city';
-import { Compass, Footer, HoverTip, Identity, Inspector, LensCard, Toasts, Vitals } from './Hud';
+import { Compass, Footer, HoverTip, Identity, Inspector, LensCard, Vitals } from './Hud';
 import { BuildTool, Hotbar, TerrainTool } from './tools/BuildTool';
 import { FilesTool } from './tools/FilesTool';
 import { LensTool } from './tools/LensTool';
@@ -116,13 +117,35 @@ export function FloodSimApp() {
       const newCommand = command !== prev.past.at(-1) && command !== prev.future.at(-1) && s.future.length === 0 && command?.before === prev.scenario;
       if (!newCommand) loadEditor();
     });
+    let settingsTimer: ReturnType<typeof setTimeout> | null = null;
     const offSettings = useSceneStore.subscribe((s, prev) => {
-      if (s.runSettings !== prev.runSettings && useEditorStore.getState().mode === 'edit') loadEditor();
+      if (s.runSettings === prev.runSettings) return;
+      if (settingsTimer) clearTimeout(settingsTimer);
+      settingsTimer = setTimeout(() => {
+        const cur = useSceneStore.getState();
+        const editor = useEditorStore.getState();
+        if (!editor.scenario) return;
+        if (editor.mode === 'edit') {
+          loadEditor();
+          return;
+        }
+        // Paused run: a new start time (or engine) restarts the storm from that clock.
+        if (cur.playing) b.pause();
+        useSimFeedStore.getState().reset();
+        b.load(editor.scenario, editor.scenario.defaults.seed, {
+          mode: 'run',
+          npcParams: editor.params,
+          speed: cur.speed,
+          engine: cur.runSettings.engine,
+          startTimeSeconds: cur.runSettings.startSeconds,
+        });
+      }, 280);
     });
     return () => {
       offReady();
       offEditor();
       offSettings();
+      if (settingsTimer) clearTimeout(settingsTimer);
       stopAutosave();
       disconnect();
       b.dispose();
@@ -294,15 +317,17 @@ export function FloodSimApp() {
         <Inspector />
       </div>
 
-      <Toasts />
       <ScoreRecorder />
       <SoundDirector />
-      <NewsTicker />
       <RecoveryPrompt />
       {tool === 'build' && mode === 'edit' && <Hotbar />}
-      {bridge && <Transport bridge={bridge} onPlay={play} onRestart={restart} onBranch={askBranch} />}
+      <div className={styles.dock}>
+        <NewsTicker />
+        {bridge && <Transport bridge={bridge} onPlay={play} onRestart={restart} onBranch={askBranch} />}
+      </div>
       <Compass />
       {tool === 'inspect' && <LensCard />}
+      {tool === 'inspect' && mode === 'run' && <IncidentBoard />}
       <Footer />
       <HoverTip />
 

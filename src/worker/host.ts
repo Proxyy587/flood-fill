@@ -187,7 +187,14 @@ export class SimHost {
   private sendView() {
     if (!this.engine) return;
     if (this.viewTick >= this.live) {
-      this.postSnapshot(this.engine.snapshot());
+      const snapshot = this.engine.snapshot();
+      if (snapshot.dirtyChunks.length && snapshot.tick > 0 && this.options?.mode === 'run') {
+        // The run itself changed the terrain (e.g. a levee breach).
+        const world = this.engine.world();
+        world.dirtyChunks = [...snapshot.dirtyChunks];
+        this.post({ type: 'world', world }, worldTransferables(world));
+      }
+      this.postSnapshot(snapshot);
       return;
     }
     const frame = this.frames.get(Math.floor(this.viewTick / RECORD_EVERY) * RECORD_EVERY);

@@ -1,12 +1,26 @@
 import * as THREE from 'three';
 import { UI_COLORS } from '../palette';
 
-/** Hover cell outline, selection ring/box and evidence-cell highlights. */
+const unitBox = () => new THREE.BoxGeometry(1, 1, 1);
+
+/** Places a unit-box object over `box`, grown by `pad` on every side. */
+const fit = (o: THREE.Object3D, box: THREE.Box3, pad: number, size: THREE.Vector3): void => {
+  box.getSize(size);
+  box.getCenter(o.position);
+  o.scale.set(size.x + pad * 2, size.y + pad * 2, size.z + pad * 2);
+};
+
+/**
+ * Hover and selection marks. Both wrap the whole thing under the pointer:
+ * a building's full footprint and height, or a single ground cell column.
+ */
 export class Markers {
   readonly group = new THREE.Group();
   private hover: THREE.LineSegments;
+  private hoverFill: THREE.Mesh;
   private selection: THREE.Mesh;
   private selectionBox: THREE.LineSegments;
+  private selectionFill: THREE.Mesh;
   private highlights: THREE.InstancedMesh;
   private highlightGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   private highlightMat = new THREE.MeshBasicMaterial({
@@ -17,37 +31,47 @@ export class Markers {
     depthTest: false,
   });
   private ringMat = new THREE.MeshBasicMaterial({ color: UI_COLORS.selection, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide });
+  private hoverFillMat = new THREE.MeshBasicMaterial({ color: UI_COLORS.hover, transparent: true, opacity: 0.1, depthWrite: false, fog: false });
+  private selectionFillMat = new THREE.MeshBasicMaterial({ color: UI_COLORS.selection, transparent: true, opacity: 0.16, depthWrite: false, fog: false });
   private dummy = new THREE.Object3D();
+  private size = new THREE.Vector3();
+  private hovering = false;
 
   constructor() {
     this.group.name = 'markers';
     this.hover = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
-      new THREE.LineBasicMaterial({ color: UI_COLORS.hover, transparent: true, opacity: 0.8 }),
+      new THREE.EdgesGeometry(unitBox()),
+      new THREE.LineBasicMaterial({ color: UI_COLORS.hover, transparent: true, opacity: 0.85 }),
     );
     this.hover.visible = false;
+    this.hoverFill = new THREE.Mesh(unitBox(), this.hoverFillMat);
+    this.hoverFill.visible = false;
+    this.hoverFill.renderOrder = 6;
     this.selection = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.42, 32).rotateX(-Math.PI / 2), this.ringMat);
     this.selection.visible = false;
     this.selection.renderOrder = 7;
     this.selectionBox = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
+      new THREE.EdgesGeometry(unitBox()),
       new THREE.LineBasicMaterial({ color: UI_COLORS.selection, depthTest: false, transparent: true, opacity: 0.9 }),
     );
     this.selectionBox.renderOrder = 9;
     this.selectionBox.visible = false;
+    this.selectionFill = new THREE.Mesh(unitBox(), this.selectionFillMat);
+    this.selectionFill.renderOrder = 6;
+    this.selectionFill.visible = false;
     this.highlights = new THREE.InstancedMesh(this.highlightGeo, this.highlightMat, 1024);
     this.highlights.count = 0;
     this.highlights.frustumCulled = false;
     this.highlights.renderOrder = 8;
-    this.group.add(this.hover, this.selection, this.selectionBox, this.highlights);
+    this.group.add(this.hover, this.hoverFill, this.selection, this.selectionFill, this.selectionBox, this.highlights);
   }
 
-  setHover(x: number, z: number, y0: number, y1: number, visible: boolean): void {
-    this.hover.visible = visible;
-    if (!visible) return;
-    const hgt = Math.max(0.05, y1 - y0);
-    this.hover.position.set(x + 0.5, y0 + hgt / 2, z + 0.5);
-    this.hover.scale.set(1.02, hgt + 0.02, 1.02);
+  /** Outline and soft fill over whatever the pointer is on (a whole building, or one cell). */
+  setHover(box: THREE.Box3 | null): void {
+    this.hovering = this.hover.visible = this.hoverFill.visible = !!box;
+    if (!box) return;
+    fit(this.hover, box, 0.02, this.size);
+    fit(this.hoverFill, box, 0.025, this.size);
   }
 
   /** Ring that tracks a moving entity. */
@@ -61,11 +85,14 @@ export class Markers {
 
   /** Box around a building footprint or a cell column. */
   setSelectionBox(box: THREE.Box3 | null): void {
-    this.selectionBox.visible = !!box;
-    if (!box) return;
-    const size = box.getSize(new THREE.Vector3());
-    box.getCenter(this.selectionBox.position);
-    this.selectionBox.scale.set(size.x + 0.06, size.y + 0.06, size.z + 0.06);
+    this.selectionBox.visible = this.selectionFill.visible = !!box;
+    if (box) {
+      fit(this.selectionBox, box, 0.03, this.size);
+      fit(this.selectionFill, box, 0.035, this.size);
+    }
+    // The hover marks would double up on the selected thing.
+    const same = !!box && this.hover.position.distanceToSquared(this.selectionBox.position) < 1e-4;
+    this.hover.visible = this.hoverFill.visible = this.hovering && !same;
   }
 
   setHighlights(cells: number[], w: number, heightAt: (c: number) => number): void {
@@ -82,15 +109,17 @@ export class Markers {
 
   update(now: number): void {
     this.highlightMat.opacity = 0.35 + Math.sin(now / 220) * 0.15;
+    this.selectionFillMat.opacity = 0.13 + Math.sin(now / 320) * 0.05;
   }
 
   dispose(): void {
-    this.hover.geometry.dispose();
+    for (const m of [this.hover, this.hoverFill, this.selectionBox, this.selectionFill]) m.geometry.dispose();
     (this.hover.material as THREE.Material).dispose();
+    (this.selectionBox.material as THREE.Material).dispose();
+    this.hoverFillMat.dispose();
+    this.selectionFillMat.dispose();
     this.selection.geometry.dispose();
     this.ringMat.dispose();
-    this.selectionBox.geometry.dispose();
-    (this.selectionBox.material as THREE.Material).dispose();
     this.highlights.dispose();
     this.highlightGeo.dispose();
     this.highlightMat.dispose();

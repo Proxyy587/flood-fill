@@ -27,6 +27,8 @@ export enum NpcState {
   Stranded,
   Rescued,
   OnDuty,
+  /** Hurt and waiting for an ambulance. */
+  Injured,
 }
 
 export enum VehicleKind {

@@ -47,6 +47,22 @@ export const SIM_EVENT_TYPES = [
   'HOMES_FLOODED',
   /** Extra rescue teams (boats and crews) released into the city. */
   'TEAMS_DEPLOYED',
+  /** First response: heavy-rain alert naming the flood-prone areas. */
+  'FLOOD_ALERT',
+  /** A named flood-prone spot (underpass, basin, hollow) is under water. */
+  'WATERLOGGING',
+  /** Police barricade a flooded or blocked road and divert traffic. */
+  'ROADBLOCK',
+  /** A person is hurt (wading, debris, electric shock) and needs an ambulance. */
+  'INJURY_REPORTED',
+  'AMBULANCE_DISPATCH',
+  /** A helicopter drops food and water to people sheltering in flooded homes. */
+  'FOOD_DROP',
+  'LEVEE_BREACH',
+  /** Rain-soaked hillside slides onto a road. */
+  'LANDSLIDE',
+  /** A relief camp receives its first evacuees. */
+  'CAMP_OPENED',
 ] as const;
 
 export type SimEventType = (typeof SIM_EVENT_TYPES)[number];

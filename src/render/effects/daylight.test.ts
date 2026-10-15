@@ -27,4 +27,13 @@ describe('daylight (render-only clock)', () => {
     expect(daylightAt(86400 + 12 * 3600).day).toBeCloseTo(daylightAt(12 * 3600).day);
     expect(daylightAt(-3600).seconds).toBe(23 * 3600);
   });
+
+  it('marks clear morning, afternoon and midnight phases', () => {
+    expect(daylightAt(8 * 3600).morning).toBeGreaterThan(0.5);
+    expect(daylightAt(8 * 3600).afternoon).toBeLessThan(0.2);
+    expect(daylightAt(14 * 3600).afternoon).toBeGreaterThan(0.5);
+    expect(daylightAt(14 * 3600).morning).toBeLessThan(0.2);
+    expect(daylightAt(0).midnight).toBeGreaterThan(0.7);
+    expect(daylightAt(12 * 3600).midnight).toBe(0);
+  });
 });

@@ -101,7 +101,7 @@ export class CameraRig {
     const vfov = THREE.MathUtils.degToRad(this.camera.fov) / 2;
     const hfov = Math.atan(Math.tan(vfov) * this.camera.aspect);
     const distance = (Math.hypot(w, h) * 0.5) / Math.sin(Math.min(vfov, hfov));
-    this.maxDistance = Math.max(160, distance * 1.6);
+    this.maxDistance = Math.max(48, distance * 1.15);
     const pose: Pose = {
       target: new THREE.Vector3(w / 2, this.heightAt(w / 2, h / 2), h / 2),
       yaw: -0.62,
@@ -248,10 +248,11 @@ export class CameraRig {
     return THREE.MathUtils.clamp(d, MIN_DISTANCE, this.maxDistance);
   }
 
+  /** Keep the orbit target on the city. */
   private clampTarget(t: THREE.Vector3): void {
-    const m = 6;
-    t.x = THREE.MathUtils.clamp(t.x, -m, this.bounds.w + m);
-    t.z = THREE.MathUtils.clamp(t.z, -m, this.bounds.h + m);
+    const m = 4;
+    t.x = THREE.MathUtils.clamp(t.x, m, this.bounds.w - m);
+    t.z = THREE.MathUtils.clamp(t.z, m, this.bounds.h - m);
   }
 
   /** Where a screen point meets the horizontal plane through the orbit target. */

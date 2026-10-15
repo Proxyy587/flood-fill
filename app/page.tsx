@@ -1,5 +1,5 @@
-import { FloodSimApp } from "../src/shell/FloodSimApp";
+import { GeographyApp } from '../src/shell/geography/GeographyApp';
 
 export default function Home() {
-  return <FloodSimApp />;
+  return <GeographyApp />;
 }

@@ -76,6 +76,27 @@ class Builder {
     this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
+  /** Arbitrary planar quad, counter-clockwise seen from the front. */
+  quad(v: [number, number, number][], color: Rgb, role: number, cell: number): void {
+    const [a, b, d] = v;
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const wx = d[0] - a[0], wy = d[1] - a[1], wz = d[2] - a[2];
+    let nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+    const len = Math.hypot(nx, ny, nz);
+    // A zero-area quad has no normal; lit in a shader it turns into NaN pixels that the bloom spreads over the frame.
+    if (len < 1e-9) return;
+    nx /= len; ny /= len; nz /= len;
+    const base = this.pos.length / 3;
+    for (const p of v) {
+      this.pos.push(p[0], p[1], p[2]);
+      this.nor.push(nx, ny, nz);
+      this.col.push(color[0], color[1], color[2]);
+      this.role.push(role);
+      this.cell.push(cell);
+    }
+    this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+
   /** Box without a bottom face. */
   box(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, color: Rgb, role: number, cell: number): void {
     for (const d of ['px', 'nx', 'pz', 'nz', 'py'] as const) this.face(d, x0, x1, y0, y1, z0, z1, color, role, cell, 0.9);
@@ -175,6 +196,64 @@ const drawnTop = (world: WorldSnapshot, c: number): number => world.ground[c] + 
 /** Column top in voxels (ground + structure, or the model standing on it). */
 export const columnTop = (world: WorldSnapshot, c: number): number => drawnTop(world, c) + (PROP_HEIGHT[world.blocks[c] as BlockType] ?? 0);
 
+/** A road cell sloping up to a bridge deck: heights in world units at the cell's far and near edges. */
+export interface Ramp {
+  dx: number;
+  dz: number;
+  far: number;
+  near: number;
+}
+
+const isRoadBlock = (b: number) => b === BlockType.Road;
+
+/**
+ * Approach ramp for a road cell one or two cells before a raised bridge deck.
+ * Two-cell ramps split the climb so the slope stays gentle.
+ */
+export const rampAt = (world: WorldSnapshot, deck: Int16Array, c: number): Ramp | null => {
+  const { w, h, blocks, ground } = world;
+  if (!isRoadBlock(blocks[c])) return null;
+  const x = c % w;
+  const z = (c - x) / w;
+  const cellOf = (px: number, pz: number) => (px < 0 || pz < 0 || px >= w || pz >= h ? -1 : pz * w + px);
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    const n1 = cellOf(x + dx, z + dz);
+    if (n1 >= 0 && blocks[n1] === BlockType.Bridge && deck[n1] > ground[c]) {
+      const back = cellOf(x - dx, z - dz);
+      const top = deck[n1] * Y_SCALE;
+      if (back >= 0 && isRoadBlock(blocks[back]) && deck[n1] - ground[back] >= 1) {
+        const mid = (ground[back] * Y_SCALE + top) / 2;
+        return { dx, dz, far: Math.max(mid, ground[c] * Y_SCALE), near: top };
+      }
+      return { dx, dz, far: ground[c] * Y_SCALE, near: top };
+    }
+    const n2 = cellOf(x + 2 * dx, z + 2 * dz);
+    if (n1 >= 0 && n2 >= 0 && isRoadBlock(blocks[n1]) && blocks[n2] === BlockType.Bridge && deck[n2] - ground[c] >= 1) {
+      const top = deck[n2] * Y_SCALE;
+      return { dx, dz, far: ground[c] * Y_SCALE, near: Math.max(ground[n1] * Y_SCALE, (ground[c] * Y_SCALE + top) / 2) };
+    }
+  }
+  return null;
+};
+
+/** Height of a ramp at a point inside its cell (fx, fz in 0..1). */
+export const rampHeight = (r: Ramp, fx: number, fz: number): number => {
+  const t = r.dx > 0 ? fx : r.dx < 0 ? 1 - fx : r.dz > 0 ? fz : 1 - fz;
+  return r.far + (r.near - r.far) * t;
+};
+
+const DIR_SEED: Record<Dir, number> = { px: 1, nx: 2, pz: 3, nz: 4, py: 5 };
+
+/**
+ * How brightly a window pane glows at night (stored in the window mesh's
+ * vertex colour; `TerrainLayer` turns it into the `aLit` attribute). About a
+ * third of panes stay dark so lit facades read as occupied, not uniform.
+ */
+export const windowLit = (c: number, row: number, pane: number, dir: Dir): number => {
+  const r = hash01(c * 97 + row * 13 + pane * 7 + DIR_SEED[dir] * 31);
+  return r < 0.34 ? 0.05 : 0.45 + hash01(r * 1e6 + 3) * 0.6;
+};
+
 /**
  * Builds the solid and window meshes for one 16×16 chunk. Faces between
  * columns are only emitted where the neighbour is lower (hidden-face culling).
@@ -225,12 +304,28 @@ export const buildChunk = (world: WorldSnapshot, deck: Int16Array, chunkX: numbe
               const y0 = (g + row + 0.35) * Y;
               const y1 = (g + row + 0.8) * Y;
               const e = 0.015;
-              if (dir === 'px') windows.face(dir, x + e, x + 1 + e, y0, y1, z + 0.15, z + 0.85, [1, 1, 1], ROLE_BUILDING, c, 1);
-              if (dir === 'nx') windows.face(dir, x - e, x + 1, y0, y1, z + 0.15, z + 0.85, [1, 1, 1], ROLE_BUILDING, c, 1);
-              if (dir === 'pz') windows.face(dir, x + 0.15, x + 0.85, y0, y1, z, z + 1 + e, [1, 1, 1], ROLE_BUILDING, c, 1);
-              if (dir === 'nz') windows.face(dir, x + 0.15, x + 0.85, y0, y1, z - e, z + 1, [1, 1, 1], ROLE_BUILDING, c, 1);
+              for (let pane = 0; pane < 2; pane++) {
+                const a = pane ? 0.54 : 0.12;
+                const b = pane ? 0.88 : 0.46;
+                const lit = windowLit(c, row, pane, dir);
+                const col: Rgb = [lit, lit, lit];
+                if (dir === 'px') windows.face(dir, x + e, x + 1 + e, y0, y1, z + a, z + b, col, ROLE_BUILDING, c, 1);
+                if (dir === 'nx') windows.face(dir, x - e, x + 1, y0, y1, z + a, z + b, col, ROLE_BUILDING, c, 1);
+                if (dir === 'pz') windows.face(dir, x + a, x + b, y0, y1, z, z + 1 + e, col, ROLE_BUILDING, c, 1);
+                if (dir === 'nz') windows.face(dir, x + a, x + b, y0, y1, z - e, z + 1, col, ROLE_BUILDING, c, 1);
+              }
             }
           }
+        }
+        // Roof rim along the building's own outline, so neighbouring buildings of equal height read apart.
+        if (buildingIndex[c] && tinted && top > g && !PROP_HEIGHT[block] && !sameBuilding(c, nb)) {
+          const t = top * Y;
+          const rim = rgb(vis.top, vary * 0.72);
+          const k = 0.07;
+          if (dir === 'px') solid.box(x + 1 - k, x + 1, t, t + 0.09, z, z + 1, rim, role, c);
+          if (dir === 'nx') solid.box(x, x + k, t, t + 0.09, z, z + 1, rim, role, c);
+          if (dir === 'pz') solid.box(x, x + 1, t, t + 0.09, z + 1 - k, z + 1, rim, role, c);
+          if (dir === 'nz') solid.box(x, x + 1, t, t + 0.09, z, z + k, rim, role, c);
         }
       }
 
@@ -238,6 +333,40 @@ export const buildChunk = (world: WorldSnapshot, deck: Int16Array, chunkX: numbe
     }
   }
   return { solid: solid.build(), windows: windows.build() };
+};
+
+/** Sloped road surface with side walls, plus low parapets so the climb reads as a bridge approach. */
+const drawRamp = (b: Builder, r: Ramp, x: number, z: number, base: number, road: Rgb, c: number, open: { lo: boolean; hi: boolean }): void => {
+  const hAt = (fx: number, fz: number) => rampHeight(r, fx, fz);
+  const x1 = x + 1;
+  const z1 = z + 1;
+  b.quad([[x, hAt(0, 0), z], [x, hAt(0, 1), z1], [x1, hAt(1, 1), z1], [x1, hAt(1, 0), z]], road, ROLE_STATIC, c);
+  const wall = rgb(0x8a7663);
+  const rail = rgb(0xd0c8bc);
+  const p = 0.12;
+  if (r.dx !== 0) {
+    if (open.hi) {
+      b.quad([[x, base, z1], [x1, base, z1], [x1, hAt(1, 1), z1], [x, hAt(0, 1), z1]], wall, ROLE_STATIC, c);
+      b.quad([[x, hAt(0, 1), z1], [x1, hAt(1, 1), z1], [x1, hAt(1, 1) + p, z1], [x, hAt(0, 1) + p, z1]], rail, ROLE_STATIC, c);
+      b.quad([[x1, hAt(1, 1), z1 - 0.01], [x, hAt(0, 1), z1 - 0.01], [x, hAt(0, 1) + p, z1 - 0.01], [x1, hAt(1, 1) + p, z1 - 0.01]], rail, ROLE_STATIC, c);
+    }
+    if (open.lo) {
+      b.quad([[x1, base, z], [x, base, z], [x, hAt(0, 0), z], [x1, hAt(1, 0), z]], wall, ROLE_STATIC, c);
+      b.quad([[x1, hAt(1, 0), z], [x, hAt(0, 0), z], [x, hAt(0, 0) + p, z], [x1, hAt(1, 0) + p, z]], rail, ROLE_STATIC, c);
+      b.quad([[x, hAt(0, 0), z + 0.01], [x1, hAt(1, 0), z + 0.01], [x1, hAt(1, 0) + p, z + 0.01], [x, hAt(0, 0) + p, z + 0.01]], rail, ROLE_STATIC, c);
+    }
+  } else {
+    if (open.hi) {
+      b.quad([[x1, base, z1], [x1, base, z], [x1, hAt(1, 0), z], [x1, hAt(1, 1), z1]], wall, ROLE_STATIC, c);
+      b.quad([[x1, hAt(1, 1), z1], [x1, hAt(1, 0), z], [x1, hAt(1, 0) + p, z], [x1, hAt(1, 1) + p, z1]], rail, ROLE_STATIC, c);
+      b.quad([[x1 - 0.01, hAt(1, 0), z], [x1 - 0.01, hAt(1, 1), z1], [x1 - 0.01, hAt(1, 1) + p, z1], [x1 - 0.01, hAt(1, 0) + p, z]], rail, ROLE_STATIC, c);
+    }
+    if (open.lo) {
+      b.quad([[x, base, z], [x, base, z1], [x, hAt(0, 1), z1], [x, hAt(0, 0), z]], wall, ROLE_STATIC, c);
+      b.quad([[x, hAt(0, 0), z], [x, hAt(0, 1), z1], [x, hAt(0, 1) + p, z1], [x, hAt(0, 0) + p, z]], rail, ROLE_STATIC, c);
+      b.quad([[x + 0.01, hAt(0, 1), z1], [x + 0.01, hAt(0, 0), z], [x + 0.01, hAt(0, 0) + p, z], [x + 0.01, hAt(0, 1) + p, z1]], rail, ROLE_STATIC, c);
+    }
+  }
 };
 
 const decorate = (b: Builder, world: WorldSnapshot, deck: Int16Array, c: number, x: number, z: number, top: number, vary: number): void => {
@@ -296,11 +425,32 @@ const decorate = (b: Builder, world: WorldSnapshot, deck: Int16Array, c: number,
       b.box(x + 0.2, x + 0.8, ty + 4.6 * Y, ty + 4.8 * Y, z + 0.47, z + 0.53, rgb(0x5b4636), ROLE_STATIC, c);
       break;
     case BlockType.Road: {
+      const ramp = rampAt(world, deck, c);
+      if (ramp) {
+        const twin = (sx: number, sz: number) => {
+          const nx = x + sx;
+          const nz = z + sz;
+          if (nx < 0 || nz < 0 || nx >= w || nz >= h) return false;
+          const o = rampAt(world, deck, nz * w + nx);
+          return !!o && o.dx === ramp.dx && o.dz === ramp.dz;
+        };
+        const open = ramp.dx !== 0 ? { lo: !twin(0, -1), hi: !twin(0, 1) } : { lo: !twin(-1, 0), hi: !twin(1, 0) };
+        drawRamp(b, ramp, x, z, ty, rgb(BLOCK_VISUALS[BlockType.Road].top, vary), c, open);
+        break;
+      }
       const ew = isRoadAt(1, 0) && isRoadAt(-1, 0) && !isRoadAt(0, 1) && !isRoadAt(0, -1);
       const ns = isRoadAt(0, 1) && isRoadAt(0, -1) && !isRoadAt(1, 0) && !isRoadAt(-1, 0);
       const line = rgb(0xd9d2b8);
       if (ew) b.face('py', x + 0.3, x + 0.7, 0, ty + 0.01, z + 0.47, z + 0.53, line, ROLE_STATIC, c);
       if (ns) b.face('py', x + 0.47, x + 0.53, 0, ty + 0.01, z + 0.3, z + 0.7, line, ROLE_STATIC, c);
+      // Raised kerb-side footway where the road meets anything but road; pedestrians keep to it.
+      const kerb = rgb(0xb9bbb2, vary);
+      const k = 0.15;
+      const kh = ty + 0.05;
+      if (!isRoadAt(-1, 0)) b.box(x, x + k, ty, kh, z, z + 1, kerb, ROLE_STATIC, c);
+      if (!isRoadAt(1, 0)) b.box(x + 1 - k, x + 1, ty, kh, z, z + 1, kerb, ROLE_STATIC, c);
+      if (!isRoadAt(0, -1)) b.box(x, x + 1, ty, kh, z, z + k, kerb, ROLE_STATIC, c);
+      if (!isRoadAt(0, 1)) b.box(x, x + 1, ty, kh, z + 1 - k, z + 1, kerb, ROLE_STATIC, c);
       break;
     }
     case BlockType.Drainage:
@@ -312,8 +462,24 @@ const decorate = (b: Builder, world: WorldSnapshot, deck: Int16Array, c: number,
       const d = deck[c] >= 0 ? deck[c] : top + 2;
       const dy = d * Y;
       b.box(x, x + 1, dy - 0.25, dy, z, z + 1, rgb(0x8a7663, vary), ROLE_STATIC, c);
-      if (!isRoadAt(0, -1)) b.box(x, x + 1, dy, dy + 0.18, z, z + 0.06, rgb(0xd0c8bc), ROLE_STATIC, c);
-      if (!isRoadAt(0, 1)) b.box(x, x + 1, dy, dy + 0.18, z + 0.94, z + 1, rgb(0xd0c8bc), ROLE_STATIC, c);
+      const walk = rgb(0xb3ada3, vary);
+      const rail = rgb(0xd0c8bc);
+      if (!isRoadAt(0, -1)) {
+        b.box(x, x + 1, dy, dy + 0.05, z + 0.06, z + 0.2, walk, ROLE_STATIC, c);
+        b.box(x, x + 1, dy, dy + 0.18, z, z + 0.06, rail, ROLE_STATIC, c);
+      }
+      if (!isRoadAt(0, 1)) {
+        b.box(x, x + 1, dy, dy + 0.05, z + 0.8, z + 0.94, walk, ROLE_STATIC, c);
+        b.box(x, x + 1, dy, dy + 0.18, z + 0.94, z + 1, rail, ROLE_STATIC, c);
+      }
+      if (!isRoadAt(-1, 0)) {
+        b.box(x + 0.06, x + 0.2, dy, dy + 0.05, z, z + 1, walk, ROLE_STATIC, c);
+        b.box(x, x + 0.06, dy, dy + 0.18, z, z + 1, rail, ROLE_STATIC, c);
+      }
+      if (!isRoadAt(1, 0)) {
+        b.box(x + 0.8, x + 0.94, dy, dy + 0.05, z, z + 1, walk, ROLE_STATIC, c);
+        b.box(x + 0.94, x + 1, dy, dy + 0.18, z, z + 1, rail, ROLE_STATIC, c);
+      }
       if ((x + z) % 2 === 0) b.box(x + 0.4, x + 0.6, 0, dy - 0.25, z + 0.4, z + 0.6, rgb(0x6f6458), ROLE_STATIC, c);
       break;
     }

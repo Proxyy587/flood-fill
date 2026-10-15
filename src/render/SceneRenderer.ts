@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { sameEntity, type EntityRef, type RenderSnapshot, type WorldSnapshot } from '../contracts';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { FXAAPass } from 'three/examples/jsm/postprocessing/FXAAPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { PowerState, sameEntity, type EntityRef, type RenderSnapshot, type WorldSnapshot } from '../contracts';
 import type { SimBridge } from '../bridge/SimBridge';
 import { useSceneStore, type SceneState } from '../bridge/sceneStore';
 import { CameraRig } from './camera/CameraRig';
@@ -13,8 +18,10 @@ import { Markers } from './overlays/Markers';
 import { ReportRings } from './overlays/ReportRings';
 import { RouteOverlay } from './overlays/RouteOverlay';
 import { SignalLayer } from './overlays/SignalLayer';
-import { DAYLIGHT, SKY } from './palette';
-import { columnTop } from './terrain/mesher';
+import { Skyscape, type SkyLight } from './effects/Skyscape';
+import { DAYLIGHT, SKY, ZENITH } from './palette';
+import { columnTop, rampAt, rampHeight, type Ramp } from './terrain/mesher';
+import { SkyIsland } from './terrain/SkyIsland';
 import { TerrainLayer } from './terrain/TerrainLayer';
 import { cellAt, Y_SCALE } from './units';
 import { WaterLayer } from './water/WaterLayer';
@@ -22,6 +29,10 @@ import { EditPreview } from './overlays/EditPreview';
 import { LabelLayer } from './overlays/LabelLayer';
 import { findLandmarks, LandmarkHalos, type Footprint } from './overlays/LandmarkHalos';
 import { LensLayer } from './overlays/LensLayer';
+import { EventBeacons } from './overlays/EventBeacons';
+import { InteriorView } from './overlays/InteriorView';
+import { RoadStatus } from './overlays/RoadStatus';
+import { useSimFeedStore } from '../bridge/simFeedStore';
 import { useEditorStore } from '../ui/store/editorStore';
 import { commitGesture, previewGesture } from '../editor/gestures';
 import { BLOCK_VISUALS } from './palette';
@@ -36,9 +47,10 @@ export class SceneRenderer {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private rig: CameraRig;
-  private sun = new THREE.DirectionalLight(0xfff4e0, 1.7);
-  private hemi = new THREE.HemisphereLight(0xcfe6ff, 0x5a4a3a, 1.15);
+  private sun = new THREE.DirectionalLight(0xffe8d0, 0.95);
+  private hemi = new THREE.HemisphereLight(0xe4eef8, 0x8a7a68, 1.05);
   private moon = new THREE.DirectionalLight(DAYLIGHT.moon, 0);
+  private fill = new THREE.AmbientLight(0xc8d4e0, 0.18);
   private police = new PoliceStations();
   private streetLights = new StreetLights();
   private centre = new THREE.Vector3();
@@ -58,6 +70,27 @@ export class SceneRenderer {
   private lens = new LensLayer();
   private halos = new LandmarkHalos();
   private labels: LabelLayer;
+  private beacons: EventBeacons;
+  private roads = new RoadStatus();
+  private interior = new InteriorView();
+  private island = new SkyIsland();
+  private skyscape = new Skyscape();
+  private skyLight: SkyLight = {
+    day: 1,
+    storm: 0,
+    horizon: new THREE.Color(),
+    zenith: new THREE.Color(),
+    sun: new THREE.Vector3(0, 1, 0),
+    sunColor: new THREE.Color(0xffe0b8),
+  };
+  /** Share of building cells with power, for the city's glow on the clouds at night. */
+  private litShare = 1;
+  private composer: EffectComposer;
+  private bloom: UnrealBloomPass;
+  private fxaa: FXAAPass;
+  private hoverKey = '';
+  private night = 0;
+  private ramps = new Map<number, Ramp>();
   private landmarks: Footprint[] = [];
   private published = { heading: 0, tilt: 0 };
   private editPath: number[] = [];
@@ -85,9 +118,9 @@ export class SceneRenderer {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 0.92;
     this.renderer.domElement.style.display = 'block';
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
@@ -97,16 +130,30 @@ export class SceneRenderer {
     this.rig = new CameraRig(this.renderer.domElement, (x, z) => this.groundY(x, z), (x, z) => this.obstacleY(x, z));
     this.labels = new LabelLayer((id) => this.store.getState().focus({ kind: 'building', id }));
     container.appendChild(this.labels.root);
-    for (const m of this.terrain.materials) this.lens.patch(m);
+    this.beacons = new EventBeacons((cell) => this.store.getState().focus({ kind: 'cell', id: cell }));
+    container.appendChild(this.beacons.root);
+    this.beacons.root.appendChild(this.interior.chip);
+    for (const m of this.terrain.materials) this.lens.patch(m, 1, true);
     this.lens.patch(this.water.material, 0.55);
+    // Solid sky colour + dome gradient; both track day/night so the void is never a flat grey.
     this.scene.background = this.sky;
     this.scene.fog = new THREE.Fog(SKY.clear, 120, 320);
+    // Multisampled targets come back empty on some WebGL stacks, so anti-aliasing is FXAA on low-DPI screens instead.
+    this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType }));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.55, 1.6);
+    this.fxaa = new FXAAPass();
+    this.composer.addPass(new RenderPass(this.scene, this.rig.camera));
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
+    this.composer.addPass(this.fxaa);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
-    this.sun.shadow.bias = -0.0006;
-    this.sun.shadow.normalBias = 0.02;
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.035;
+    this.sun.shadow.radius = 3.5;
     this.scene.add(
       this.hemi,
+      this.fill,
       this.sun,
       this.sun.target,
       this.moon,
@@ -122,6 +169,11 @@ export class SceneRenderer {
       this.markers.group,
       this.rain.lines,
       this.editPreview.group,
+      this.roads.group,
+      this.beacons.group,
+      this.interior.group,
+      this.skyscape.group,
+      this.island.group,
     );
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -151,6 +203,14 @@ export class SceneRenderer {
     this.police.dispose();
     this.streetLights.dispose();
     this.labels.dispose();
+    this.beacons.dispose();
+    this.roads.dispose();
+    this.interior.dispose();
+    this.island.dispose();
+    this.skyscape.dispose();
+    this.bloom.dispose();
+    this.fxaa.dispose();
+    this.composer.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
@@ -175,6 +235,7 @@ export class SceneRenderer {
         if (s.view !== prev.view && this.snapshot) this.applyWater(this.snapshot);
         if (s.inspector !== prev.inspector || s.overlays.routes !== prev.overlays.routes || !sameEntity(s.selected, prev.selected)) this.applyRoute(s);
         if (!sameEntity(s.selected, prev.selected)) this.selectionBox = this.boxFor(s.selected);
+        if (s.inspector !== prev.inspector || !sameEntity(s.selected, prev.selected)) this.applyInterior(s);
         if (s.highlightCells !== prev.highlightCells) this.applyHighlights(s.highlightCells);
         if (s.overlays !== prev.overlays) this.applyOverlays(s);
       }),
@@ -188,6 +249,12 @@ export class SceneRenderer {
       this.editPreview.set(s.mode==='edit'?s.preview:[],s.previewValid,this.world,height);
     };
     this.offs.push(useEditorStore.subscribe(applyEditor));applyEditor();
+    this.offs.push(
+      useSimFeedStore.subscribe((s, prev) => {
+        if (s.events.length < prev.events.length) this.beacons.reset();
+        else if (s.events.length > prev.events.length) this.beacons.add(s.events.slice(prev.events.length), this.snapshot?.tick ?? 0, performance.now());
+      }),
+    );
   }
 
   private setWorld(w: WorldSnapshot): void {
@@ -197,6 +264,16 @@ export class SceneRenderer {
     this.terrain.setWorld(w);
     this.police.setWorld(w);
     this.streetLights.setWorld(w, this.terrain.deckHeights);
+    this.roads.setWorld(w, this.terrain.deckHeights);
+    this.beacons.setWorld(w);
+    this.island.setWorld(w);
+    this.skyscape.setIsland(w.w / 2, w.h / 2, this.island.radius);
+    this.hoverKey = '';
+    this.ramps.clear();
+    for (let c = 0; c < w.w * w.h; c++) {
+      const r = rampAt(w, this.terrain.deckHeights, c);
+      if (r) this.ramps.set(c, r);
+    }
     this.water.setWorld(w);
     this.signals.setWorld(w);
     this.lens.setWorld(w);
@@ -218,7 +295,10 @@ export class SceneRenderer {
   }
 
   private setSnapshot(s: RenderSnapshot): void {
-    if (this.snapshot && (s.tick < this.snapshot.tick || s.tick === 0)) this.entities.reset();
+    if (this.snapshot && (s.tick < this.snapshot.tick || s.tick === 0)) {
+      this.entities.reset();
+      this.beacons.reset();
+    }
     this.snapshot = s;
     this.snapshotAt = performance.now();
     if (!this.world) return;
@@ -227,10 +307,31 @@ export class SceneRenderer {
     this.signals.setPower(s.powered);
     this.streetLights.setPower(s.powered);
     this.rings.setReports(s.reports);
+    this.litShare = this.poweredShare(s.powered);
     this.applyWater(s);
+    this.roads.setSnapshot(s, (c) => this.water.surfaceAt(c));
     this.lens.setSnapshot(s);
     this.labels.setSnapshot(s, this.world);
   }
+
+  private poweredShare(powered: Uint8Array): number {
+    const w = this.world;
+    if (!w || powered.length !== w.buildingIndex.length) return 1;
+    let all = 0;
+    let lit = 0;
+    for (let c = 0; c < powered.length; c++) {
+      if (!w.buildingIndex[c]) continue;
+      all++;
+      if (powered[c] !== PowerState.Off) lit++;
+    }
+    return all ? lit / all : 1;
+  }
+
+  /** Glass cutaway for a selected relief camp or hospital. */
+  private applyInterior(s: SceneState): void {
+    const sel = s.selected;
+    this.interior.set(this.world, sel?.kind === 'building' ? sel.id : null, s.inspector);
+    this.lens.setXray(this.interior.box);  }
 
   private applyLabels(s: SceneState): void {
     if (this.world) this.labels.setLabels(s.labels, this.world, this.landmarks);
@@ -239,6 +340,7 @@ export class SceneRenderer {
   private applyWater(s: RenderSnapshot): void {
     const belief = this.store.getState().view === 'belief' && !!s.hqBelief;
     this.water.setWater(belief && s.hqBelief ? s.hqBelief.water : s.water, belief);
+    this.island.setWater((c) => this.water.surfaceAt(c));
   }
 
   private applyOverlays(s: SceneState): void {
@@ -314,9 +416,10 @@ export class SceneRenderer {
     const cx = w.w / 2;
     const cz = w.h / 2;
     const r = Math.hypot(w.w, w.h) / 2 + 4;
-    this.centre.set(cx, 0, cz);
+    this.centre.set(cx, 8, cz);
     this.sunRadius = r;
     this.sun.target.position.set(cx, 0, cz);
+    this.rain.setCity(w.w, w.h);
     this.moon.target.position.set(cx, 0, cz);
     this.moon.position.set(cx + r * 0.4, r * 1.6, cz - r * 0.5);
     const cam = this.sun.shadow.camera;
@@ -327,9 +430,10 @@ export class SceneRenderer {
     cam.near = 1;
     cam.far = r * 4;
     cam.updateProjectionMatrix();
+    // Soft atmospheric haze — lifts the void into the sky without washing the city.
     const fog = this.scene.fog as THREE.Fog;
-    fog.near = r * 2.2;
-    fog.far = r * 6;
+    fog.near = r * 1.8;
+    fog.far = r * 5.2;
   }
 
   /** Sun, sky, moon and night lighting from the simulated clock (render-only). */
@@ -343,24 +447,49 @@ export class SceneRenderer {
     const light = daylightAt(st.startSeconds + this.simTickAt(st, now));
     const day = light.day;
     const night = 1 - day;
+    this.night = Math.max(night, storm * 0.55);
     const r = this.sunRadius;
-    this.sun.position.set(this.centre.x + light.sun.x * r * 1.6, Math.max(0.15, light.sun.y) * r * 1.6, this.centre.z + light.sun.z * r * 1.6);
-    this.sun.color.setHex(DAYLIGHT.sun).lerp(this.c1.setHex(DAYLIGHT.sunLow), light.golden);
-    this.sun.intensity = (1.7 - storm * 0.9) * day;
-    this.sun.castShadow = st.overlays.shadows && day > 0.15;
-    this.moon.intensity = 0.55 * night * (1 - storm * 0.5);
+    // Morning: crisp cool key. Afternoon: warmer and a little softer. Night: blue moonlight.
+    this.sun.position.set(this.centre.x + light.sun.x * r * 1.6, Math.max(0.2, light.sun.y) * r * 1.6, this.centre.z + light.sun.z * r * 1.6);
+    this.sun.color.setHex(DAYLIGHT.sun).lerp(this.c1.setHex(DAYLIGHT.sunLow), Math.max(light.golden, light.afternoon * 0.45));
+    this.sun.intensity = Math.max(0, (1.42 + 0.12 * light.morning - 0.38 * light.afternoon - storm * 0.55) * day);
+    this.sun.castShadow = st.overlays.shadows && day > 0.12;
+    this.moon.color.setHex(DAYLIGHT.moon);
+    this.moon.intensity = (0.55 + 0.2 * light.midnight) * night * (1 - storm * 0.35);
     this.hemi.color.setHex(DAYLIGHT.hemiSkyNight).lerp(this.c1.setHex(DAYLIGHT.hemiSkyDay), day);
     this.hemi.groundColor.setHex(DAYLIGHT.hemiGroundNight).lerp(this.c1.setHex(DAYLIGHT.hemiGroundDay), day);
-    this.hemi.intensity = 0.7 + (0.45 - storm * 0.35) * day;
-    // Sky: night → day, warmed near the horizon, greyed by the storm.
-    this.c1.setHex(SKY.clear).lerp(this.c2.setHex(SKY.golden), light.golden * 0.7).lerp(this.stormSky, storm);
-    this.c2.setHex(SKY.night).lerp(this.sky.setHex(SKY.nightStorm), storm);
+    this.hemi.intensity = 0.62 + 0.38 * day - storm * 0.12 * day;
+    this.fill.color.setHex(0xd4e8f8).lerp(this.c1.setHex(0x6a88c8), night);
+    this.fill.intensity = 0.1 * day + 0.22 * night;
+    // Clear morning blue → warm afternoon haze → golden → deep navy night.
+    this.c1.setHex(SKY.morning).lerp(this.c2.setHex(SKY.afternoon), light.afternoon).lerp(this.sky.setHex(SKY.golden), light.golden * 0.75).lerp(this.stormSky, storm * 0.8);
+    this.c2.setHex(SKY.night).lerp(this.sky.setHex(SKY.midnight), light.midnight * 0.55).lerp(this.sky.setHex(SKY.nightStorm), storm);
     this.sky.copy(this.c2).lerp(this.c1, day);
+    (this.scene.background as THREE.Color).copy(this.sky);
     (this.scene.fog as THREE.Fog).color.copy(this.sky);
-    this.renderer.toneMappingExposure = 0.95 + 0.17 * day;
+    const fog = this.scene.fog as THREE.Fog;
+    fog.near = r * (1.7 + light.morning * 0.7);
+    fog.far = r * (4.4 + light.morning * 1.6 - light.afternoon * 0.4);
+    const sl = this.skyLight;
+    sl.day = day;
+    sl.storm = storm;
+    sl.horizon.copy(this.sky);
+    sl.zenith
+      .setHex(ZENITH.morning)
+      .lerp(this.c1.setHex(ZENITH.afternoon), light.afternoon)
+      .lerp(this.c1.setHex(ZENITH.golden), light.golden * 0.75)
+      .lerp(this.c2.setHex(ZENITH.storm), storm * 0.8);
+    sl.zenith.lerp(this.c1.setHex(ZENITH.night), night);
+    sl.zenith.lerp(this.c1.setHex(ZENITH.midnight), light.midnight * night * 0.65);
+    sl.sun.set(light.sun.x, light.sun.y, light.sun.z).normalize();
+    sl.sunColor!.copy(this.sun.color);
+    this.renderer.toneMappingExposure = 0.88 + 0.2 * day + 0.06 * light.morning - 0.1 * light.afternoon;
+    this.bloom.threshold = 0.72 + 1.15 * day;
+    this.bloom.strength = 0.05 + 0.42 * this.night;
+    this.bloom.radius = 0.42;
     this.terrain.setNight(night, this.c1.setHex(DAYLIGHT.windowsNight));
     this.streetLights.update(night);
-    this.entities.setNight(Math.max(night, storm * 0.7));
+    this.entities.setNight(Math.max(night, storm * 0.55));
     this.police.setLighting(night, this.snapshot?.powered ?? null);
   }
 
@@ -369,6 +498,7 @@ export class SceneRenderer {
     this.hemi.intensity += flash * 2.2;
     this.hemi.color.lerp(this.c1.setHex(0xe8eeff), flash);
     this.sky.lerp(this.c1.setHex(0xd6defa), flash * 0.75);
+    (this.scene.background as THREE.Color).copy(this.sky);
     (this.scene.fog as THREE.Fog).color.copy(this.sky);
     this.renderer.toneMappingExposure += flash * 0.35;
   }
@@ -381,7 +511,10 @@ export class SceneRenderer {
     const c = cellAt(w.w, w.h, x, z);
     if (c < 0) return 0;
     const deck = this.terrain.deckHeights[c];
-    return (deck >= 0 ? deck : w.ground[c]) * Y_SCALE;
+    if (deck >= 0) return deck * Y_SCALE;
+    const ramp = this.ramps.get(c);
+    if (ramp) return rampHeight(ramp, x - Math.floor(x), z - Math.floor(z));
+    return w.ground[c] * Y_SCALE;
   };
 
   private waterY = (x: number, z: number): number => {
@@ -427,7 +560,8 @@ export class SceneRenderer {
       this.pointer.inside = false;
       this.store.getState().setHover(null, null);
       this.store.setState({ hoverInfo: null });
-      this.markers.setHover(0, 0, 0, 0, false);
+      this.markers.setHover(null);
+      this.hoverKey = '';
       if(!this.editPath.length)useEditorStore.setState({preview:[]});
     };
     const onDown = (e: PointerEvent) => {
@@ -535,12 +669,12 @@ export class SceneRenderer {
             }
           : null,
     });
-    if (hit.cell >= 0 && !(hit.entity && hit.entity.kind !== 'building')) {
-      const x = hit.cell % w.w;
-      const z = Math.floor(hit.cell / w.w);
-      this.markers.setHover(x, z, w.ground[hit.cell] * Y_SCALE, columnTop(w, hit.cell) * Y_SCALE, true);
-    } else {
-      this.markers.setHover(0, 0, 0, 0, false);
+    // Buildings highlight as a whole; open ground highlights the one cell column.
+    const ref: EntityRef | null = hit.entity?.kind === 'building' ? hit.entity : hit.cell >= 0 && !hit.entity ? { kind: 'cell', id: hit.cell } : null;
+    const key = ref ? `${ref.kind}:${ref.id}` : '';
+    if (key !== this.hoverKey) {
+      this.hoverKey = key;
+      this.markers.setHover(this.boxFor(ref));
     }
     this.renderer.domElement.style.cursor = hit.entity ? 'pointer' : 'default';
   }
@@ -560,6 +694,9 @@ export class SceneRenderer {
     const width = this.container.clientWidth || 1;
     const height = this.container.clientHeight || 1;
     this.renderer.setSize(width, height, false);
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer.setSize(width, height);
+    this.fxaa.enabled = this.renderer.getPixelRatio() < 1.5;
     this.rig.resize(width, height);
   }
 
@@ -587,12 +724,20 @@ export class SceneRenderer {
     this.route.update(selPoint, this.surfaceY, now);
 
     const weather = this.snapshot?.weather ?? { rain: 0, wind: 0 };
-    this.rain.update(dt, this.rig.target, weather.rain, weather.wind, st.overlays.rain);
+    // Anchor rain on the city, not the orbit target — otherwise it sticks to the screen centre.
+    this.rain.update(dt, this.centre, weather.rain, weather.wind, st.overlays.rain);
     this.applyDaylight(st, now, Math.min(1, weather.rain * 0.9));
     this.applyLightning(st.playing ? lightningFlash(now, weather.rain) : 0);
 
-    this.renderer.render(this.scene, this.rig.camera);
+    this.roads.update(now, this.night);
+    this.skyLight.horizon.copy(this.sky);
+    this.skyscape.update(now, this.skyLight, this.night * this.litShare * 0.22, 0);
+    this.island.update(now, this.skyLight.day, this.night);
+
+    this.composer.render(dt);
     const el = this.renderer.domElement;
+    this.beacons.update(now, this.rig.camera, el.clientWidth, el.clientHeight, this.surfaceY);
+    this.interior.update(this.rig.camera, el.clientWidth, el.clientHeight, this.night);
     this.labels.update(this.rig.camera, el.clientWidth, el.clientHeight, this.rig.camera.position.distanceTo(this.rig.target));
 
     this.fpsFrames++;

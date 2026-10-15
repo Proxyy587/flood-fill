@@ -1,6 +1,6 @@
 import { BlockType } from '../blocks';
 import { asBuildingId } from '../ids';
-import type { BuildingDef, PowerNode, Scenario } from '../scenario';
+import type { BuildingDef, Hotspot, PowerNode, Scenario } from '../scenario';
 import { createMockRng } from './rng';
 
 // A synthetic test city, 96 × 96 cells (384 m × 384 m). The layout follows
@@ -82,13 +82,15 @@ interface Landmark {
 export const MOCK_LANDMARKS: readonly Landmark[] = [
   { name: 'St. Avery General Hospital', type: BlockType.Hospital, x: 20, z: 28, w: 3, d: 3, capacity: 60, generator: 2400 },
   { name: 'Eastbank Medical Centre', type: BlockType.Hospital, x: 54, z: 39, w: 3, d: 3, capacity: 45, generator: 900 },
+  { name: 'Riverside Clinic', type: BlockType.Hospital, x: 57, z: 64, w: 2, d: 2, capacity: 3, generator: 420 },
   { name: 'Eastbank Helipad', type: BlockType.Helipad, x: 57, z: 39, w: 2, d: 2, capacity: 2, helipad: true },
-  { name: 'Westridge Community Hall', type: BlockType.Shelter, x: 10, z: 9, w: 3, d: 3, capacity: 180 },
-  { name: 'Hilltop School', type: BlockType.Shelter, x: 84, z: 11, w: 3, d: 3, capacity: 220 },
-  { name: 'Old Town Gym', type: BlockType.Shelter, x: 69, z: 64, w: 3, d: 3, capacity: 120 },
+  { name: 'Westridge Helipad', type: BlockType.Helipad, x: 24, z: 28, w: 2, d: 2, capacity: 2, helipad: true },
+  { name: 'NDRF Relief Camp · Westridge Hall', type: BlockType.Shelter, x: 10, z: 9, w: 3, d: 3, capacity: 180 },
+  { name: 'Hilltop School Relief Camp', type: BlockType.Shelter, x: 84, z: 11, w: 3, d: 3, capacity: 220 },
+  { name: 'Old Town Gym Shelter', type: BlockType.Shelter, x: 69, z: 64, w: 3, d: 3, capacity: 60 },
   { name: 'Central Police Station', type: BlockType.PoliceStation, x: 63, z: 32, w: 2, d: 2, capacity: 16 },
-  { name: 'Flood Response HQ', type: BlockType.FloodHQ, x: 21, z: 47, w: 3, d: 2, capacity: 10 },
-  { name: 'River Boat Depot', type: BlockType.BoatDepot, x: 49, z: 41, w: 2, d: 2, capacity: 8 },
+  { name: 'NDRF Flood Response HQ', type: BlockType.FloodHQ, x: 21, z: 47, w: 3, d: 2, capacity: 10 },
+  { name: 'SDRF Boat Depot', type: BlockType.BoatDepot, x: 49, z: 41, w: 2, d: 2, capacity: 8 },
   { name: 'Fire Station 3', type: BlockType.FireStation, x: 62, z: 72, w: 2, d: 2, capacity: 10 },
   { name: 'Southport Power Station', type: BlockType.PowerPlant, x: 64, z: 89, w: 3, d: 3, capacity: 0 },
   { name: 'Westridge Substation', type: BlockType.Substation, x: 11, z: 40, w: 2, d: 2, capacity: 0 },
@@ -152,6 +154,75 @@ const noise = (x: number, z: number, scale: number, seed: number): number => {
   const a = h(ix, iz) + (h(ix + 1, iz) - h(ix, iz)) * tx;
   const b = h(ix, iz + 1) + (h(ix + 1, iz + 1) - h(ix, iz + 1)) * tx;
   return a + (b - a) * tz;
+};
+
+/**
+ * Named flood-prone spots, the way a city's waterlogging list reads: the
+ * underpasses, the old market basin, a hollow estate, the low suburb behind
+ * the levee and the riverside ghat road; one hill-road cut that slides and
+ * one weak levee section.
+ */
+const mockHotspots = (
+  blocks: number[],
+  ground: number[],
+  westEdge: (z: number) => number,
+  eastEdge: (z: number) => number,
+): Hotspot[] => {
+  const idx = (x: number, z: number) => z * W + x;
+  const isRoad = (c: number) => blocks[c] === BlockType.Road;
+  const roadsWithin = (cx: number, cz: number, r: number) => {
+    const out: number[] = [];
+    for (let z = Math.max(0, cz - r); z <= Math.min(H - 1, cz + r); z++) {
+      for (let x = Math.max(0, cx - r); x <= Math.min(W - 1, cx + r); x++) {
+        if (Math.hypot(x - cx, z - cz) <= r && isRoad(idx(x, z))) out.push(idx(x, z));
+      }
+    }
+    return out;
+  };
+  const underpass = (xs: number[]) => {
+    const out: number[] = [];
+    for (const x of xs) for (let z = EMBANKMENT_Z[0] - 3; z <= EMBANKMENT_Z[1] + 3; z++) if (isRoad(idx(x, z))) out.push(idx(x, z));
+    return out;
+  };
+  const ghat: number[] = [];
+  for (let z = 26; z <= 42; z++) if (isRoad(idx(eastEdge(z), z))) ghat.push(idx(eastEdge(z), z));
+
+  // The steepest road cell in the western hills, plus the road either side of it.
+  let cut = -1;
+  let steep = 0;
+  for (let z = 2; z < 40; z++) {
+    for (let x = 1; x < Math.min(30, westEdge(z)); x++) {
+      const c = idx(x, z);
+      if (!isRoad(c)) continue;
+      let s = 0;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nb = idx(x + dx, z + dz);
+        if (!isRoad(nb)) s = Math.max(s, ground[nb] - ground[c]);
+      }
+      if (s > steep) {
+        steep = s;
+        cut = c;
+      }
+    }
+  }
+  const slide = cut < 0 ? [] : [cut, ...[1, -1, W, -W].map((d) => cut + d).filter((c) => c >= 0 && c < W * H && isRoad(c))];
+
+  const levee: number[] = [];
+  for (let z = 60; z <= 64; z++) {
+    for (let x = 0; x < W; x++) if (blocks[idx(x, z)] === BlockType.Levee) levee.push(idx(x, z));
+  }
+
+  const spots: Hotspot[] = [
+    { name: 'Railgate Underpass', kind: 'waterlogging', cells: underpass([UNDERPASS_X[0], UNDERPASS_X[1]]) },
+    { name: 'Heights Underpass', kind: 'waterlogging', cells: underpass([UNDERPASS_X[2]]) },
+    { name: 'Old Market Basin', kind: 'waterlogging', cells: roadsWithin(64, 70, 7) },
+    { name: 'Heights Hollow', kind: 'waterlogging', cells: roadsWithin(86, 28, 5) },
+    { name: 'Millbrook Lowlands', kind: 'waterlogging', cells: roadsWithin(16, 72, 6) },
+    { name: 'Ghat Road', kind: 'waterlogging', cells: ghat },
+    { name: 'Westridge Hill Cut', kind: 'landslide', cells: slide },
+    { name: 'Millbrook Levee (weak section)', kind: 'levee', cells: levee },
+  ];
+  return spots.filter((s) => s.cells.length > 0);
 };
 
 /** Procedural river city (96 × 96). Deterministic for a given seed. */
@@ -236,14 +307,10 @@ export const mockScenario = (seed = 7): Scenario => {
     }
   }
 
-  // Avenue Bridge spans the whole floodplain (high deck). Mill Bridge spans only
-  // the channel, so its approaches cross the floodplain at park level (low deck).
-  for (const z of AVENUE_Z) {
+  // Both bridges span the whole floodplain bank to bank, so their decks sit
+  // above the design flood and never dip into the water mid-span.
+  for (const z of [...AVENUE_Z, MILL_Z]) {
     for (let x = westEdge(z) + 1; x < eastEdge(z); x++) blocks[idx(x, z)] = BlockType.Bridge;
-  }
-  for (let x = westEdge(MILL_Z) + 1; x < eastEdge(MILL_Z); x++) {
-    const c = idx(x, MILL_Z);
-    blocks[c] = kind[c] === 'channel' ? BlockType.Bridge : BlockType.Road;
   }
 
   // Millbrook levee on the floodplain edge.
@@ -468,6 +535,8 @@ export const mockScenario = (seed = 7): Scenario => {
   const districtCells: number[][] = MOCK_DISTRICTS.map(() => []);
   for (let c = 0; c < n; c++) districtCells[districtOf(c % W, Math.floor(c / W))].push(c);
 
+  const millBridge = idx(Math.round(riverCentre(MILL_Z + 0.5)), MILL_Z);
+
   return {
     schemaVersion: 1,
     name: 'riverside-test-city',
@@ -476,40 +545,49 @@ export const mockScenario = (seed = 7): Scenario => {
     blocks,
     buildings,
     districts: MOCK_DISTRICTS.map((name, id) => ({ id, name, cells: districtCells[id] })),
-    population: { count: 560, mix: { carOwners: 0.4, limitedMobility: 0.1, needsAssist: 0.05 }, schedule: 'office-hours' },
+    hotspots: mockHotspots(blocks, ground, westEdge, eastEdge),
+    population: { count: 620, mix: { carOwners: 0.4, limitedMobility: 0.1, needsAssist: 0.05 }, schedule: 'office-hours' },
     fleet: {
-      ambulances: 5,
-      policeCars: 5,
-      boats: 4,
+      ambulances: 6,
+      policeCars: 8,
+      boats: 2,
       helicopters: 2,
       doctors: 14,
       nurses: 28,
       policeOfficers: 16,
-      boatOperators: 8,
+      boatOperators: 4,
     },
+    // Showcase storm, paced for a one-hour run that starts at 17:15: alert and
+    // waterlogging first, the river and the night arrive together, and the
+    // worst of it (blackout, breach, landslide) lands after dark.
     weather: {
       rain: [
-        { t: 0, intensity: 0 },
-        { t: 240, intensity: 0 },
-        { t: 600, intensity: 0.6 },
-        { t: 900, intensity: 1 },
-        { t: 1800, intensity: 1 },
-        { t: 2400, intensity: 0.3 },
-        { t: 3000, intensity: 0 },
+        { t: 0, intensity: 0.05 },
+        { t: 120, intensity: 0.3 },
+        { t: 420, intensity: 0.75 },
+        { t: 700, intensity: 1 },
+        { t: 2500, intensity: 1 },
+        { t: 3100, intensity: 0.45 },
+        { t: 3600, intensity: 0.2 },
       ],
       wind: [
-        { t: 0, speed: 0.1 },
-        { t: 900, speed: 0.4 },
-        { t: 1300, speed: 0.85 },
-        { t: 1600, speed: 0.85 },
-        { t: 1900, speed: 0.4 },
-        { t: 3000, speed: 0.1 },
+        { t: 0, speed: 0.15 },
+        { t: 800, speed: 0.45 },
+        { t: 1150, speed: 0.85 },
+        { t: 1450, speed: 0.85 },
+        { t: 1750, speed: 0.45 },
+        { t: 3600, speed: 0.3 },
       ],
       floodKind: 'compound',
-      sources: [{ cell: idx(Math.round(riverCentre(0.5)), 0), startT: 600, endT: 2400, rate: 0.5 }],
+      sources: [{ cell: idx(Math.round(riverCentre(0.5)), 0), startT: 480, endT: 3200, rate: 0.6 }],
       warningDelay: 120,
     },
-    injected: [],
+    injected: [
+      { t: 950, kind: 'comms_outage', durationTicks: 150 },
+      { t: 1650, kind: 'bridge_closed', cell: millBridge },
+      { t: 1900, kind: 'boat_failure' },
+      { t: 2300, kind: 'false_report' },
+    ],
     powerGrid: { nodes, edges },
     defaults: { dispatchMode: 'negotiation', seed },
   };

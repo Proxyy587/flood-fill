@@ -17,12 +17,30 @@ export interface Scenario {
   bridges?: { cell: number; deckHeight: number }[];
   /** For fairness metrics. */
   districts: { id: number; name: string; cells: number[] }[];
+  /**
+   * Named flood-prone spots (synthetic, or digitised from observed
+   * waterlogging). Engines that do not model them ignore them.
+   */
+  hotspots?: Hotspot[];
   population: PopulationDef;
   fleet: FleetDef;
   weather: WeatherDef;
   injected: InjectedEvent[];
   powerGrid: { nodes: PowerNode[]; edges: [number, number][] };
   defaults: { dispatchMode: DispatchMode; seed: number };
+}
+
+/**
+ * 'waterlogging': low streets that pond in heavy rain. 'landslide': a hill
+ * road cut that can slide once the slope is saturated. 'levee': a weak
+ * levee section that can breach when the river stays high against it.
+ */
+export type HotspotKind = 'waterlogging' | 'landslide' | 'levee';
+
+export interface Hotspot {
+  name: string;
+  kind: HotspotKind;
+  cells: number[];
 }
 
 export interface BuildingDef {

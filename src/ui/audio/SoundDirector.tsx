@@ -18,7 +18,10 @@ const EVENT_CUES: Partial<Record<SimEventType, Cue>> = {
   POWER_RESTORED: 'powerUp',
   ASSIGNED: 'siren',
   HELI_DISPATCH: 'siren',
+  AMBULANCE_DISPATCH: 'siren',
   TEAMS_DEPLOYED: 'horn',
+  LEVEE_BREACH: 'thunder',
+  LANDSLIDE: 'thunder',
 };
 
 /** Drives the sound engine from the run. Mount once; renders nothing. */

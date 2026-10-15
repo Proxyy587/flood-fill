@@ -1,19 +1,18 @@
 'use client';
 
-import { ChevronDown, ChevronUp, Crosshair, Footprints, Minus, Plus, RotateCcw, RotateCw, Scan, Waves, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Crosshair, Footprints, Minus, Plus, Scan, Waves, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSceneStore } from '../bridge/sceneStore';
 import { useSimFeedStore } from '../bridge/simFeedStore';
-import { BlockType, type MetricsFrame, type SimEvent } from '../contracts';
+import { BlockType, type MetricsFrame } from '../contracts';
 import { LANDMARK_COLORS } from '../render/palette';
 import { LANDMARK_CATEGORY } from '../render/overlays/LandmarkHalos';
 import { LENSES } from '../render/lenses';
 import { SoundToggle } from '../ui/audio/SoundDirector';
 import { ScoreBadge } from '../ui/score/ScoreCard';
 import { useEditorStore } from '../ui/store/editorStore';
-import { blockName, clockOf, eventTitle, HEADLINES, useCityStore, type Tone } from './city';
+import { blockName, clockOf, useCityStore } from './city';
 import { LensLegend } from './tools/LensTool';
-import { focusEvent } from './tools/LogTool';
 import styles from './shell.module.css';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -140,28 +139,36 @@ export function Vitals({ onScore }: { onScore?: () => void }) {
   const mode = useEditorStore((s) => s.mode);
   const tick = useSceneStore((s) => s.tick);
   const weather = useSceneStore((s) => s.weather);
+  const scenario = useEditorStore((s) => s.scenario);
   const selected = useSceneStore((s) => s.selected);
-  // Collapsed by default while something is selected, so the inspector has room; a manual toggle sticks per selection.
+  // Compact by default so the map stays the hero; the tiles fold away again while something is selected.
   const selKey = selected ? `${selected.kind}:${selected.id}` : null;
-  const [pref, setPref] = useState<{ open: boolean; key: string | null }>({ open: true, key: null });
-  const open = pref.key === selKey ? pref.open : selKey === null;
+  const [pref, setPref] = useState<{ open: boolean; key: string | null }>({ open: false, key: null });
+  const open = pref.key === selKey ? pref.open : false;
   const setOpen = (next: boolean) => setPref({ open: next, key: selKey });
   const live = mode !== 'edit' && frames.length > 0;
+  const f = frames[frames.length - 1];
+  const summary = live && f
+    ? `${f.stranded} stranded · ${f.unmet} waiting for help`
+    : scenario
+      ? `${scenario.population.count.toLocaleString()} residents · ${scenario.fleet.boats} boats · ${scenario.fleet.helicopters} helicopters`
+      : '';
   return (
-    <section className={`${styles.panel} ${styles.vitals}`} aria-label="City vitals">
-      <div className={styles.vitalsHead}>
-        <h2>{live ? 'City vitals' : 'City at a glance'}</h2>
-        <div className={styles.row}>
+    <section className={`${styles.panel} ${styles.vitals}`} aria-label="City vitals" data-open={open}>
+      <button type="button" className={styles.vitalsHead} onClick={() => setOpen(!open)} aria-label={open ? 'Collapse vitals' : 'Expand vitals'} aria-expanded={open}>
+        <span>
+          <strong>{live ? 'City vitals' : 'City at a glance'}</strong>
+          {!open && <small>{summary}</small>}
+        </span>
+        <span className={styles.row}>
           {live && (
-            <span>
-              {clockOf(tick)} · rain {Math.round(weather.rain * 150)} mm/h
-            </span>
+            <em>
+              {clockOf(tick)} · {Math.round(weather.rain * 150)} mm/h
+            </em>
           )}
-          <button type="button" className={styles.iconButton} onClick={() => setOpen(!open)} aria-label={open ? 'Collapse vitals' : 'Expand vitals'} aria-expanded={open}>
-            {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </button>
-        </div>
-      </div>
+          {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        </span>
+      </button>
       {live && <ScoreBadge onOpen={onScore} />}
       {open && (live ? <LiveVitals frames={frames} /> : <CityFacts />)}
     </section>
@@ -260,15 +267,23 @@ export function Inspector() {
 
 // ---------- compass ----------
 
+const VIEWS = [
+  { id: 'oblique', label: '3D', title: 'Angled city view' },
+  { id: 'top', label: 'Top', title: 'Straight down, like a map' },
+  { id: 'side', label: 'Side', title: 'Low view across the streets' },
+] as const;
+
 export function Compass() {
   const heading = useSceneStore((s) => s.heading);
   const tilt = useSceneStore((s) => s.tilt);
   const cmd = useSceneStore((s) => s.cameraCommand);
   const overview = useSceneStore((s) => s.overview);
   const preset = tilt < 0.25 ? 'top' : tilt > 1.15 ? 'side' : 'oblique';
+  const view = VIEWS.findIndex((v) => v.id === preset);
+  const next = VIEWS[(view + 1) % VIEWS.length];
   return (
     <nav className={`${styles.panel} ${styles.compass}`} aria-label="Camera">
-      <button type="button" className={styles.dial} onClick={() => cmd({ kind: 'north' })} title="Face north" aria-label="Face north">
+      <button type="button" className={styles.dial} onClick={() => cmd({ kind: 'north' })} title="Face north (rotate with Q / E or right-drag)" aria-label="Face north">
         <svg viewBox="0 0 44 44" style={{ transform: `rotate(${(heading * 180) / Math.PI}deg)` }} aria-hidden>
           <path d="M22 6 L27 22 L22 20 L17 22 Z" fill="#d93a2b" />
           <path d="M22 38 L27 22 L22 24 L17 22 Z" fill="#c4ccd0" />
@@ -277,26 +292,9 @@ export function Compass() {
           </text>
         </svg>
       </button>
-      <div className={styles.row} style={{ gap: 0 }}>
-        <button type="button" className={styles.iconButton} style={{ width: 24 }} title="Rotate left (Q)" aria-label="Rotate left" onClick={() => cmd({ kind: 'rotate', by: -Math.PI / 4 })}>
-          <RotateCcw size={14} />
-        </button>
-        <button type="button" className={styles.iconButton} style={{ width: 24 }} title="Rotate right (E)" aria-label="Rotate right" onClick={() => cmd({ kind: 'rotate', by: Math.PI / 4 })}>
-          <RotateCw size={14} />
-        </button>
-      </div>
-      <span className={styles.compassSep} />
-      {(
-        [
-          ['top', 'Top', 'Straight down, like a map'],
-          ['oblique', '3D', 'Angled city view'],
-          ['side', 'Side', 'Low view across the streets'],
-        ] as const
-      ).map(([id, label, title]) => (
-        <button key={id} type="button" className={styles.iconButton} style={{ fontSize: 11.5, fontWeight: 650 }} aria-pressed={preset === id} title={title} onClick={() => cmd({ kind: 'tilt', preset: id })}>
-          {label}
-        </button>
-      ))}
+      <button type="button" className={styles.viewButton} title={`${VIEWS[view]?.title ?? ''}. Click for ${next.label.toLowerCase()} view.`} aria-label={`Camera angle: ${VIEWS[view]?.label}. Switch to ${next.label}`} onClick={() => cmd({ kind: 'tilt', preset: next.id })}>
+        {VIEWS[view]?.label}
+      </button>
       <span className={styles.compassSep} />
       <button type="button" className={styles.iconButton} title="Zoom in (+)" aria-label="Zoom in" onClick={() => cmd({ kind: 'zoom', by: 0.7 })}>
         <Plus size={15} />
@@ -308,78 +306,6 @@ export function Compass() {
         <Scan size={15} />
       </button>
     </nav>
-  );
-}
-
-// ---------- toasts ----------
-
-interface Toast {
-  id: number;
-  event: SimEvent;
-  tone: Tone;
-  count: number;
-  born: number;
-}
-
-const TOAST_MS = 7000;
-
-export function Toasts() {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const seen = useRef(0);
-  const nextId = useRef(1);
-  useEffect(
-    () =>
-      useSimFeedStore.subscribe((s) => {
-        if (s.events.length < seen.current) seen.current = 0;
-        const fresh = s.events.slice(seen.current).filter((e) => HEADLINES[e.type]);
-        const bulk = s.events.length - seen.current > 400;
-        seen.current = s.events.length;
-        if (!fresh.length || bulk) return;
-        setToasts((prev) => {
-          let list = [...prev];
-          for (const e of fresh) {
-            const same = list.find((t) => t.event.type === e.type && e.tick - t.event.tick < 90);
-            if (same) {
-              list = list.map((t) => (t === same ? { ...t, event: e, count: t.count + 1, born: performance.now() } : t));
-            } else {
-              list.push({ id: nextId.current++, event: e, tone: HEADLINES[e.type]?.tone ?? 'info', count: 1, born: performance.now() });
-            }
-          }
-          return list.slice(-3);
-        });
-      }),
-    [],
-  );
-  useEffect(() => {
-    if (!toasts.length) return;
-    const timer = setInterval(() => setToasts((l) => l.filter((t) => performance.now() - t.born < TOAST_MS)), 500);
-    return () => clearInterval(timer);
-  }, [toasts.length]);
-  return (
-    <div className={styles.toasts} role="log" aria-live="polite">
-      {toasts.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          className={`${styles.panel} ${styles.toast}`}
-          data-tone={t.tone}
-          onClick={() => {
-            focusEvent(t.event);
-            setToasts((l) => l.filter((x) => x.id !== t.id));
-          }}
-        >
-          <span>
-            <strong>
-              {eventTitle(t.event)}
-              {t.count > 1 ? ` ×${t.count}` : ''}
-            </strong>
-            <p>{t.event.reason}</p>
-          </span>
-          <span />
-          <time>{clockOf(t.event.tick)}</time>
-        </button>
-      ))}
-    </div>
   );
 }
 

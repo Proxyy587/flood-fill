@@ -35,7 +35,25 @@ export interface RenderSnapshot {
   weather: { rain: number; wind: number };
   /** HQ's aggregated belief, for the truth-vs-belief view. Omitted when unavailable. */
   hqBelief?: { water: Float32Array };
+  /** w*h bit flags from `ZONE` (alerts, closures, barricades, detours). Omitted when unavailable. */
+  zones?: Uint8Array;
 }
+
+/** Bits of `RenderSnapshot.zones`. */
+export const ZONE = {
+  /** Inside a flood-prone area named in the flood alert. */
+  prone: 1,
+  /** Road closed by water. */
+  closed: 2,
+  /** Open road cell where police hold a barricade facing a closure. */
+  barricade: 4,
+  /** Road carrying diverted traffic. */
+  detour: 8,
+  /** Debris or landslide material on the road. */
+  debris: 16,
+  /** Levee breach. */
+  breach: 32,
+} as const;
 
 /**
  * Static world layers, sent on `load` and after edits. The renderer rebuilds
@@ -62,6 +80,7 @@ export const snapshotTransferables = (s: RenderSnapshot): ArrayBuffer[] => {
     ...Object.values(s.vehicles),
     ...Object.values(s.reports),
     ...(s.hqBelief ? [s.hqBelief.water] : []),
+    ...(s.zones ? [s.zones] : []),
   ];
   const buffers = new Set<ArrayBuffer>();
   for (const a of arrays) if (a.buffer instanceof ArrayBuffer) buffers.add(a.buffer);

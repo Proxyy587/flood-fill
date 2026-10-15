@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BlockType, bridgeDeckHeights, type WorldSnapshot } from '../../contracts';
-import { buildChunk } from './mesher';
+import { buildChunk, windowLit } from './mesher';
 
 const flatWorld = (w: number, h: number, block = BlockType.Grass, groundH = 2): WorldSnapshot => ({
   w,
@@ -30,8 +30,8 @@ describe('chunk mesher', () => {
       world.buildingIndex[c] = 1;
     }
     const { solid, windows } = buildChunk(world, bridgeDeckHeights(4, 4, world.ground, world.blocks), 0, 0);
-    // 8 exterior wall faces × 10 window rows.
-    expect(quads(windows)).toBe(8 * 10);
+    // 8 exterior wall faces × 10 window rows × 2 panes.
+    expect(quads(windows)).toBe(8 * 10 * 2);
     // Every vertex is tagged with an in-grid cell.
     expect(Math.max(...solid.cells)).toBeLessThan(16);
     expect(solid.positions.length / 3).toBe(solid.roles.length);
@@ -53,5 +53,30 @@ describe('chunk mesher', () => {
       const area = Math.hypot(cross[0], cross[1], cross[2]);
       if (area > 1e-9) expect(dot).toBeGreaterThan(0);
     }
+  });
+
+  it('emits no zero-length normals (they light as NaN and the bloom spreads them)', () => {
+    const world = flatWorld(16, 16, BlockType.Road);
+    world.blocks[5 * 16 + 8] = BlockType.Bridge;
+    world.ground[5 * 16 + 8] = 4;
+    const deck = bridgeDeckHeights(16, 16, world.ground, world.blocks);
+    const { solid } = buildChunk(world, deck, 0, 0);
+    for (let i = 0; i < solid.normals.length; i += 3) expect(Math.hypot(solid.normals[i], solid.normals[i + 1], solid.normals[i + 2])).toBeGreaterThan(0.99);
+  });
+});
+
+describe('windowLit', () => {
+  it('is deterministic and leaves roughly a third of panes dark', () => {
+    let dark = 0;
+    const n = 4000;
+    for (let i = 0; i < n; i++) {
+      const v = windowLit(i, i % 7, i % 2, 'px');
+      expect(v).toBe(windowLit(i, i % 7, i % 2, 'px'));
+      expect(v).toBeGreaterThan(0);
+      expect(v).toBeLessThanOrEqual(1.05);
+      if (v < 0.1) dark++;
+    }
+    expect(dark / n).toBeGreaterThan(0.25);
+    expect(dark / n).toBeLessThan(0.45);
   });
 });

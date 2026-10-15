@@ -119,7 +119,8 @@ export class StreetLights {
       const state = this.powered ? this.powered[c] : PowerState.Grid;
       const lit = state === PowerState.Off ? 0 : on;
       const lamp = state === PowerState.Generator ? LAMP_GENERATOR : LAMP_WARM;
-      this.heads!.setColorAt(i, this.color.copy(LAMP_DARK).lerp(lamp, lit));
+      // Lit heads go past 1.0 so the bloom pass gives them a halo.
+      this.heads!.setColorAt(i, this.color.copy(LAMP_DARK).lerp(lamp, lit).multiplyScalar(1 + lit * 2.4));
       this.pools!.setColorAt(i, this.color.copy(lamp).multiplyScalar(lit * 0.55));
     });
     this.heads.instanceColor.needsUpdate = true;

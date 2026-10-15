@@ -1,14 +1,8 @@
+/* Sits in the shell's bottom dock, stacked on the transport bar. */
 .wrap {
-  position: absolute;
-  left: 50%;
-  bottom: 84px;
-  transform: translateX(-50%);
-  width: min(720px, calc(100vw - 420px));
-  min-width: 460px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  z-index: 3;
 }
 
 .ticker {

@@ -19,6 +19,12 @@ export interface Daylight {
   day: number;
   /** 0..1, strongest just after sunrise and before sunset. */
   golden: number;
+  /** 0..1 clear morning blue (peaks mid-morning). */
+  morning: number;
+  /** 0..1 bright afternoon (peaks near noon–3pm). */
+  afternoon: number;
+  /** 0..1 deep midnight (peaks around 00:00). */
+  midnight: number;
 }
 
 const smooth = (a: number, b: number, v: number) => {
@@ -45,5 +51,20 @@ export const daylightAt = (secondsOfDay: number): Daylight => {
   const len = Math.hypot(sun.x, sun.y, sun.z) || 1;
   const day = smooth(-0.12, 0.22, elevation);
   const golden = day > 0 ? (1 - smooth(0.05, 0.45, elevation)) * smooth(-0.12, 0.02, elevation) : 0;
-  return { seconds, elevation, sun: { x: sun.x / len, y: sun.y / len, z: sun.z / len }, day, golden };
+  const hour = seconds / 3600;
+  // Perfect morning ~07–10, afternoon ~12–16, midnight deepest around 00:00.
+  const morning = day * smooth(6, 7.5, hour) * (1 - smooth(10.5, 12, hour)) * (1 - golden);
+  const afternoon = day * smooth(11, 12.5, hour) * (1 - smooth(16, 17.5, hour)) * (1 - golden * 0.85);
+  const midDist = Math.min(Math.abs(hour), Math.abs(hour - 24));
+  const midnight = (1 - day) * (1 - smooth(0, 3.5, midDist));
+  return {
+    seconds,
+    elevation,
+    sun: { x: sun.x / len, y: sun.y / len, z: sun.z / len },
+    day,
+    golden,
+    morning,
+    afternoon,
+    midnight,
+  };
 };

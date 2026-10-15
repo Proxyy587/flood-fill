@@ -3,81 +3,39 @@
   "response": {
    "source": "cache",
    "report": {
-    "summary": "The deterministic analysers flagged 8 issues. Most serious: Traffic stopped in Old Town; Traffic stopped in Millbrook; Old Town Substation flooded and tripped. 3 small, cheap changes are proposed below; verify each by re-running the storm before trusting it.",
+    "summary": "The deterministic analysers flagged 10 issues. Most serious: Riverside Clinic took the load while St. Avery General Hospital stayed quiet; Old Town Substation flooded and tripped; Traffic stopped in Downtown. 3 small, cheap changes are proposed below; verify each by re-running the storm before trusting it.",
     "findings": [
      {
-      "id": "gridlock-1",
+      "id": "hospitals-1",
       "severity": "high",
-      "title": "Traffic stopped in Old Town",
-      "explanation": "12 stalled or gridlocked road cells in Old Town, first at (44, 64) in Old Town, 75 m from Fire Station 3. Across the city 38 vehicles stalled in water and some road was gridlocked for 1 min (peak 1 cells).",
+      "title": "Riverside Clinic took the load while St. Avery General Hospital stayed quiet",
+      "explanation": "Riverside Clinic peaked at 100% of beds, St. Avery General Hospital at 0%; the widest gap was 100%. Hospitals spent 7 min on diversion and 2 patients were redirected.",
       "evidence": [
        {
         "cells": [
-         6188,
-         5031,
-         6477,
-         4882,
-         6864,
-         6979,
-         6004,
-         6109,
-         7546,
-         6777,
-         6013,
-         5419
+         6104,
+         6105,
+         6200,
+         6201
         ],
         "eventTicks": [
-         960,
-         1028,
-         1274,
-         1676
+         1390,
+         1383,
+         1430
         ]
        },
        {
-        "metric": "gridlockMinutes",
+        "metric": "peakUtil",
         "value": 1
        }
       ],
-      "confidence": "medium"
-     },
-     {
-      "id": "gridlock-2",
-      "severity": "high",
-      "title": "Traffic stopped in Millbrook",
-      "explanation": "10 stalled or gridlocked road cells in Millbrook, first at (40, 86) in Millbrook. Across the city 38 vehicles stalled in water and some road was gridlocked for 1 min (peak 1 cells).",
-      "evidence": [
-       {
-        "cells": [
-         8296,
-         9063,
-         6946,
-         5587,
-         8669,
-         5499,
-         6835,
-         7410,
-         6354,
-         5395
-        ],
-        "eventTicks": [
-         632,
-         960,
-         1028,
-         1676
-        ]
-       },
-       {
-        "metric": "gridlockMinutes",
-        "value": 1
-       }
-      ],
-      "confidence": "medium"
+      "confidence": "high"
      },
      {
       "id": "power-1",
       "severity": "high",
       "title": "Old Town Substation flooded and tripped",
-      "explanation": "Old Town Substation flooded: depth 0.56 > trip threshold 0.4. 3367 cells (37% of the map) lost grid power. At worst 44% of residents were without power.",
+      "explanation": "Old Town Substation flooded: depth 0.56 > trip threshold 0.4. 3367 cells (37% of the map) lost grid power. At worst 32% of residents were without power; 1 backup generator ran dry.",
       "evidence": [
        {
         "cells": [
@@ -87,31 +45,149 @@
          6688
         ],
         "eventTicks": [
-         1273
+         1011
         ]
        },
        {
         "metric": "unpoweredPopPct",
-        "value": 44
+        "value": 32
        }
       ],
       "confidence": "high"
      },
      {
+      "id": "gridlock-1",
+      "severity": "high",
+      "title": "Traffic stopped in Downtown",
+      "explanation": "12 stalled or gridlocked road cells in Downtown, first at (47, 35) in Downtown, 25 m from Eastbank Medical Centre. Across the city 30 vehicles stalled in water and some road was gridlocked for 2 min (peak 1 cells).",
+      "evidence": [
+       {
+        "cells": [
+         3407,
+         1304,
+         4459,
+         3311,
+         4172,
+         1699,
+         2556,
+         1020,
+         636,
+         445,
+         832,
+         3604
+        ],
+        "eventTicks": [
+         702,
+         768,
+         1414
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 2
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "gridlock-2",
+      "severity": "high",
+      "title": "Traffic stopped in Old Town",
+      "explanation": "8 stalled or gridlocked road cells in Old Town, first at (52, 77) in Old Town, 41 m from Fire Station 3. Across the city 30 vehicles stalled in water and some road was gridlocked for 2 min (peak 1 cells).",
+      "evidence": [
+       {
+        "cells": [
+         7444,
+         6285,
+         5127,
+         6786,
+         6788,
+         6588,
+         7557,
+         6012
+        ],
+        "eventTicks": [
+         702,
+         1012,
+         1414
+        ]
+       },
+       {
+        "metric": "gridlockMinutes",
+        "value": 2
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
       "id": "drainage-1",
-      "severity": "medium",
+      "severity": "high",
+      "title": "Water pooled in Downtown with no drain within 24 m",
+      "explanation": "19 ponding sites in Downtown had no storm drain within 6 cells, starting at (48, 45) in Downtown, 26 m from SDRF Boat Depot. The city has 10 drain cells; 54 of 73 ponding sites were uncovered.",
+      "evidence": [
+       {
+        "cells": [
+         4368,
+         1027,
+         1020,
+         1500,
+         1788,
+         2076,
+         924,
+         2364,
+         1308,
+         2742,
+         1596,
+         832,
+         1219,
+         2365,
+         2077,
+         1212,
+         2173,
+         1791,
+         1885
+        ],
+        "eventTicks": []
+       },
+       {
+        "metric": "drainCells",
+        "value": 10
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "drainage-2",
+      "severity": "high",
       "title": "Water pooled in Old Town with no drain within 24 m",
-      "explanation": "2 ponding sites in Old Town had no storm drain within 6 cells, starting at (82, 51) in Old Town, 71 m from Old Town Gym. The city has 10 drain cells; 2 of 6 ponding sites were uncovered.",
+      "explanation": "18 ponding sites in Old Town had no storm drain within 6 cells, starting at (82, 51) in Old Town, 71 m from Old Town Gym Shelter. The city has 10 drain cells; 54 of 73 ponding sites were uncovered.",
       "evidence": [
        {
         "cells": [
          4978,
-         4860
+         4860,
+         7544,
+         6003,
+         7644,
+         7836,
+         7554,
+         5419,
+         6484,
+         6016,
+         7555,
+         6773,
+         7549,
+         6388,
+         7547,
+         6772,
+         6019,
+         7546
         ],
         "eventTicks": [
-         538,
-         792,
-         1339
+         267,
+         534,
+         1296,
+         1540
         ]
        },
        {
@@ -123,40 +199,32 @@
      },
      {
       "id": "response-1",
-      "severity": "low",
-      "title": "3 of 19 calls from Old Town were still unanswered",
-      "explanation": "Answered requests from Old Town waited 3 min on average against 4 min citywide; 3 were still open at minute 30. Citywide Gini of time to service is 0.17 (0 = everyone waited equally).",
+      "severity": "high",
+      "title": "8 of 11 calls from Southport were still unanswered",
+      "explanation": "Answered requests from Southport waited 3 min on average against 2 min citywide; 8 were still open at minute 30. Citywide Gini of time to service is 0.21 (0 = everyone waited equally).",
       "evidence": [
        {
         "cells": [
-         5414,
-         7827,
-         5800,
-         6671,
-         6285,
-         7636,
-         6769,
-         5606,
-         5799,
-         5995,
-         5997,
-         7732,
-         5606,
-         6781,
-         6595,
-         7164,
-         6595,
-         6972,
-         6780
+         8308,
+         8691,
+         8116,
+         8700,
+         8797,
+         8989,
+         8892,
+         8314,
+         8124,
+         8124,
+         8797
         ]
        },
        {
         "metric": "gini",
-        "value": 0.17
+        "value": 0.21
        },
        {
         "metric": "unmet",
-        "value": 3
+        "value": 8
        }
       ],
       "confidence": "medium"
@@ -164,85 +232,148 @@
      {
       "id": "response-2",
       "severity": "medium",
-      "title": "Millbrook waited longest for help",
-      "explanation": "Answered requests from Millbrook waited 6 min on average against 4 min citywide; 0 were still open at minute 30. Citywide Gini of time to service is 0.17 (0 = everyone waited equally).",
+      "title": "26 of 46 calls from Old Town were still unanswered",
+      "explanation": "Answered requests from Old Town waited 2 min on average against 2 min citywide; 26 were still open at minute 30. Citywide Gini of time to service is 0.21 (0 = everyone waited equally).",
       "evidence": [
        {
         "cells": [
-         8295,
-         7323,
-         5403,
-         5403,
-         5402,
-         6362,
-         5691,
-         8381,
-         7524,
-         8289,
-         5682,
-         6363,
-         6365
+         5997,
+         5223,
+         6188,
+         7732,
+         7154,
+         6864,
+         5606,
+         6768,
+         5414,
+         6768,
+         5031,
+         6285,
+         7057,
+         5995,
+         6671,
+         7635,
+         6781,
+         7069,
+         6685,
+         6397,
+         6780,
+         6877,
+         7069,
+         7544,
+         6396,
+         6003,
+         7644,
+         7836,
+         7554,
+         5419,
+         6484,
+         6108,
+         6016,
+         7555,
+         5802,
+         6773,
+         7549,
+         6388,
+         5802,
+         7547
         ]
        },
        {
         "metric": "gini",
-        "value": 0.17
+        "value": 0.21
        },
        {
         "metric": "unmet",
-        "value": 0
+        "value": 26
        }
       ],
       "confidence": "medium"
      },
      {
-      "id": "hospitals-1",
-      "severity": "low",
-      "title": "St. Avery General Hospital took the load while Eastbank Medical Centre stayed quiet",
-      "explanation": "St. Avery General Hospital peaked at 30% of beds, Eastbank Medical Centre at 0%; the widest gap was 30%. Hospitals spent 0 min on diversion and 0 patients were redirected.",
-      "evidence": [
-       {
-        "cells": [
-         2708,
-         2709,
-         2710,
-         2804,
-         2805,
-         2806,
-         2900,
-         2901,
-         2902
-        ],
-        "eventTicks": [
-         1760
-        ]
-       },
-       {
-        "metric": "peakUtil",
-        "value": 0.3
-       }
-      ],
-      "confidence": "high"
-     },
-     {
       "id": "rooftops-1",
-      "severity": "low",
-      "title": "3 people still stranded in Old Town",
-      "explanation": "61 people were stranded during the storm and 3 were never reached (3 at the end). In Old Town they were around (61, 70) in Old Town, 8 m from Fire Station 3. Helicopters made 18 rooftop rescues in total.",
+      "severity": "medium",
+      "title": "25 people still stranded in Old Town",
+      "explanation": "145 people were stranded during the storm and 75 were never reached (75 at the end). In Old Town they were around (61, 70) in Old Town, 8 m from Fire Station 3. Helicopters made 21 rooftop rescues in total.",
       "evidence": [
        {
         "cells": [
          6781,
-         7164,
-         6595
+         7069,
+         6685,
+         6397,
+         6780,
+         6877,
+         7544,
+         6396,
+         6003,
+         7644,
+         7836,
+         7554,
+         5419,
+         6484,
+         6108,
+         6016,
+         7555,
+         6773,
+         7549,
+         6388,
+         7547,
+         7452,
+         6772,
+         6019,
+         7546
         ],
         "eventTicks": [
-         1274
+         1012,
+         1599
         ]
        },
        {
         "metric": "stranded",
-        "value": 3
+        "value": 75
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "rooftops-2",
+      "severity": "medium",
+      "title": "22 people still stranded in Downtown",
+      "explanation": "145 people were stranded during the storm and 75 were never reached (75 at the end). In Downtown they were around (48, 45) in Downtown, 26 m from SDRF Boat Depot. Helicopters made 21 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         4368,
+         1027,
+         1020,
+         1500,
+         1788,
+         2076,
+         924,
+         2364,
+         1308,
+         2742,
+         1596,
+         3412,
+         832,
+         1219,
+         2365,
+         3700,
+         2077,
+         1212,
+         2173,
+         1791,
+         3604,
+         1885
+        ],
+        "eventTicks": [
+         1599
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 75
        }
       ],
       "confidence": "medium"
@@ -289,9 +420,10 @@
      {
       "id": "add-drains",
       "addresses": [
-       "drainage-1"
+       "drainage-1",
+       "drainage-2"
       ],
-      "title": "Add 2 storm drains in Old Town",
+      "title": "Add 6 storm drains in Old Town",
       "rationale": "Ponding sites had no drain within 6 cells. Each drain is placed on open ground beside a ponding site, never on a road or building.",
       "commands": [
        {
@@ -301,20 +433,41 @@
        },
        {
         "kind": "setBlock",
+        "cell": 5789,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
         "cell": 4763,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 8603,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 4465,
+        "block": 7
+       },
+       {
+        "kind": "setBlock",
+        "cell": 7447,
         "block": 7
        }
       ],
       "expectedEffect": "Less standing water near these sites, fewer stalled vehicles and road closures there. A hypothesis until verified.",
-      "cost": 4
+      "cost": 12
      },
      {
       "id": "helipad-rooftops",
       "addresses": [
-       "rooftops-1"
+       "rooftops-1",
+       "rooftops-2"
       ],
       "title": "Add a helipad in Old Town",
-      "rationale": "3 people still stranded in Old Town. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "rationale": "25 people still stranded in Old Town. A landing pad inside the area shortens helicopter round trips when roads are closed.",
       "commands": [
        {
         "kind": "placeBuilding",
@@ -359,21 +512,21 @@
       "unit": "pts",
       "better": "higher",
       "baseline": {
-       "mean": 98.5,
-       "min": 97,
-       "max": 100
+       "mean": 71.5,
+       "min": 70,
+       "max": 73
       },
       "patched": {
-       "mean": 94,
-       "min": 91,
-       "max": 97
+       "mean": 72.5,
+       "min": 72,
+       "max": 73
       },
       "delta": {
-       "mean": -4.5,
-       "min": -6,
-       "max": -3
+       "mean": 1,
+       "min": -1,
+       "max": 3
       },
-      "verdict": "worse"
+      "verdict": "no_clear_effect"
      },
      {
       "key": "residentsAffected",
@@ -381,14 +534,14 @@
       "unit": "",
       "better": "lower",
       "baseline": {
-       "mean": 0,
-       "min": 0,
-       "max": 0
+       "mean": 552,
+       "min": 552,
+       "max": 552
       },
       "patched": {
-       "mean": 0,
-       "min": 0,
-       "max": 0
+       "mean": 552,
+       "min": 552,
+       "max": 552
       },
       "delta": {
        "mean": 0,
@@ -403,21 +556,21 @@
       "unit": "s",
       "better": "lower",
       "baseline": {
-       "mean": 143.5,
-       "min": 46,
-       "max": 241
+       "mean": 156.5,
+       "min": 144,
+       "max": 169
       },
       "patched": {
-       "mean": 241,
-       "min": 241,
-       "max": 241
+       "mean": 160.5,
+       "min": 144,
+       "max": 177
       },
       "delta": {
-       "mean": 97.5,
-       "min": 0,
-       "max": 195
+       "mean": 4,
+       "min": -25,
+       "max": 33
       },
-      "verdict": "worse"
+      "verdict": "no_clear_effect"
      },
      {
       "key": "unmetPct",
@@ -425,21 +578,21 @@
       "unit": "%",
       "better": "lower",
       "baseline": {
-       "mean": 0,
-       "min": 0,
-       "max": 0
+       "mean": 33,
+       "min": 26,
+       "max": 40
       },
       "patched": {
-       "mean": 12.5,
-       "min": 0,
-       "max": 25
+       "mean": 28.557723057243365,
+       "min": 28.30188679245283,
+       "max": 28.8135593220339
       },
       "delta": {
-       "mean": 12.5,
-       "min": 0,
-       "max": 25
+       "mean": -4.442276942756635,
+       "min": -11.69811320754717,
+       "max": 2.8135593220338997
       },
-      "verdict": "worse"
+      "verdict": "no_clear_effect"
      },
      {
       "key": "stranded",
@@ -447,21 +600,21 @@
       "unit": "",
       "better": "lower",
       "baseline": {
-       "mean": 0,
-       "min": 0,
-       "max": 0
+       "mean": 17.5,
+       "min": 13,
+       "max": 22
       },
       "patched": {
-       "mean": 0.5,
-       "min": 0,
-       "max": 1
+       "mean": 16,
+       "min": 15,
+       "max": 17
       },
       "delta": {
-       "mean": 0.5,
-       "min": 0,
-       "max": 1
+       "mean": -1.5,
+       "min": -7,
+       "max": 4
       },
-      "verdict": "worse"
+      "verdict": "no_clear_effect"
      },
      {
       "key": "gridlockMin",
@@ -469,19 +622,19 @@
       "unit": "min",
       "better": "lower",
       "baseline": {
-       "mean": 0,
+       "mean": 3.3333333333333335,
        "min": 0,
-       "max": 0
+       "max": 6.666666666666667
       },
       "patched": {
-       "mean": 0,
+       "mean": 3.75,
        "min": 0,
-       "max": 0
+       "max": 7.5
       },
       "delta": {
-       "mean": 0,
-       "min": 0,
-       "max": 0
+       "mean": 0.4166666666666665,
+       "min": -6.666666666666667,
+       "max": 7.5
       },
       "verdict": "no_clear_effect"
      },
@@ -491,21 +644,21 @@
       "unit": "pts",
       "better": "lower",
       "baseline": {
-       "mean": 3.5,
-       "min": 2,
-       "max": 5
+       "mean": 33,
+       "min": 33,
+       "max": 33
       },
       "patched": {
-       "mean": 5,
-       "min": 5,
-       "max": 5
+       "mean": 17.5,
+       "min": 4,
+       "max": 31
       },
       "delta": {
-       "mean": 1.5,
-       "min": 0,
-       "max": 3
+       "mean": -15.5,
+       "min": -29,
+       "max": -2
       },
-      "verdict": "worse"
+      "verdict": "improved"
      },
      {
       "key": "unpoweredPeak",
@@ -535,24 +688,24 @@
       "unit": "cells",
       "better": "lower",
       "baseline": {
-       "mean": 1639,
-       "min": 1639,
-       "max": 1639
+       "mean": 1628,
+       "min": 1628,
+       "max": 1628
       },
       "patched": {
-       "mean": 1639,
-       "min": 1639,
-       "max": 1639
+       "mean": 1632,
+       "min": 1632,
+       "max": 1632
       },
       "delta": {
-       "mean": 0,
-       "min": 0,
-       "max": 0
+       "mean": 4,
+       "min": 4,
+       "max": 4
       },
       "verdict": "no_clear_effect"
      }
     ],
-    "verdict": "worse"
+    "verdict": "improved"
    }
   }
  },
@@ -560,35 +713,32 @@
   "response": {
    "source": "cache",
    "report": {
-    "summary": "The deterministic analysers flagged 10 issues. Most serious: Traffic stopped in Southeast Suburbs; Traffic stopped in Southwest Civic; Water pooled in Southwest Civic with no drain within 24 m. 3 small, cheap changes are proposed below; verify each by re-running the storm before trusting it.",
+    "summary": "The deterministic analysers flagged 10 issues. Most serious: Traffic stopped in Southeast Suburbs; Traffic stopped in Northeast Riverside; Water pooled in Southwest Civic with no drain within 24 m. 3 small, cheap changes are proposed below; verify each by re-running the storm before trusting it.",
     "findings": [
      {
       "id": "gridlock-1",
       "severity": "high",
       "title": "Traffic stopped in Southeast Suburbs",
-      "explanation": "19 stalled or gridlocked road cells in Southeast Suburbs, first at (48, 44) in Southeast Suburbs, 54 m from Boat Depot #6. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 3 cells).",
+      "explanation": "16 stalled or gridlocked road cells in Southeast Suburbs, first at (48, 33) in Southeast Suburbs, 14 m from Hospital #2. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 1 cells).",
       "evidence": [
        {
         "cells": [
-         2864,
          2160,
-         2166,
-         2600,
          2085,
-         2105,
-         2599,
-         3061,
-         2736,
-         3125,
-         3376,
-         2103,
+         2086,
+         2800,
+         2094,
          2097,
-         2741,
-         2604,
-         2612,
-         2352,
-         2224,
-         2096
+         3061,
+         2864,
+         3125,
+         2602,
+         3568,
+         2089,
+         3184,
+         2095,
+         3248,
+         2087
         ],
         "eventTicks": [
          719
@@ -604,29 +754,25 @@
      {
       "id": "gridlock-2",
       "severity": "high",
-      "title": "Traffic stopped in Southwest Civic",
-      "explanation": "15 stalled or gridlocked road cells in Southwest Civic, first at (8, 35) in Southwest Civic, 26 m from St. Avery General Hospital. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 3 cells).",
+      "title": "Traffic stopped in Northeast Riverside",
+      "explanation": "10 stalled or gridlocked road cells in Northeast Riverside, first at (48, 23) in Northeast Riverside, 22 m from Shelter #4. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 1 cells).",
       "evidence": [
        {
         "cells": [
-         2248,
-         2640,
-         2055,
-         2064,
-         2448,
-         2128,
-         3028,
-         3408,
-         2512,
-         2065,
-         3024,
-         2053,
-         2384,
-         2704,
-         2247
+         1520,
+         1269,
+         2032,
+         1061,
+         1392,
+         1328,
+         690,
+         752,
+         1205,
+         1970
         ],
         "eventTicks": [
-         1324
+         719,
+         838
         ]
        },
        {
@@ -640,50 +786,50 @@
       "id": "drainage-1",
       "severity": "high",
       "title": "Water pooled in Southwest Civic with no drain within 24 m",
-      "explanation": "51 ponding sites in Southwest Civic had no storm drain within 6 cells, starting at (18, 32) in Southwest Civic, 25 m from St. Avery General Hospital. The city has 4 drain cells; 93 of 96 ponding sites were uncovered.",
+      "explanation": "59 ponding sites in Southwest Civic had no storm drain within 6 cells, starting at (6, 32) in Southwest Civic, 25 m from St. Avery General Hospital. The city has 4 drain cells; 97 of 101 ponding sites were uncovered.",
       "evidence": [
        {
         "cells": [
-         2066,
-         3207,
-         2576,
-         3600,
-         3093,
-         2503,
-         2184,
-         2056,
-         3091,
-         2768,
-         3271,
-         2896,
-         2256,
-         3408,
-         2053,
-         2067,
-         2759,
-         2823,
-         3098,
-         2320,
-         3097,
-         2311,
-         3280,
-         3346,
-         2964,
-         2384,
-         2192,
          2054,
-         2448,
-         2960,
-         2247,
-         3094,
-         2065,
-         2052,
-         2055,
-         3143,
-         3024,
+         3536,
+         3028,
+         2759,
          3344,
+         2640,
+         2068,
+         2184,
+         3091,
+         3271,
+         2053,
+         3472,
+         3335,
+         3346,
+         2578,
+         2576,
+         2512,
+         2439,
+         2192,
+         2823,
+         2055,
+         2695,
+         2375,
+         3345,
+         2951,
+         3093,
+         3096,
+         3216,
+         2052,
+         3024,
+         2067,
+         2503,
+         2631,
+         2066,
+         2768,
+         2320,
+         2831,
+         2065,
          2704,
-         2831
+         3098
         ],
         "eventTicks": []
        },
@@ -698,50 +844,48 @@
       "id": "drainage-2",
       "severity": "high",
       "title": "Water pooled in Northwest Heights with no drain within 24 m",
-      "explanation": "42 ponding sites in Northwest Heights had no storm drain within 6 cells, starting at (16, 10) in Northwest Heights, 18 m from Substation #45. The city has 4 drain cells; 93 of 96 ponding sites were uncovered.",
+      "explanation": "38 ponding sites in Northwest Heights had no storm drain within 6 cells, starting at (10, 14) in Northwest Heights, 16 m from Substation #45. The city has 4 drain cells; 97 of 101 ponding sites were uncovered.",
       "evidence": [
        {
         "cells": [
-         656,
-         1681,
-         1041,
-         1098,
-         1044,
-         778,
-         650,
-         1424,
-         1162,
-         1104,
-         1232,
-         1168,
-         657,
-         1552,
-         1296,
-         592,
-         912,
          906,
-         1680,
-         1418,
-         1049,
-         654,
-         651,
-         1034,
+         1162,
          1226,
-         1360,
+         1808,
+         1168,
+         1296,
          714,
-         1290,
-         1488,
-         653,
-         1048,
-         655,
-         1426,
-         658,
-         585,
-         659,
-         976,
+         652,
+         650,
          848,
-         842,
-         1744
+         778,
+         654,
+         1048,
+         970,
+         1044,
+         1290,
+         1232,
+         976,
+         1800,
+         655,
+         1040,
+         1682,
+         1167,
+         1488,
+         720,
+         1098,
+         1552,
+         1046,
+         656,
+         653,
+         1424,
+         1425,
+         1034,
+         1864,
+         528,
+         658,
+         912,
+         586
         ],
         "eventTicks": []
        },
@@ -803,60 +947,60 @@
      {
       "id": "response-1",
       "severity": "high",
-      "title": "82 of 91 calls from Northwest Heights were still unanswered",
-      "explanation": "Answered requests from Northwest Heights waited 4 min on average against 6 min citywide; 82 were still open at minute 30. Citywide Gini of time to service is 0.17 (0 = everyone waited equally).",
+      "title": "73 of 79 calls from Northwest Heights were still unanswered",
+      "explanation": "Answered requests from Northwest Heights waited 6 min on average against 4 min citywide; 73 were still open at minute 30. Citywide Gini of time to service is 0.15 (0 = everyone waited equally).",
       "evidence": [
        {
         "cells": [
-         656,
-         1681,
-         1041,
-         1098,
-         1044,
-         778,
-         1041,
-         650,
-         1872,
-         1424,
-         1162,
-         778,
-         1104,
-         1232,
-         1744,
-         1168,
-         657,
-         1044,
-         1041,
-         1552,
-         1296,
-         592,
-         657,
-         912,
          906,
-         1680,
-         1418,
-         1049,
-         654,
-         1104,
-         651,
-         1034,
-         654,
+         1162,
          1226,
-         1360,
-         714,
+         1808,
+         1168,
+         1168,
          1296,
-         1034,
-         592,
-         1290
+         714,
+         1872,
+         1936,
+         652,
+         650,
+         848,
+         778,
+         654,
+         1048,
+         970,
+         1044,
+         1290,
+         1232,
+         976,
+         1800,
+         848,
+         655,
+         1296,
+         1040,
+         970,
+         652,
+         1226,
+         652,
+         1682,
+         714,
+         1167,
+         906,
+         906,
+         1488,
+         720,
+         1800,
+         1098,
+         1800
         ]
        },
        {
         "metric": "gini",
-        "value": 0.17
+        "value": 0.15
        },
        {
         "metric": "unmet",
-        "value": 82
+        "value": 73
        }
       ],
       "confidence": "medium"
@@ -864,60 +1008,60 @@
      {
       "id": "response-2",
       "severity": "high",
-      "title": "100 of 114 calls from Southwest Civic were still unanswered",
-      "explanation": "Answered requests from Southwest Civic waited 3 min on average against 6 min citywide; 100 were still open at minute 30. Citywide Gini of time to service is 0.17 (0 = everyone waited equally).",
+      "title": "108 of 125 calls from Southwest Civic were still unanswered",
+      "explanation": "Answered requests from Southwest Civic waited 3 min on average against 4 min citywide; 108 were still open at minute 30. Citywide Gini of time to service is 0.15 (0 = everyone waited equally).",
       "evidence": [
        {
         "cells": [
          2076,
-         2066,
-         2072,
-         2059,
-         3207,
-         2576,
-         3600,
-         2071,
-         3093,
-         2503,
-         2184,
-         2056,
-         2184,
-         2056,
-         3091,
-         2768,
-         3271,
-         2896,
-         2256,
-         2072,
-         2061,
-         3093,
-         2056,
-         3408,
-         2053,
-         2067,
-         2064,
+         2054,
+         3536,
+         3028,
          2759,
+         3344,
+         2640,
+         2068,
+         2184,
+         3091,
+         3271,
+         2053,
+         3472,
+         3335,
+         2061,
+         2058,
+         3346,
+         2578,
+         2059,
+         2576,
+         2512,
+         2053,
+         2439,
+         2075,
+         2192,
          2823,
-         3098,
-         2071,
-         2768,
-         2320,
-         2064,
-         3097,
-         2311,
-         2256,
-         2066,
-         2060,
-         3280
+         3344,
+         2055,
+         2184,
+         2576,
+         2061,
+         2695,
+         2375,
+         3271,
+         2375,
+         3345,
+         2951,
+         2576,
+         3093,
+         3096
         ]
        },
        {
         "metric": "gini",
-        "value": 0.17
+        "value": 0.15
        },
        {
         "metric": "unmet",
-        "value": 100
+        "value": 108
        }
       ],
       "confidence": "medium"
@@ -925,51 +1069,51 @@
      {
       "id": "rooftops-1",
       "severity": "medium",
-      "title": "54 people still stranded in Southwest Civic",
-      "explanation": "398 people were stranded during the storm and 182 were never reached (182 at the end). In Southwest Civic they were around (18, 32) in Southwest Civic, 25 m from St. Avery General Hospital. Helicopters made 32 rooftop rescues in total.",
+      "title": "63 people still stranded in Southwest Civic",
+      "explanation": "397 people were stranded during the storm and 181 were never reached (181 at the end). In Southwest Civic they were around (6, 32) in Southwest Civic, 25 m from St. Avery General Hospital. Helicopters made 29 rooftop rescues in total.",
       "evidence": [
        {
         "cells": [
-         2066,
-         2072,
-         3207,
-         2576,
-         3600,
-         2071,
-         3093,
-         2503,
-         2184,
-         2056,
-         3091,
-         2768,
-         3271,
-         2896,
-         2256,
-         3408,
-         2053,
-         2067,
-         2759,
-         2823,
-         3098,
-         2320,
-         3097,
-         2311,
-         3280,
-         3346,
-         2964,
-         2384,
-         2192,
          2054,
-         2448,
-         2960,
-         2247,
-         3094,
-         2065,
-         2052,
+         3536,
+         3028,
+         2759,
+         3344,
+         2640,
+         2068,
+         2184,
+         3091,
+         3271,
+         2053,
+         3472,
+         3335,
+         3346,
+         2578,
+         2576,
+         2512,
+         2439,
+         2192,
+         2823,
          2055,
-         3143,
+         2695,
+         2375,
+         3345,
+         2951,
+         3093,
+         3096,
+         2074,
+         3216,
+         2052,
          3024,
-         3344
+         2067,
+         2503,
+         2631,
+         2066,
+         2768,
+         2320,
+         2073,
+         2831,
+         2065
         ],
         "eventTicks": [
          1366
@@ -977,7 +1121,7 @@
        },
        {
         "metric": "stranded",
-        "value": 182
+        "value": 181
        }
       ],
       "confidence": "medium"
@@ -985,51 +1129,49 @@
      {
       "id": "rooftops-2",
       "severity": "medium",
-      "title": "42 people still stranded in Northwest Heights",
-      "explanation": "398 people were stranded during the storm and 182 were never reached (182 at the end). In Northwest Heights they were around (16, 10) in Northwest Heights, 18 m from Substation #45. Helicopters made 32 rooftop rescues in total.",
+      "title": "38 people still stranded in Northwest Heights",
+      "explanation": "397 people were stranded during the storm and 181 were never reached (181 at the end). In Northwest Heights they were around (10, 14) in Northwest Heights, 16 m from Substation #45. Helicopters made 29 rooftop rescues in total.",
       "evidence": [
        {
         "cells": [
-         656,
-         1681,
-         1041,
-         1098,
-         1044,
-         778,
-         650,
-         1424,
-         1162,
-         1104,
-         1232,
-         1168,
-         657,
-         1552,
-         1296,
-         592,
-         912,
          906,
-         1680,
-         1418,
-         1049,
-         654,
-         651,
-         1034,
+         1162,
          1226,
-         1360,
+         1808,
+         1168,
+         1296,
          714,
-         1290,
-         1488,
-         653,
-         1048,
-         655,
-         1426,
-         658,
-         585,
-         659,
-         976,
+         652,
+         650,
          848,
-         842,
-         1744
+         778,
+         654,
+         1048,
+         970,
+         1044,
+         1290,
+         1232,
+         976,
+         1800,
+         655,
+         1040,
+         1682,
+         1167,
+         1488,
+         720,
+         1098,
+         1552,
+         1046,
+         656,
+         653,
+         1424,
+         1425,
+         1034,
+         1864,
+         528,
+         658,
+         912,
+         586
         ],
         "eventTicks": [
          1366
@@ -1037,7 +1179,7 @@
        },
        {
         "metric": "stranded",
-        "value": 182
+        "value": 181
        }
       ],
       "confidence": "medium"
@@ -1055,32 +1197,32 @@
       "commands": [
        {
         "kind": "setBlock",
-        "cell": 2001,
+        "cell": 841,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 591,
+        "cell": 1989,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 3142,
+        "cell": 3471,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 977,
+        "cell": 2963,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 1033,
+        "cell": 1743,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 2511,
+        "cell": 2694,
         "block": 7
        }
       ],
@@ -1171,20 +1313,20 @@
        "rooftops-1",
        "rooftops-2"
       ],
-      "title": "Add a helipad in Southwest Civic",
-      "rationale": "54 people still stranded in Southwest Civic. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "title": "Add a helipad in Northwest Heights",
+      "rationale": "63 people still stranded in Southwest Civic. A landing pad inside the area shortens helicopter round trips when roads are closed.",
       "commands": [
        {
         "kind": "placeBuilding",
         "def": {
          "type": 19,
          "cells": [
-          2129,
-          2130,
-          2193,
-          2194
+          843,
+          844,
+          907,
+          908
          ],
-         "entrance": 2129
+         "entrance": 843
         }
        }
       ],
@@ -1261,21 +1403,21 @@
       "unit": "s",
       "better": "lower",
       "baseline": {
-       "mean": 125,
-       "min": 119,
-       "max": 131
+       "mean": 152,
+       "min": 148,
+       "max": 156
       },
       "patched": {
-       "mean": 128.5,
-       "min": 126,
-       "max": 131
+       "mean": 151.5,
+       "min": 148,
+       "max": 155
       },
       "delta": {
-       "mean": 3.5,
-       "min": 0,
-       "max": 7
+       "mean": -0.5,
+       "min": -1,
+       "max": 0
       },
-      "verdict": "worse"
+      "verdict": "no_clear_effect"
      },
      {
       "key": "unmetPct",
@@ -1283,18 +1425,18 @@
       "unit": "%",
       "better": "lower",
       "baseline": {
-       "mean": 97.70644590232219,
-       "min": 97.47474747474747,
-       "max": 97.9381443298969
+       "mean": 98.19310897435898,
+       "min": 97.94871794871794,
+       "max": 98.4375
       },
       "patched": {
-       "mean": 97.70110430732193,
-       "min": 97.47474747474747,
-       "max": 97.92746113989638
+       "mean": 98.18901866022284,
+       "min": 97.94871794871794,
+       "max": 98.42931937172776
       },
       "delta": {
-       "mean": -0.005341595000260213,
-       "min": -0.010683190000520426,
+       "mean": -0.004090314136121265,
+       "min": -0.00818062827224253,
        "max": 0
       },
       "verdict": "no_clear_effect"
@@ -1305,14 +1447,14 @@
       "unit": "",
       "better": "lower",
       "baseline": {
-       "mean": 191.5,
-       "min": 190,
-       "max": 193
+       "mean": 190,
+       "min": 189,
+       "max": 191
       },
       "patched": {
-       "mean": 191,
-       "min": 189,
-       "max": 193
+       "mean": 189.5,
+       "min": 188,
+       "max": 191
       },
       "delta": {
        "mean": -0.5,
@@ -1349,14 +1491,14 @@
       "unit": "pts",
       "better": "lower",
       "baseline": {
-       "mean": 4,
-       "min": 4,
-       "max": 4
+       "mean": 1,
+       "min": 1,
+       "max": 1
       },
       "patched": {
-       "mean": 4,
-       "min": 4,
-       "max": 4
+       "mean": 1,
+       "min": 1,
+       "max": 1
       },
       "delta": {
        "mean": 0,
@@ -1376,13 +1518,13 @@
        "max": 48.47
       },
       "patched": {
-       "mean": 48.19,
+       "mean": 48.33,
        "min": 48.19,
-       "max": 48.19
+       "max": 48.47
       },
       "delta": {
-       "mean": -0.14000000000000057,
-       "min": -0.28000000000000114,
+       "mean": 0,
+       "min": 0,
        "max": 0
       },
       "verdict": "no_clear_effect"
@@ -1410,7 +1552,7 @@
       "verdict": "no_clear_effect"
      }
     ],
-    "verdict": "worse"
+    "verdict": "no_clear_effect"
    }
   }
  },
@@ -1424,34 +1566,34 @@
       "id": "gridlock-1",
       "severity": "high",
       "title": "Traffic stopped in Northeast Commercial",
-      "explanation": "25 stalled or gridlocked road cells in Northeast Commercial, first at (60, 41) in Northeast Commercial, 42 m from Police Station #5. Across the city 104 vehicles stalled in water and some road was gridlocked for 30 min (peak 4 cells).",
+      "explanation": "25 stalled or gridlocked road cells in Northeast Commercial, first at (48, 42) in Northeast Commercial. Across the city 104 vehicles stalled in water and some road was gridlocked for 30 min (peak 1 cells).",
       "evidence": [
        {
         "cells": [
-         3996,
-         1212,
+         4080,
+         1428,
+         3523,
          1236,
-         2292,
-         1226,
-         3505,
-         2352,
-         3537,
-         2363,
-         2844,
-         3533,
+         2952,
+         1237,
+         3629,
+         1296,
+         1230,
+         1032,
+         1612,
+         3432,
+         3132,
+         1212,
+         3636,
+         2484,
+         3444,
          2358,
-         3510,
-         1208,
-         1227,
-         2751,
-         3519,
-         3514,
-         1219,
-         4584,
-         2737,
-         936,
+         3532,
+         2383,
+         3512,
          3912,
-         1417,
+         2369,
+         3531,
          4294
         ],
         "eventTicks": [
@@ -1471,33 +1613,34 @@
       "id": "gridlock-2",
       "severity": "high",
       "title": "Traffic stopped in Northwest Residential",
-      "explanation": "24 stalled or gridlocked road cells in Northwest Residential, first at (24, 45) in Northwest Residential. Across the city 104 vehicles stalled in water and some road was gridlocked for 30 min (peak 4 cells).",
+      "explanation": "25 stalled or gridlocked road cells in Northwest Residential, first at (24, 40) in Northwest Residential. Across the city 104 vehicles stalled in water and some road was gridlocked for 30 min (peak 1 cells).",
       "evidence": [
        {
         "cells": [
-         4344,
-         1168,
-         1740,
-         1175,
-         1164,
-         3503,
-         1171,
-         984,
-         792,
-         2904,
-         2332,
-         4524,
-         3471,
-         2797,
-         3012,
-         1180,
+         3864,
+         1188,
+         1356,
          2315,
-         1764,
-         1464,
-         3502,
+         4344,
+         1561,
+         1164,
+         2321,
+         2424,
+         1548,
+         2332,
+         2436,
+         2616,
+         1656,
+         2508,
+         3483,
          2628,
-         2349,
-         4428,
+         3948,
+         1068,
+         2904,
+         3855,
+         2726,
+         1195,
+         2916,
          1965
         ],
         "eventTicks": [
@@ -1563,17 +1706,13 @@
      {
       "id": "drainage-1",
       "severity": "high",
-      "title": "Water pooled in Northwest Residential with no drain within 24 m",
-      "explanation": "6 ponding sites in Northwest Residential had no storm drain within 6 cells, starting at (20, 12) in Northwest Residential, 6 m from Shelter #3. The city has 3 drain cells; 17 of 17 ponding sites were uncovered.",
+      "title": "Water pooled in Coastal Basin South with no drain within 24 m",
+      "explanation": "2 ponding sites in Coastal Basin South had no storm drain within 6 cells, starting at (45, 72) in Coastal Basin South, 12 m from Boat Depot #6. The city has 3 drain cells; 4 of 4 ponding sites were uncovered.",
       "evidence": [
        {
         "cells": [
-         1172,
-         1173,
-         1174,
-         1169,
-         3467,
-         1165
+         6957,
+         6159
         ],
         "eventTicks": []
        },
@@ -1587,17 +1726,13 @@
      {
       "id": "drainage-2",
       "severity": "high",
-      "title": "Water pooled in Northeast Commercial with no drain within 24 m",
-      "explanation": "6 ponding sites in Northeast Commercial had no storm drain within 6 cells, starting at (84, 39) in Northeast Commercial, 59 m from Police Station #5. The city has 3 drain cells; 17 of 17 ponding sites were uncovered.",
+      "title": "Water pooled in Marina Industrial with no drain within 24 m",
+      "explanation": "2 ponding sites in Marina Industrial had no storm drain within 6 cells, starting at (56, 72) in Marina Industrial, 36 m from Substation #129. The city has 3 drain cells; 4 of 4 ponding sites were uncovered.",
       "evidence": [
        {
         "cells": [
-         3828,
-         1220,
-         3156,
-         3531,
-         1584,
-         936
+         6968,
+         6988
         ],
         "eventTicks": []
        },
@@ -1610,61 +1745,61 @@
      },
      {
       "id": "response-1",
-      "severity": "medium",
-      "title": "143 of 354 calls from Northwest Residential were still unanswered",
-      "explanation": "Answered requests from Northwest Residential waited 13 min on average against 11 min citywide; 143 were still open at minute 30. Citywide Gini of time to service is 0.11 (0 = everyone waited equally).",
+      "severity": "low",
+      "title": "2 of 66 calls from Coastal Basin South were still unanswered",
+      "explanation": "Answered requests from Coastal Basin South waited 6 min on average against 9 min citywide; 2 were still open at minute 30. Citywide Gini of time to service is 0.20 (0 = everyone waited equally).",
       "evidence": [
        {
         "cells": [
-         3876,
-         4548,
-         3878,
-         4260,
-         1172,
-         1173,
-         2341,
-         1173,
-         1173,
-         1172,
-         1172,
-         1173,
-         1172,
-         1173,
-         1172,
-         1173,
-         1173,
-         1174,
-         1173,
-         1173,
-         1572,
-         1173,
-         1173,
-         1162,
-         1174,
-         1174,
-         1173,
-         1174,
-         1172,
-         2316,
-         1172,
-         1174,
-         1172,
-         3865,
-         3853,
-         1173,
-         1173,
-         1173,
-         1172,
-         1173
+         5802,
+         4645,
+         4650,
+         4645,
+         5804,
+         5029,
+         5806,
+         5412,
+         5799,
+         4644,
+         4654,
+         5796,
+         5805,
+         5774,
+         6957,
+         4627,
+         4908,
+         6159,
+         6732,
+         4620,
+         5006,
+         6936,
+         5018,
+         5873,
+         4631,
+         7032,
+         6756,
+         6171,
+         6276,
+         5208,
+         6931,
+         6927,
+         6168,
+         5791,
+         4636,
+         5208,
+         4624,
+         6084,
+         4617,
+         6180
         ]
        },
        {
         "metric": "gini",
-        "value": 0.11
+        "value": 0.2
        },
        {
         "metric": "unmet",
-        "value": 143
+        "value": 2
        }
       ],
       "confidence": "medium"
@@ -1672,110 +1807,74 @@
      {
       "id": "response-2",
       "severity": "low",
-      "title": "6 of 102 calls from Northeast Commercial were still unanswered",
-      "explanation": "Answered requests from Northeast Commercial waited 10 min on average against 11 min citywide; 6 were still open at minute 30. Citywide Gini of time to service is 0.11 (0 = everyone waited equally).",
+      "title": "2 of 80 calls from Marina Industrial were still unanswered",
+      "explanation": "Answered requests from Marina Industrial waited 4 min on average against 9 min citywide; 2 were still open at minute 30. Citywide Gini of time to service is 0.20 (0 = everyone waited equally).",
       "evidence": [
        {
         "cells": [
-         4176,
-         4560,
-         4188,
-         4476,
-         3892,
-         4092,
-         3816,
-         2379,
-         1226,
-         1884,
-         1219,
-         2737,
-         2389,
-         3444,
-         3518,
-         1332,
-         4008,
-         2376,
-         1211,
-         840,
-         4104,
-         1212,
-         2376,
-         2362,
-         3519,
-         3924,
-         912,
-         3336,
-         816,
-         1214,
-         3525,
-         2376,
-         1201,
-         1211,
-         1204,
-         1203,
-         816,
-         1608,
-         2772,
-         4308
+         5340,
+         5532,
+         4752,
+         5820,
+         5815,
+         5137,
+         4658,
+         5340,
+         4661,
+         5813,
+         5052,
+         5244,
+         5814,
+         4667,
+         5532,
+         4849,
+         5812,
+         4662,
+         5820,
+         5041,
+         5532,
+         6120,
+         6196,
+         5448,
+         6192,
+         5460,
+         6963,
+         5053,
+         4684,
+         7068,
+         6216,
+         6804,
+         4693,
+         7440,
+         6986,
+         5064,
+         5841,
+         5842,
+         6995,
+         7260
         ]
        },
        {
         "metric": "gini",
-        "value": 0.11
+        "value": 0.2
        },
        {
         "metric": "unmet",
-        "value": 6
+        "value": 2
        }
       ],
       "confidence": "medium"
      },
      {
-      "id": "hospitals-1",
-      "severity": "medium",
-      "title": "Hospital #1 took the load while Hospital #2 stayed quiet",
-      "explanation": "Hospital #1 peaked at 68% of beds, Hospital #2 at 0%; the widest gap was 68%. Hospitals spent 0 min on diversion and 0 patients were redirected.",
-      "evidence": [
-       {
-        "cells": [
-         1965,
-         2061,
-         2157,
-         1966,
-         2062,
-         2158,
-         1967,
-         2063,
-         2159,
-         1968,
-         2064,
-         2160
-        ],
-        "eventTicks": [
-         1790
-        ]
-       },
-       {
-        "metric": "peakUtil",
-        "value": 0.68
-       }
-      ],
-      "confidence": "high"
-     },
-     {
       "id": "rooftops-1",
       "severity": "low",
-      "title": "6 people still stranded in Northwest Residential",
-      "explanation": "600 people were stranded during the storm and 154 were never reached (154 at the end). In Northwest Residential they were around (20, 12) in Northwest Residential, 6 m from Shelter #3. Helicopters made 68 rooftop rescues in total.",
+      "title": "2 people still stranded in Coastal Basin South",
+      "explanation": "600 people were stranded during the storm and 4 were never reached (4 at the end). In Coastal Basin South they were around (45, 72) in Coastal Basin South, 12 m from Boat Depot #6. Helicopters made 52 rooftop rescues in total.",
       "evidence": [
        {
         "cells": [
-         1172,
-         1173,
-         1174,
-         1169,
-         3467,
-         1165
+         6957,
+         6159
         ],
         "eventTicks": [
          710
@@ -1783,7 +1882,29 @@
        },
        {
         "metric": "stranded",
-        "value": 154
+        "value": 4
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "rooftops-2",
+      "severity": "low",
+      "title": "2 people still stranded in Marina Industrial",
+      "explanation": "600 people were stranded during the storm and 4 were never reached (4 at the end). In Marina Industrial they were around (56, 72) in Marina Industrial, 36 m from Substation #129. Helicopters made 52 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         6968,
+         6988
+        ],
+        "eventTicks": [
+         710
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 4
        }
       ],
       "confidence": "medium"
@@ -1894,42 +2015,32 @@
        "drainage-1",
        "drainage-2"
       ],
-      "title": "Add 6 storm drains in Northwest Residential",
+      "title": "Add 4 storm drains in Coastal Basin South",
       "rationale": "Ponding sites had no drain within 6 cells. Each drain is placed on open ground beside a ponding site, never on a road or building.",
       "commands": [
        {
         "kind": "setBlock",
-        "cell": 1075,
+        "cell": 6860,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 7091,
+        "cell": 6064,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 7067,
+        "cell": 6871,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 6119,
-        "block": 7
-       },
-       {
-        "kind": "setBlock",
-        "cell": 3731,
-        "block": 7
-       },
-       {
-        "kind": "setBlock",
-        "cell": 1123,
+        "cell": 6891,
         "block": 7
        }
       ],
       "expectedEffect": "Less standing water near these sites, fewer stalled vehicles and road closures there. A hypothesis until verified.",
-      "cost": 12
+      "cost": 8
      },
      {
       "id": "helipad-rooftops",
@@ -1937,20 +2048,20 @@
        "rooftops-1",
        "rooftops-2"
       ],
-      "title": "Add a helipad in Northwest Residential",
-      "rationale": "6 people still stranded in Northwest Residential. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "title": "Add a helipad in Coastal Basin South",
+      "rationale": "2 people still stranded in Coastal Basin South. A landing pad inside the area shortens helicopter round trips when roads are closed.",
       "commands": [
        {
         "kind": "placeBuilding",
         "def": {
          "type": 19,
          "cells": [
-          1267,
-          1268,
-          1363,
-          1364
+          7052,
+          7053,
+          7148,
+          7149
          ],
-         "entrance": 1267
+         "entrance": 7052
         }
        }
       ],
@@ -1983,14 +2094,14 @@
       "unit": "pts",
       "better": "higher",
       "baseline": {
-       "mean": 34.5,
-       "min": 34,
-       "max": 35
+       "mean": 32.5,
+       "min": 32,
+       "max": 33
       },
       "patched": {
-       "mean": 34.5,
-       "min": 34,
-       "max": 35
+       "mean": 32.5,
+       "min": 32,
+       "max": 33
       },
       "delta": {
        "mean": 0,
@@ -2027,21 +2138,21 @@
       "unit": "s",
       "better": "lower",
       "baseline": {
-       "mean": 179.5,
-       "min": 177,
-       "max": 182
+       "mean": 345.5,
+       "min": 340,
+       "max": 351
       },
       "patched": {
-       "mean": 178.5,
-       "min": 177,
-       "max": 180
+       "mean": 338,
+       "min": 337,
+       "max": 339
       },
       "delta": {
-       "mean": -1,
-       "min": -2,
-       "max": 0
+       "mean": -7.5,
+       "min": -14,
+       "max": -1
       },
-      "verdict": "no_clear_effect"
+      "verdict": "improved"
      },
      {
       "key": "unmetPct",
@@ -2049,19 +2160,19 @@
       "unit": "%",
       "better": "lower",
       "baseline": {
-       "mean": 93.08333333333333,
-       "min": 92.33333333333333,
-       "max": 93.83333333333333
+       "mean": 89.83333333333334,
+       "min": 89.16666666666667,
+       "max": 90.5
       },
       "patched": {
-       "mean": 92.66666666666666,
-       "min": 91.66666666666666,
-       "max": 93.66666666666667
+       "mean": 90.66666666666666,
+       "min": 89.16666666666667,
+       "max": 92.16666666666666
       },
       "delta": {
-       "mean": -0.4166666666666643,
-       "min": -0.6666666666666714,
-       "max": -0.1666666666666572
+       "mean": 0.8333333333333286,
+       "min": 0,
+       "max": 1.6666666666666572
       },
       "verdict": "no_clear_effect"
      },
@@ -2071,19 +2182,19 @@
       "unit": "",
       "better": "lower",
       "baseline": {
-       "mean": 558.5,
-       "min": 554,
-       "max": 563
+       "mean": 539,
+       "min": 535,
+       "max": 543
       },
       "patched": {
-       "mean": 556,
-       "min": 550,
-       "max": 562
+       "mean": 544,
+       "min": 535,
+       "max": 553
       },
       "delta": {
-       "mean": -2.5,
-       "min": -4,
-       "max": -1
+       "mean": 5,
+       "min": 0,
+       "max": 10
       },
       "verdict": "no_clear_effect"
      },
@@ -2115,14 +2226,14 @@
       "unit": "pts",
       "better": "lower",
       "baseline": {
-       "mean": 23.5,
-       "min": 23,
-       "max": 24
+       "mean": 0,
+       "min": 0,
+       "max": 0
       },
       "patched": {
-       "mean": 23.5,
-       "min": 23,
-       "max": 24
+       "mean": 0,
+       "min": 0,
+       "max": 0
       },
       "delta": {
        "mean": 0,
@@ -2137,14 +2248,14 @@
       "unit": "%",
       "better": "lower",
       "baseline": {
-       "mean": 98.33500000000001,
-       "min": 98.15,
-       "max": 98.52
+       "mean": 98.515,
+       "min": 98.33,
+       "max": 98.7
       },
       "patched": {
-       "mean": 98.33500000000001,
-       "min": 98.15,
-       "max": 98.52
+       "mean": 98.515,
+       "min": 98.33,
+       "max": 98.7
       },
       "delta": {
        "mean": 0,
@@ -2176,7 +2287,7 @@
       "verdict": "no_clear_effect"
      }
     ],
-    "verdict": "no_clear_effect"
+    "verdict": "improved"
    }
   }
  },
@@ -2190,58 +2301,51 @@
       "id": "gridlock-1",
       "severity": "high",
       "title": "Traffic stopped in Central Basin Floodplain",
-      "explanation": "40 stalled or gridlocked road cells in Central Basin Floodplain, first at (49, 48) in Central Basin Floodplain, 38 m from Boat Depot #8. Across the city 51 vehicles stalled in water and some road was gridlocked for 30 min (peak 8 cells).",
+      "explanation": "36 stalled or gridlocked road cells in Central Basin Floodplain, first at (49, 48) in Central Basin Floodplain, 38 m from Boat Depot #8. Across the city 50 vehicles stalled in water and some road was gridlocked for 30 min (peak 1 cells).",
       "evidence": [
        {
         "cells": [
          4657,
          4656,
-         4645,
-         4650,
-         5424,
-         4651,
-         3975,
-         4661,
-         3984,
-         5700,
-         3708,
-         4836,
-         4380,
-         5412,
-         5892,
-         5800,
-         5124,
-         5908,
-         4068,
+         3888,
+         5232,
+         5136,
+         5520,
          4356,
-         3900,
-         5244,
-         5810,
-         4452,
-         4670,
-         3507,
-         4543,
-         3492,
-         4548,
-         3684,
-         5809,
-         5807,
-         3509,
-         4284,
-         4644,
-         5808,
-         5316,
+         5604,
+         5436,
+         3500,
+         5148,
+         5220,
+         5801,
+         4380,
          5821,
-         5804,
-         5604
+         4092,
+         5628,
+         5916,
+         3514,
+         4956,
+         5317,
+         3876,
+         3804,
+         3612,
+         5798,
+         3509,
+         3974,
+         3493,
+         5820,
+         4740,
+         5724,
+         4836,
+         4643,
+         5124,
+         5052,
+         5412
         ],
         "eventTicks": [
          9,
          776,
-         929,
-         1323,
-         1432,
-         1545
+         1432
         ]
        },
        {
@@ -2255,16 +2359,17 @@
       "id": "gridlock-2",
       "severity": "high",
       "title": "Traffic stopped in Mid-East Commercial District",
-      "explanation": "3 stalled or gridlocked road cells in Mid-East Commercial District, first at (74, 48) in Mid-East Commercial District, 16 m from Hospital #3. Across the city 51 vehicles stalled in water and some road was gridlocked for 30 min (peak 8 cells).",
+      "explanation": "5 stalled or gridlocked road cells in Mid-East Commercial District, first at (48, 29) in Mid-East Commercial District, 44 m from Substation #11. Across the city 50 vehicles stalled in water and some road was gridlocked for 30 min (peak 1 cells).",
       "evidence": [
        {
         "cells": [
-         4682,
+         2832,
+         3518,
+         5155,
          6013,
          6012
         ],
         "eventTicks": [
-         1185,
          1432
         ]
        },
@@ -2279,7 +2384,7 @@
       "id": "power-1",
       "severity": "high",
       "title": "Substation #9 flooded and tripped",
-      "explanation": "Substation #8 flooded: depth 0.4 > trip threshold 0.4. 6251 cells (68% of the map) lost grid power. At worst 77% of residents were without power.",
+      "explanation": "Substation #8 flooded: depth 0.4 > trip threshold 0.4. 6251 cells (68% of the map) lost grid power. At worst 72% of residents were without power.",
       "evidence": [
        {
         "cells": [
@@ -2294,7 +2399,7 @@
        },
        {
         "metric": "unpoweredPopPct",
-        "value": 77
+        "value": 72
        }
       ],
       "confidence": "high"
@@ -2302,23 +2407,12 @@
      {
       "id": "drainage-1",
       "severity": "high",
-      "title": "Water pooled in Central Basin Floodplain with no drain within 24 m",
-      "explanation": "12 ponding sites in Central Basin Floodplain had no storm drain within 6 cells, starting at (48, 36) in Central Basin Floodplain, 34 m from Substation #9. The city has 4 drain cells; 13 of 15 ponding sites were uncovered.",
+      "title": "Water pooled in Mid-East Commercial District with no drain within 24 m",
+      "explanation": "1 ponding sites in Mid-East Commercial District had no storm drain within 6 cells, starting at (54, 30) in Mid-East Commercial District, 54 m from Substation #11. The city has 4 drain cells; 2 of 2 ponding sites were uncovered.",
       "evidence": [
        {
         "cells": [
-         3504,
-         3506,
-         3505,
-         3408,
-         4671,
-         3703,
-         3510,
-         3515,
-         3517,
-         5724,
-         4285,
-         3502
+         2934
         ],
         "eventTicks": []
        },
@@ -2332,12 +2426,12 @@
      {
       "id": "drainage-2",
       "severity": "high",
-      "title": "Water pooled in Mid-East Commercial District with no drain within 24 m",
-      "explanation": "1 ponding sites in Mid-East Commercial District had no storm drain within 6 cells, starting at (53, 67) in Mid-East Commercial District. The city has 4 drain cells; 13 of 15 ponding sites were uncovered.",
+      "title": "Water pooled in Central Basin Floodplain with no drain within 24 m",
+      "explanation": "1 ponding sites in Central Basin Floodplain had no storm drain within 6 cells, starting at (34, 48) in Central Basin Floodplain, 27 m from Boat Depot #8. The city has 4 drain cells; 2 of 2 ponding sites were uncovered.",
       "evidence": [
        {
         "cells": [
-         6485
+         4642
         ],
         "eventTicks": []
        },
@@ -2410,9 +2504,38 @@
      },
      {
       "id": "response-1",
+      "severity": "medium",
+      "title": "1 of 8 calls from Mid-East Commercial District were still unanswered",
+      "explanation": "Answered requests from Mid-East Commercial District waited 4 min on average against 3 min citywide; 1 were still open at minute 30. Citywide Gini of time to service is 0.12 (0 = everyone waited equally).",
+      "evidence": [
+       {
+        "cells": [
+         2934,
+         5822,
+         6013,
+         6484,
+         3324,
+         5155,
+         5059,
+         6013
+        ]
+       },
+       {
+        "metric": "gini",
+        "value": 0.12
+       },
+       {
+        "metric": "unmet",
+        "value": 1
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "response-2",
       "severity": "low",
-      "title": "19 of 223 calls from Central Basin Floodplain were still unanswered",
-      "explanation": "Answered requests from Central Basin Floodplain waited 3 min on average against 3 min citywide; 19 were still open at minute 30. Citywide Gini of time to service is 0.07 (0 = everyone waited equally).",
+      "title": "1 of 222 calls from Central Basin Floodplain were still unanswered",
+      "explanation": "Answered requests from Central Basin Floodplain waited 2 min on average against 3 min citywide; 1 were still open at minute 30. Citywide Gini of time to service is 0.12 (0 = everyone waited equally).",
       "evidence": [
        {
         "cells": [
@@ -2427,76 +2550,40 @@
          4657,
          4657,
          4658,
-         4652,
-         3888,
-         4651,
-         3888,
-         4648,
-         4666,
-         3984,
-         4666,
-         5328,
-         4272,
-         4663,
-         5616,
-         4651,
-         4665,
-         4651,
-         5232,
-         3888,
-         3976,
-         3984,
-         5136,
-         4651,
-         5030,
-         3696,
-         4663,
-         4666,
-         5328,
          4552,
+         3700,
+         5520,
+         5136,
+         4661,
+         5136,
+         3888,
+         4649,
+         5040,
+         3888,
+         4664,
+         5424,
+         5040,
+         3692,
+         4666,
+         5040,
+         4647,
+         3984,
+         5616,
+         4646,
          4663,
-         3976
+         3696,
+         4647,
+         4666,
+         4660,
+         4176,
+         4666,
+         4660,
+         5616
         ]
        },
        {
         "metric": "gini",
-        "value": 0.07
-       },
-       {
-        "metric": "unmet",
-        "value": 19
-       }
-      ],
-      "confidence": "medium"
-     },
-     {
-      "id": "response-2",
-      "severity": "low",
-      "title": "1 of 15 calls from Mid-East Commercial District were still unanswered",
-      "explanation": "Answered requests from Mid-East Commercial District waited 4 min on average against 3 min citywide; 1 were still open at minute 30. Citywide Gini of time to service is 0.07 (0 = everyone waited equally).",
-      "evidence": [
-       {
-        "cells": [
-         6012,
-         6484,
-         6484,
-         6485,
-         3324,
-         5822,
-         5059,
-         5059,
-         5155,
-         6485,
-         6484,
-         6013,
-         3518,
-         6484,
-         6485
-        ]
-       },
-       {
-        "metric": "gini",
-        "value": 0.07
+        "value": 0.12
        },
        {
         "metric": "unmet",
@@ -2506,68 +2593,45 @@
       "confidence": "medium"
      },
      {
-      "id": "hospitals-1",
-      "severity": "low",
-      "title": "Hospital #1 took the load while Hospital #3 stayed quiet",
-      "explanation": "Hospital #1 peaked at 22% of beds, Hospital #3 at 0%; the widest gap was 22%. Hospitals spent 0 min on diversion and 0 patients were redirected.",
-      "evidence": [
-       {
-        "cells": [
-         1196,
-         1292,
-         1388,
-         1197,
-         1293,
-         1389,
-         1198,
-         1294,
-         1390,
-         1199,
-         1295,
-         1391
-        ],
-        "eventTicks": [
-         1790
-        ]
-       },
-       {
-        "metric": "peakUtil",
-        "value": 0.22
-       }
-      ],
-      "confidence": "high"
-     },
-     {
       "id": "rooftops-1",
       "severity": "low",
-      "title": "14 people still stranded in Central Basin Floodplain",
-      "explanation": "251 people were stranded during the storm and 20 were never reached (20 at the end). In Central Basin Floodplain they were around (48, 41) in Central Basin Floodplain, 28 m from Substation #9. Helicopters made 26 rooftop rescues in total.",
+      "title": "2 people still stranded in Central Basin Floodplain",
+      "explanation": "245 people were stranded during the storm and 3 were never reached (2 at the end). In Central Basin Floodplain they were around (60, 48) in Central Basin Floodplain, 58 m from Hospital #3. Helicopters made 23 rooftop rescues in total.",
       "evidence": [
        {
         "cells": [
-         3984,
-         4464,
-         3504,
-         3506,
-         3505,
-         3408,
-         4671,
-         3703,
-         3510,
-         3515,
-         3517,
-         5724,
-         4285,
-         3502
+         4668,
+         4642
         ],
         "eventTicks": [
-         816,
+         1450,
          1460
         ]
        },
        {
         "metric": "stranded",
-        "value": 20
+        "value": 2
+       }
+      ],
+      "confidence": "medium"
+     },
+     {
+      "id": "rooftops-2",
+      "severity": "low",
+      "title": "1 people still stranded in Mid-East Commercial District",
+      "explanation": "245 people were stranded during the storm and 3 were never reached (2 at the end). In Mid-East Commercial District they were around (54, 30) in Mid-East Commercial District, 54 m from Substation #11. Helicopters made 23 rooftop rescues in total.",
+      "evidence": [
+       {
+        "cells": [
+         2934
+        ],
+        "eventTicks": [
+         1460
+        ]
+       },
+       {
+        "metric": "stranded",
+        "value": 2
        }
       ],
       "confidence": "medium"
@@ -2637,42 +2701,22 @@
        "drainage-1",
        "drainage-2"
       ],
-      "title": "Add 6 storm drains in Central Basin Floodplain",
+      "title": "Add 2 storm drains in Mid-East Commercial District",
       "rationale": "Ponding sites had no drain within 6 cells. Each drain is placed on open ground beside a ponding site, never on a road or building.",
       "commands": [
        {
         "kind": "setBlock",
-        "cell": 3407,
+        "cell": 2933,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 4574,
-        "block": 7
-       },
-       {
-        "kind": "setBlock",
-        "cell": 3606,
-        "block": 7
-       },
-       {
-        "kind": "setBlock",
-        "cell": 3421,
-        "block": 7
-       },
-       {
-        "kind": "setBlock",
-        "cell": 6388,
-        "block": 7
-       },
-       {
-        "kind": "setBlock",
-        "cell": 5627,
+        "cell": 4545,
         "block": 7
        }
       ],
       "expectedEffect": "Less standing water near these sites, fewer stalled vehicles and road closures there. A hypothesis until verified.",
-      "cost": 12
+      "cost": 4
      },
      {
       "id": "helipad-cutoff",
@@ -2706,19 +2750,19 @@
        "rooftops-2"
       ],
       "title": "Add a helipad in Central Basin Floodplain",
-      "rationale": "14 people still stranded in Central Basin Floodplain. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "rationale": "2 people still stranded in Central Basin Floodplain. A landing pad inside the area shortens helicopter round trips when roads are closed.",
       "commands": [
        {
         "kind": "placeBuilding",
         "def": {
          "type": 19,
          "cells": [
-          3889,
-          3890,
-          3985,
-          3986
+          4765,
+          4766,
+          4861,
+          4862
          ],
-         "entrance": 3889
+         "entrance": 4765
         }
        }
       ],
@@ -2751,18 +2795,18 @@
       "unit": "pts",
       "better": "higher",
       "baseline": {
-       "mean": 61.5,
-       "min": 61,
-       "max": 62
+       "mean": 63.5,
+       "min": 62,
+       "max": 65
       },
       "patched": {
-       "mean": 61,
-       "min": 60,
-       "max": 62
+       "mean": 63.5,
+       "min": 62,
+       "max": 65
       },
       "delta": {
-       "mean": -0.5,
-       "min": -1,
+       "mean": 0,
+       "min": 0,
        "max": 0
       },
       "verdict": "no_clear_effect"
@@ -2795,18 +2839,18 @@
       "unit": "s",
       "better": "lower",
       "baseline": {
-       "mean": 208,
-       "min": 84,
-       "max": 332
+       "mean": 125.5,
+       "min": 101,
+       "max": 150
       },
       "patched": {
-       "mean": 207.5,
-       "min": 83,
-       "max": 332
+       "mean": 125.5,
+       "min": 101,
+       "max": 150
       },
       "delta": {
-       "mean": -0.5,
-       "min": -1,
+       "mean": 0,
+       "min": 0,
        "max": 0
       },
       "verdict": "no_clear_effect"
@@ -2817,19 +2861,19 @@
       "unit": "%",
       "better": "lower",
       "baseline": {
-       "mean": 65.8983451536643,
-       "min": 59.57446808510638,
-       "max": 72.22222222222221
+       "mean": 65.0297619047619,
+       "min": 56.25,
+       "max": 73.80952380952381
       },
       "patched": {
-       "mean": 65.34346846846847,
-       "min": 60.416666666666664,
-       "max": 70.27027027027027
+       "mean": 65.0297619047619,
+       "min": 56.25,
+       "max": 73.80952380952381
       },
       "delta": {
-       "mean": -0.5548766851958291,
-       "min": -1.9519519519519406,
-       "max": 0.8421985815602824
+       "mean": 0,
+       "min": 0,
+       "max": 0
       },
       "verdict": "no_clear_effect"
      },
@@ -2839,21 +2883,21 @@
       "unit": "",
       "better": "lower",
       "baseline": {
-       "mean": 27,
-       "min": 26,
-       "max": 28
+       "mean": 29,
+       "min": 27,
+       "max": 31
       },
       "patched": {
-       "mean": 27.5,
-       "min": 26,
-       "max": 29
+       "mean": 29,
+       "min": 27,
+       "max": 31
       },
       "delta": {
-       "mean": 0.5,
+       "mean": 0,
        "min": 0,
-       "max": 1
+       "max": 0
       },
-      "verdict": "worse"
+      "verdict": "no_clear_effect"
      },
      {
       "key": "gridlockMin",
@@ -2883,14 +2927,14 @@
       "unit": "pts",
       "better": "lower",
       "baseline": {
-       "mean": 8.5,
-       "min": 6,
-       "max": 11
+       "mean": 1.5,
+       "min": 1,
+       "max": 2
       },
       "patched": {
-       "mean": 8.5,
-       "min": 6,
-       "max": 11
+       "mean": 1.5,
+       "min": 1,
+       "max": 2
       },
       "delta": {
        "mean": 0,
@@ -2905,19 +2949,19 @@
       "unit": "%",
       "better": "lower",
       "baseline": {
-       "mean": 76.02,
-       "min": 75.49,
-       "max": 76.55
+       "mean": 73.675,
+       "min": 72.16,
+       "max": 75.19
       },
       "patched": {
-       "mean": 75.64500000000001,
-       "min": 74.89,
-       "max": 76.4
+       "mean": 73.75,
+       "min": 72.16,
+       "max": 75.34
       },
       "delta": {
-       "mean": -0.3749999999999929,
-       "min": -1.6599999999999966,
-       "max": 0.9100000000000108
+       "mean": 0.07500000000000284,
+       "min": 0,
+       "max": 0.15000000000000568
       },
       "verdict": "no_clear_effect"
      },
@@ -2944,7 +2988,7 @@
       "verdict": "improved"
      }
     ],
-    "verdict": "worse"
+    "verdict": "improved"
    }
   }
  },
@@ -2958,52 +3002,55 @@
       "id": "gridlock-1",
       "severity": "high",
       "title": "Traffic stopped in Central Basin Floodplain",
-      "explanation": "36 stalled or gridlocked road cells in Central Basin Floodplain, first at (48, 42) in Central Basin Floodplain, 28 m from Substation #9. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 13 cells).",
+      "explanation": "42 stalled or gridlocked road cells in Central Basin Floodplain, first at (48, 58) in Central Basin Floodplain, 61 m from Boat Depot #8. Across the city 50 vehicles stalled in water and some road was gridlocked for 30 min (peak 10 cells).",
       "evidence": [
        {
         "cells": [
-         4080,
-         5712,
-         5232,
-         4651,
-         4646,
-         5700,
-         5797,
-         5508,
-         5436,
-         5604,
-         5341,
-         3396,
-         5799,
-         3900,
-         4452,
-         5796,
-         5124,
-         5028,
-         3780,
-         5148,
-         5802,
-         5892,
-         5798,
-         3514,
-         5532,
-         5053,
-         4284,
-         5820,
-         5814,
-         5904,
-         3023,
-         4836,
-         3684,
+         5616,
+         4648,
+         3888,
+         3600,
+         3604,
+         4661,
+         3973,
+         3493,
+         3516,
+         5815,
+         3420,
+         4764,
          4548,
-         4638,
-         3517
+         3498,
+         5812,
+         4380,
+         4643,
+         3025,
+         3506,
+         3024,
+         5816,
+         4068,
+         3780,
+         3500,
+         3900,
+         6096,
+         3492,
+         3588,
+         4644,
+         5821,
+         3494,
+         5811,
+         3396,
+         3684,
+         3408,
+         3876,
+         5341,
+         3996,
+         3511,
+         5809
         ],
         "eventTicks": [
          776,
-         1173,
-         1293,
-         1413,
+         1110,
+         1277,
          1432
         ]
        },
@@ -3018,11 +3065,12 @@
       "id": "gridlock-2",
       "severity": "high",
       "title": "Traffic stopped in Mid-West Residential Slope",
-      "explanation": "1 stalled or gridlocked road cells in Mid-West Residential Slope, first at (36, 62) in Mid-West Residential Slope, 70 m from Boat Depot #8. Across the city 52 vehicles stalled in water and some road was gridlocked for 30 min (peak 13 cells).",
+      "explanation": "2 stalled or gridlocked road cells in Mid-West Residential Slope, first at (30, 56) in Mid-West Residential Slope, 59 m from Boat Depot #8. Across the city 50 vehicles stalled in water and some road was gridlocked for 30 min (peak 10 cells).",
       "evidence": [
        {
         "cells": [
-         5988
+         5406,
+         3300
         ],
         "eventTicks": [
          1432
@@ -3039,7 +3087,7 @@
       "id": "power-1",
       "severity": "high",
       "title": "Substation #9 flooded and tripped",
-      "explanation": "Substation #8 flooded: depth 0.4 > trip threshold 0.4. 6251 cells (68% of the map) lost grid power. At worst 75% of residents were without power.",
+      "explanation": "Substation #8 flooded: depth 0.4 > trip threshold 0.4. 6251 cells (68% of the map) lost grid power. At worst 73% of residents were without power.",
       "evidence": [
        {
         "cells": [
@@ -3054,7 +3102,7 @@
        },
        {
         "metric": "unpoweredPopPct",
-        "value": 75
+        "value": 73
        }
       ],
       "confidence": "high"
@@ -3062,38 +3110,13 @@
      {
       "id": "drainage-1",
       "severity": "high",
-      "title": "Water pooled in Central Basin Floodplain with no drain within 24 m",
-      "explanation": "27 ponding sites in Central Basin Floodplain had no storm drain within 6 cells, starting at (36, 39) in Central Basin Floodplain, 22 m from Substation #9. The city has 4 drain cells; 36 of 36 ponding sites were uncovered.",
+      "title": "Water pooled in Mid-East Commercial District with no drain within 24 m",
+      "explanation": "2 ponding sites in Mid-East Commercial District had no storm drain within 6 cells, starting at (54, 31) in Mid-East Commercial District, 57 m from Substation #11. The city has 4 drain cells; 3 of 3 ponding sites were uncovered.",
       "evidence": [
        {
         "cells": [
-         3780,
-         3973,
-         3493,
-         3496,
-         3497,
-         3972,
-         3396,
-         3876,
-         4068,
-         3495,
-         3974,
-         4164,
-         3684,
-         3499,
-         3312,
-         3510,
-         4670,
-         3492,
-         5124,
-         3408,
-         4092,
-         4640,
-         3612,
-         5316,
-         6288,
-         5820,
-         4543
+         3030,
+         5155
         ],
         "eventTicks": []
        },
@@ -3107,17 +3130,12 @@
      {
       "id": "drainage-2",
       "severity": "high",
-      "title": "Water pooled in Mid-East Commercial District with no drain within 24 m",
-      "explanation": "6 ponding sites in Mid-East Commercial District had no storm drain within 6 cells, starting at (54, 30) in Mid-East Commercial District, 54 m from Substation #11. The city has 4 drain cells; 36 of 36 ponding sites were uncovered.",
+      "title": "Water pooled in Central Basin Floodplain with no drain within 24 m",
+      "explanation": "1 ponding sites in Central Basin Floodplain had no storm drain within 6 cells, starting at (36, 53) in Central Basin Floodplain, 36 m from Boat Depot #8. The city has 4 drain cells; 3 of 3 ponding sites were uncovered.",
       "evidence": [
        {
         "cells": [
-         2934,
-         3030,
-         3228,
-         5155,
-         6484,
-         6013
+         5124
         ],
         "eventTicks": []
        },
@@ -3191,74 +3209,96 @@
      {
       "id": "response-1",
       "severity": "medium",
-      "title": "6 of 15 calls from Mid-East Commercial District were still unanswered",
-      "explanation": "Answered requests from Mid-East Commercial District waited 4 min on average against 3 min citywide; 6 were still open at minute 30. Citywide Gini of time to service is 0.08 (0 = everyone waited equally).",
+      "title": "2 of 15 calls from Mid-East Commercial District were still unanswered",
+      "explanation": "Answered requests from Mid-East Commercial District waited 4 min on average against 3 min citywide; 2 were still open at minute 30. Citywide Gini of time to service is 0.09 (0 = everyone waited equally).",
       "evidence": [
        {
         "cells": [
-         2934,
-         3228,
-         3030,
-         6484,
          5059,
+         3324,
+         2934,
+         5155,
          6012,
+         3030,
          6012,
+         2934,
          6013,
-         5155,
-         6484,
          3228,
-         5155,
+         6484,
+         6012,
          6484,
          3324,
-         6013
+         5155
         ]
        },
        {
         "metric": "gini",
-        "value": 0.08
+        "value": 0.09
        },
        {
         "metric": "unmet",
-        "value": 6
+        "value": 2
        }
       ],
       "confidence": "medium"
      },
      {
       "id": "response-2",
-      "severity": "medium",
-      "title": "5 of 18 calls from Mid-West Residential Slope were still unanswered",
-      "explanation": "Answered requests from Mid-West Residential Slope waited 4 min on average against 3 min citywide; 5 were still open at minute 30. Citywide Gini of time to service is 0.08 (0 = everyone waited equally).",
+      "severity": "low",
+      "title": "1 of 226 calls from Central Basin Floodplain were still unanswered",
+      "explanation": "Answered requests from Central Basin Floodplain waited 2 min on average against 3 min citywide; 1 were still open at minute 30. Citywide Gini of time to service is 0.09 (0 = everyone waited equally).",
       "evidence": [
        {
         "cells": [
-         5214,
-         5118,
-         5118,
-         5214,
-         5022,
-         3300,
-         3300,
-         5022,
-         5022,
-         4926,
-         3204,
-         5214,
-         3204,
-         5022,
-         5022,
-         5214,
-         5310,
-         5022
+         4659,
+         4654,
+         4658,
+         4659,
+         4656,
+         4650,
+         5424,
+         4665,
+         4650,
+         4651,
+         5424,
+         4650,
+         4664,
+         4647,
+         4663,
+         3700,
+         4645,
+         4552,
+         4647,
+         4664,
+         4651,
+         3792,
+         4666,
+         4648,
+         4176,
+         5030,
+         3984,
+         5616,
+         4646,
+         4666,
+         3984,
+         5136,
+         4652,
+         4652,
+         5616,
+         4649,
+         5908,
+         5604,
+         3514,
+         5820
         ]
        },
        {
         "metric": "gini",
-        "value": 0.08
+        "value": 0.09
        },
        {
         "metric": "unmet",
-        "value": 5
+        "value": 1
        }
       ],
       "confidence": "medium"
@@ -3266,46 +3306,23 @@
      {
       "id": "rooftops-1",
       "severity": "low",
-      "title": "27 people still stranded in Central Basin Floodplain",
-      "explanation": "279 people were stranded during the storm and 55 were never reached (55 at the end). In Central Basin Floodplain they were around (36, 39) in Central Basin Floodplain, 22 m from Substation #9. Helicopters made 16 rooftop rescues in total.",
+      "title": "3 people still stranded in Mid-East Commercial District",
+      "explanation": "255 people were stranded during the storm and 4 were never reached (3 at the end). In Mid-East Commercial District they were around (60, 33) in Mid-East Commercial District, 57 m from Shelter #6. Helicopters made 17 rooftop rescues in total.",
       "evidence": [
        {
         "cells": [
-         3780,
-         3973,
-         3493,
-         3496,
-         3497,
-         3972,
-         3396,
-         3876,
-         4068,
-         3495,
-         3974,
-         4164,
-         3684,
-         3499,
-         3312,
-         3510,
-         4670,
-         3492,
-         5124,
-         3408,
-         4092,
-         4640,
-         3612,
-         5316,
-         6288,
-         5820,
-         4543
+         3228,
+         3030,
+         5155
         ],
         "eventTicks": [
+         1450,
          1460
         ]
        },
        {
         "metric": "stranded",
-        "value": 55
+        "value": 3
        }
       ],
       "confidence": "medium"
@@ -3313,17 +3330,12 @@
      {
       "id": "rooftops-2",
       "severity": "low",
-      "title": "6 people still stranded in Mid-East Commercial District",
-      "explanation": "279 people were stranded during the storm and 55 were never reached (55 at the end). In Mid-East Commercial District they were around (54, 30) in Mid-East Commercial District, 54 m from Substation #11. Helicopters made 16 rooftop rescues in total.",
+      "title": "1 people still stranded in Central Basin Floodplain",
+      "explanation": "255 people were stranded during the storm and 4 were never reached (3 at the end). In Central Basin Floodplain they were around (36, 53) in Central Basin Floodplain, 36 m from Boat Depot #8. Helicopters made 17 rooftop rescues in total.",
       "evidence": [
        {
         "cells": [
-         2934,
-         3030,
-         3228,
-         5155,
-         6484,
-         6013
+         5124
         ],
         "eventTicks": [
          1460
@@ -3331,7 +3343,7 @@
        },
        {
         "metric": "stranded",
-        "value": 55
+        "value": 3
        }
       ],
       "confidence": "medium"
@@ -3401,7 +3413,7 @@
        "drainage-1",
        "drainage-2"
       ],
-      "title": "Add 6 storm drains in Mid-East Commercial District",
+      "title": "Add 3 storm drains in Mid-East Commercial District",
       "rationale": "Ponding sites had no drain within 6 cells. Each drain is placed on open ground beside a ponding site, never on a road or building.",
       "commands": [
        {
@@ -3411,32 +3423,17 @@
        },
        {
         "kind": "setBlock",
-        "cell": 3683,
-        "block": 7
-       },
-       {
-        "kind": "setBlock",
-        "cell": 3402,
-        "block": 7
-       },
-       {
-        "kind": "setBlock",
-        "cell": 3131,
-        "block": 7
-       },
-       {
-        "kind": "setBlock",
         "cell": 5058,
         "block": 7
        },
        {
         "kind": "setBlock",
-        "cell": 6387,
+        "cell": 5027,
         "block": 7
        }
       ],
       "expectedEffect": "Less standing water near these sites, fewer stalled vehicles and road closures there. A hypothesis until verified.",
-      "cost": 12
+      "cost": 6
      },
      {
       "id": "helipad-cutoff",
@@ -3470,19 +3467,19 @@
        "rooftops-2"
       ],
       "title": "Add a helipad in Mid-East Commercial District",
-      "rationale": "27 people still stranded in Central Basin Floodplain. A landing pad inside the area shortens helicopter round trips when roads are closed.",
+      "rationale": "3 people still stranded in Mid-East Commercial District. A landing pad inside the area shortens helicopter round trips when roads are closed.",
       "commands": [
        {
         "kind": "placeBuilding",
         "def": {
          "type": 19,
          "cells": [
-          2649,
-          2650,
-          2745,
-          2746
+          3229,
+          3230,
+          3325,
+          3326
          ],
-         "entrance": 2649
+         "entrance": 3229
         }
        }
       ],
@@ -3516,20 +3513,20 @@
       "better": "higher",
       "baseline": {
        "mean": 62,
-       "min": 60,
-       "max": 64
+       "min": 58,
+       "max": 66
       },
       "patched": {
-       "mean": 62.5,
-       "min": 61,
-       "max": 64
+       "mean": 61,
+       "min": 57,
+       "max": 65
       },
       "delta": {
-       "mean": 0.5,
-       "min": 0,
-       "max": 1
+       "mean": -1,
+       "min": -1,
+       "max": -1
       },
-      "verdict": "no_clear_effect"
+      "verdict": "worse"
      },
      {
       "key": "residentsAffected",
@@ -3559,14 +3556,14 @@
       "unit": "s",
       "better": "lower",
       "baseline": {
-       "mean": 206,
-       "min": 81,
-       "max": 331
+       "mean": 242,
+       "min": 151,
+       "max": 333
       },
       "patched": {
-       "mean": 206,
-       "min": 81,
-       "max": 331
+       "mean": 242,
+       "min": 151,
+       "max": 333
       },
       "delta": {
        "mean": 0,
@@ -3581,19 +3578,19 @@
       "unit": "%",
       "better": "lower",
       "baseline": {
-       "mean": 67.33333333333333,
+       "mean": 70.58823529411765,
        "min": 66.66666666666666,
-       "max": 68
+       "max": 74.50980392156863
       },
       "patched": {
-       "mean": 67.42424242424241,
-       "min": 66.66666666666666,
-       "max": 68.18181818181817
+       "mean": 71.4987714987715,
+       "min": 70.27027027027027,
+       "max": 72.72727272727273
       },
       "delta": {
-       "mean": 0.09090909090908639,
-       "min": 0,
-       "max": 0.18181818181817277
+       "mean": 0.9105362046538588,
+       "min": -1.782531194295899,
+       "max": 3.6036036036036165
       },
       "verdict": "no_clear_effect"
      },
@@ -3603,21 +3600,21 @@
       "unit": "",
       "better": "lower",
       "baseline": {
-       "mean": 32,
-       "min": 30,
-       "max": 34
+       "mean": 31,
+       "min": 24,
+       "max": 38
       },
       "patched": {
-       "mean": 30,
-       "min": 30,
-       "max": 30
+       "mean": 33,
+       "min": 26,
+       "max": 40
       },
       "delta": {
-       "mean": -2,
-       "min": -4,
-       "max": 0
+       "mean": 2,
+       "min": 2,
+       "max": 2
       },
-      "verdict": "improved"
+      "verdict": "worse"
      },
      {
       "key": "gridlockMin",
@@ -3647,14 +3644,14 @@
       "unit": "pts",
       "better": "lower",
       "baseline": {
-       "mean": 8,
-       "min": 8,
-       "max": 8
+       "mean": 0.5,
+       "min": 0,
+       "max": 1
       },
       "patched": {
-       "mean": 8,
-       "min": 8,
-       "max": 8
+       "mean": 0.5,
+       "min": 0,
+       "max": 1
       },
       "delta": {
        "mean": 0,
@@ -3669,19 +3666,19 @@
       "unit": "%",
       "better": "lower",
       "baseline": {
-       "mean": 74.26,
-       "min": 73.84,
-       "max": 74.68
+       "mean": 73.84,
+       "min": 72.86,
+       "max": 74.82
       },
       "patched": {
-       "mean": 73.84,
-       "min": 73,
-       "max": 74.68
+       "mean": 74.05,
+       "min": 73.14,
+       "max": 74.96
       },
       "delta": {
-       "mean": -0.4200000000000017,
-       "min": -0.8400000000000034,
-       "max": 0
+       "mean": 0.21000000000000085,
+       "min": 0.14000000000000057,
+       "max": 0.28000000000000114
       },
       "verdict": "no_clear_effect"
      },
@@ -3708,7 +3705,7 @@
       "verdict": "improved"
      }
     ],
-    "verdict": "improved"
+    "verdict": "worse"
    }
   }
  }

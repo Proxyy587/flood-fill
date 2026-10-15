@@ -11,8 +11,8 @@ import { asBuildingId, asNpcId, asRequestId, asVehicleId, type EntityRef } from 
 import type { InspectorData } from '../inspector';
 import type { MetricsFrame, RunSummary } from '../metrics';
 import { DEFAULT_NPC_PARAMS, type NpcParams } from '../params';
-import type { BuildingDef, DispatchMode, InjectedEvent, Scenario } from '../scenario';
-import { chunkOfCell, type RenderSnapshot, type WorldSnapshot } from '../snapshot';
+import type { BuildingDef, DispatchMode, HotspotKind, InjectedEvent, Scenario } from '../scenario';
+import { chunkOfCell, ZONE, type RenderSnapshot, type WorldSnapshot } from '../snapshot';
 import { bridgeDeckHeights, isSignalJunction, signalPhase } from '../world';
 import { createMockRng, type MockRng } from './rng';
 import { mockBuildingNames } from './scenario';
@@ -50,6 +50,30 @@ const DARK_SIGNAL_STOP = 3;
 /** Ticks held before a vehicle counts as gridlocked; after twice this it looks for another way. */
 const GRIDLOCK_WAIT = 30;
 const RESCUERS_PER_TEAM = 4;
+
+// Emergency services.
+/** Pedestrians walk this far (cells) off the road centreline, on the footpath. */
+const FOOTPATH_OFFSET = 0.4;
+const MAX_INJURIES = 14;
+/** Minimum ticks between new injuries, so each one can be followed. */
+const INJURY_GAP = 110;
+/** Ticks without an ambulance that can reach before the casualty is handed to boats or helicopters. */
+const AMBULANCE_UNREACHABLE = 120;
+/** Ticks a closure waits for a police car before traffic police on foot put the barricades up. */
+const ROADBLOCK_FALLBACK = 150;
+/** Ticks a diversion stays marked after traffic was sent along it. */
+const DETOUR_TICKS = 240;
+/** Ticks dry before a waterlogged section reopens. */
+const REOPEN_DRY = 120;
+/** Seconds of saturating rain (intensity-weighted) before the hill cut slides. */
+const SLOPE_FAILURE = 1500;
+/** Metre-seconds of river standing high against a weak levee before it breaches. */
+const LEVEE_FAILURE = 700;
+/** The weak levee starts to seep once the river is this close to its crest (m). */
+const LEVEE_FREEBOARD = 1.2;
+/** Ticks between helicopter food drops to the same district. */
+const DROP_INTERVAL = 600;
+const PACKETS_PER_RESIDENT = 2;
 
 // Local (pluvial) flooding. Volumes are in cell·metres (1 cell = 16 m²).
 /** Rain intensity 1.0 is a 150 mm/h cloudburst. */
@@ -127,6 +151,10 @@ interface Mover {
   wait: number;
   /** Ticks stopped at the line of a dark (unpowered) signal. */
   stopWait: number;
+  /** Destination cell for routed trips (ambulance, police post), -1 to wander. */
+  goal: number;
+  /** Pedestrians keep to the footpath on this side of the street (+1 right, -1 left); 0 for vehicles. */
+  foot: number;
 }
 
 interface Walker extends Mover {
@@ -139,8 +167,13 @@ interface Walker extends Mover {
   strandedAt: number;
   requestId: number;
   assignedTo: number;
+  injuredAt: number;
+  injury: string;
   decision?: InspectorData['lastDecision'];
 }
+
+/** What a vehicle is doing beyond its basic phase. */
+type Mission = 'none' | 'patient' | 'hospital' | 'return' | 'roadblock' | 'post' | 'drop';
 
 interface Vehicle extends Mover {
   id: number;
@@ -155,6 +188,44 @@ interface Vehicle extends Mover {
   failed: boolean;
   tx: number;
   tz: number;
+  mission: Mission;
+  /** Walker index carried or sought (ambulances); closure index (police). */
+  ref: number;
+  /** Hospital index the ambulance is driving to. */
+  hospital: number;
+}
+
+const MISSION_LABEL: Record<Mission, string> = {
+  none: 'Standby',
+  patient: 'Driving to a casualty',
+  hospital: 'Taking a patient to hospital',
+  return: 'Returning to base',
+  roadblock: 'Driving to set up a roadblock',
+  post: 'Holding a roadblock',
+  drop: 'Food and water drop',
+};
+
+interface HotspotState {
+  name: string;
+  kind: HotspotKind;
+  cells: number[];
+  /** 0 quiet, 1 waterlogged / slid / breached. */
+  hit: boolean;
+  /** Ticks dry since it last flooded (waterlogging) or accumulated stress (levee, slope). */
+  counter: number;
+}
+
+/** A road section closed by the authorities, with its barricade points. */
+interface Closure {
+  name: string;
+  cells: number[];
+  barricades: number[];
+  /** Police are on site and barricades are up. */
+  policed: boolean;
+  since: number;
+  active: boolean;
+  /** Water closures lift once the section drains; bridge and debris closures stay. */
+  lifts: boolean;
 }
 
 interface Report {
@@ -218,10 +289,12 @@ const ACTOR_KIND: Partial<Record<SimEventType, EventActorKind>> = {
   GENERATOR_EXHAUSTED: 'building',
   HOSPITAL_DIVERSION_ON: 'building',
   SHELTER_OVERFLOW: 'building',
+  CAMP_OPENED: 'building',
   NPC_STRANDED: 'npc',
   REQUEST_CREATED: 'npc',
+  INJURY_REPORTED: 'npc',
 };
-const NPC_TARGET = new Set<SimEventType>(['HELI_DISPATCH', 'HELI_PICKUP', 'ROOFTOP_RESCUE']);
+const NPC_TARGET = new Set<SimEventType>(['HELI_DISPATCH', 'HELI_PICKUP', 'ROOFTOP_RESCUE', 'AMBULANCE_DISPATCH', 'MEDEVAC', 'HOSPITAL_ASSIGN']);
 
 export class MockSim {
   readonly scenario: Scenario;
@@ -300,6 +373,25 @@ export class MockSim {
   private pendingInjected: InjectedEvent[];
   private dirty = new Set<number>();
 
+  // Showcase: alerts, hotspots, closures, casualties.
+  private hotspots: HotspotState[] = [];
+  private closures: Closure[] = [];
+  /** Police / authority closure: shut to private traffic and pedestrians, open to emergency units. */
+  private authority: Uint8Array;
+  private prone: Uint8Array;
+  private breach: Uint8Array;
+  private detourUntil: Int32Array;
+  private alertIssued = false;
+  private injuries = 0;
+  private lastInjury = -Infinity;
+  private teamWaves = 0;
+  private openedCamps = new Set<number>();
+  private admitted = new Map<number, { ambulance: number; heli: number }>();
+  private dropsAt = new Map<number, number>();
+  private bfsPrev: Int32Array;
+  private bfsDist: Int32Array;
+  private bfsQueue: Int32Array;
+
   private log: SimEvent[] = [];
   private pending: SimEvent[] = [];
   readonly metricsLog: MetricsFrame[] = [];
@@ -330,6 +422,16 @@ export class MockSim {
     this.districtOf = new Int16Array(this.n).fill(-1);
     scenario.districts.forEach((d, i) => d.cells.forEach((c) => (this.districtOf[c] = i)));
     this.pendingInjected = [...scenario.injected].sort((a, b) => a.t - b.t);
+    this.authority = new Uint8Array(this.n);
+    this.prone = new Uint8Array(this.n);
+    this.breach = new Uint8Array(this.n);
+    this.detourUntil = new Int32Array(this.n);
+    this.bfsPrev = new Int32Array(this.n);
+    this.bfsDist = new Int32Array(this.n);
+    this.bfsQueue = new Int32Array(this.n);
+    this.hotspots = (scenario.hotspots ?? [])
+      .map((h) => ({ name: h.name, kind: h.kind, cells: h.cells.filter((c) => c >= 0 && c < this.n), hit: false, counter: 0 }))
+      .filter((h) => h.cells.length > 0);
 
     for (let c = 0; c < this.n; c++) {
       if (this.blocks[c] === BlockType.WaterSource) this.water[c] = RIVER_BASE_STAGE - this.ground[c];
@@ -369,6 +471,8 @@ export class MockSim {
 
   private passable(c: number, limit: number): boolean {
     if (!this.isRoad(c) || this.debris[c]) return false;
+    // Police barricades keep cars and people out; emergency units (deeper limit) are waved through.
+    if (this.authority[c] && limit <= MOCK_LIMITS.car) return false;
     if (this.blocks[c] === BlockType.Bridge) {
       const span = this.spanOf[c];
       return !this.bridgeClosed && !this.overtopped.has(span) && !this.closedSpans.has(span);
@@ -657,6 +761,8 @@ export class MockSim {
       lastReroute: -1000,
       wait: 0,
       stopWait: 0,
+      goal: -1,
+      foot: 0,
     };
   }
 
@@ -703,8 +809,9 @@ export class MockSim {
     const addVehicle = (kind: VehicleKind, cell: number, speed: number, depthLimit: number, state: VehicleState) => this.addVehicle(kind, cell, speed, depthLimit, state);
     const cars = Math.round((pop.count * pop.mix.carOwners) / 4);
     for (let i = 0; i < cars; i++) addVehicle(VehicleKind.Car, this.rng.pick(roads), this.rng.range(0.6, 0.9), MOCK_LIMITS.car, VehicleState.Driving);
+    // Ambulances wait at their hospitals until a casualty is reported.
     for (let i = 0; i < fleet.ambulances; i++) {
-      addVehicle(VehicleKind.Ambulance, hospitals.length ? hospitals[i % hospitals.length] : this.rng.pick(roads), 1.0, MOCK_LIMITS.emergency, VehicleState.Responding);
+      addVehicle(VehicleKind.Ambulance, hospitals.length ? hospitals[i % hospitals.length] : this.rng.pick(roads), 1.0, MOCK_LIMITS.emergency, VehicleState.Parked);
     }
     for (let i = 0; i < fleet.policeCars; i++) {
       addVehicle(VehicleKind.PoliceCar, police.length ? police[i % police.length] : this.rng.pick(roads), 0.95, MOCK_LIMITS.emergency, VehicleState.Driving);
@@ -721,7 +828,8 @@ export class MockSim {
 
   private addWalker(role: NpcRole, cell: number): void {
     this.walkers.push({
-      ...this.makeMover(cell, this.rng.range(0.18, 0.32), this.rng.range(-0.32, 0.32)),
+      ...this.makeMover(cell, this.rng.range(0.18, 0.32), FOOTPATH_OFFSET),
+      foot: this.rng.chance(0.5) ? 1 : -1,
       id: this.nextNpcId++,
       role,
       state: role === NpcRole.Civilian ? NpcState.Commuting : NpcState.OnDuty,
@@ -731,6 +839,8 @@ export class MockSim {
       strandedAt: -1,
       requestId: -1,
       assignedTo: -1,
+      injuredAt: -1,
+      injury: '',
     });
   }
 
@@ -749,13 +859,16 @@ export class MockSim {
       failed: false,
       tx: this.cx(cell) + 0.5,
       tz: this.cz(cell) + 0.5,
+      mission: 'none',
+      ref: -1,
+      hospital: -1,
     };
     this.vehicles.push(v);
     return v;
   }
 
   /** Releases boat teams from HQ (or the boat depot) onto the floodwater nearest to it. */
-  private deployTeams(count: number): void {
+  private deployTeams(count: number, why = ''): void {
     const base = this.buildings.find((b) => b?.type === BlockType.FloodHQ) ?? this.buildings.find((b) => b?.type === BlockType.BoatDepot) ?? null;
     const from = base?.entrance ?? this.roadCells()[0] ?? 0;
     let launch = -1;
@@ -776,8 +889,8 @@ export class MockSim {
     const where = base ? this.nameOf(base) : 'the riverbank';
     this.emit(
       'TEAMS_DEPLOYED',
-      `${count} SDRF boat team${count === 1 ? '' : 's'} released at ${where}: ${count} boat${count === 1 ? '' : 's'} and ${count * RESCUERS_PER_TEAM} rescuers launch at ${this.cellName(launch)}, ${best === Infinity ? 'on the river' : `${best * 4} m from base`}`,
-      { cell: launch, data: { teams: count, rescuers: count * RESCUERS_PER_TEAM } },
+      `${why}${count} SDRF boat team${count === 1 ? '' : 's'} released at ${where}: ${count} boat${count === 1 ? '' : 's'} and ${count * RESCUERS_PER_TEAM} rescuers launch at ${this.cellName(launch)}, ${best === Infinity ? 'on the river' : `${best * 4} m from base`}`,
+      { cell: launch, data: { teams: count, rescuers: count * RESCUERS_PER_TEAM, auto: why !== '' } },
     );
   }
 
@@ -804,6 +917,7 @@ export class MockSim {
     this.stepFlood();
     this.stepPower();
     this.stepHazards();
+    this.stepEmergency();
     this.stepReports();
     this.stepDecisions();
     this.stepMovement();
@@ -1013,6 +1127,7 @@ export class MockSim {
       this.overtopped.add(span);
       const c = this.spanOf.indexOf(span);
       this.emit('BRIDGE_OVERTOPPED', `river stage ${round2(this.stage)} m above the ${this.spanDeck[span]} m deck at ${this.cellName(c)}; span closed to all traffic`, { cell: c });
+      this.openClosure(`the bridge at ${this.cellName(c)}`, this.spanCells(span), false);
       newlyClosed++;
     }
     if (newlyClosed > 0 || this.tick % 30 === 0) this.computeShelterField();
@@ -1079,6 +1194,578 @@ export class MockSim {
         data: { complied },
       });
     }
+  }
+
+  // ---------- emergency services and named hazards ----------
+
+  private stepEmergency(): void {
+    this.stepAlert();
+    this.stepHotspots();
+    this.stepClosures();
+    this.stepTeams();
+    if (this.tick % 10 === 0) this.stepInjuries();
+    if (this.tick % 5 === 0) {
+      this.dispatchAmbulances();
+      this.dispatchFoodDrops();
+    }
+  }
+
+  /** First response: the control room names the flood-prone areas as soon as heavy rain sets in. */
+  private stepAlert(): void {
+    if (this.alertIssued || this.rain < 0.3) return;
+    this.alertIssued = true;
+    const spots = this.hotspots.filter((h) => h.kind === 'waterlogging' || h.kind === 'levee');
+    for (const h of this.hotspots) for (const c of h.cells) this.prone[c] = 1;
+    const names = this.hotspots.map((h) => h.name);
+    const list = names.length ? names.join(', ') : 'low-lying streets near the river';
+    this.emit(
+      'FLOOD_ALERT',
+      `Heavy-rain alert at ${Math.round(this.rain * RAIN_MM_PER_HOUR_AT_FULL)} mm/h. Flood-prone areas: ${list}. Residents told to avoid them; police and NDRF on standby`,
+      { ...(spots[0] ? { cell: this.centreOf(spots[0].cells) } : {}), data: { areas: this.hotspots.length } },
+    );
+  }
+
+  private centreOf(cells: number[]): number {
+    let sx = 0;
+    let sz = 0;
+    for (const c of cells) {
+      sx += this.cx(c);
+      sz += this.cz(c);
+    }
+    const mx = sx / cells.length;
+    const mz = sz / cells.length;
+    let best = cells[0];
+    let bestD = Infinity;
+    for (const c of cells) {
+      const d = (this.cx(c) - mx) ** 2 + (this.cz(c) - mz) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  private stepHotspots(): void {
+    for (const h of this.hotspots) {
+      if (h.kind === 'waterlogging') {
+        let deepest = h.cells[0];
+        for (const c of h.cells) if (this.water[c] > this.water[deepest]) deepest = c;
+        const depth = this.water[deepest];
+        if (!h.hit && depth >= MOCK_LIMITS.car) {
+          h.hit = true;
+          h.counter = 0;
+          const wet = h.cells.filter((c) => this.water[c] > 0.1).length;
+          const why = this.blocks[deepest] === BlockType.Road && this.ground[deepest] < Math.max(...this.neighbours(deepest).map((nb) => this.ground[nb]))
+            ? 'it sits below the streets around it'
+            : 'drains cannot keep up';
+          this.emit('WATERLOGGING', `${h.name} waterlogged: ${round2(depth)} m deep, ${wet} of ${h.cells.length} road cells under water; ${why}`, {
+            cell: deepest,
+            data: { depth: round2(depth), cells: wet, name: h.name },
+          });
+          this.openClosure(h.name, h.cells, true);
+        } else if (h.hit) {
+          h.counter = depth < 0.1 ? h.counter + 1 : 0;
+          if (h.counter === REOPEN_DRY) {
+            h.hit = false;
+            const cl = this.closures.find((x) => x.name === h.name && x.active);
+            if (cl) this.liftClosure(cl, `${h.name} drained below 0.1 m for ${REOPEN_DRY} s; barricades lifted`);
+          }
+        }
+      } else if (h.kind === 'landslide' && !h.hit) {
+        h.counter += this.rain;
+        if (h.counter >= SLOPE_FAILURE) this.landslide(h);
+      } else if (h.kind === 'levee' && !h.hit) {
+        const crest = Math.min(...h.cells.map((c) => this.barrier(c)));
+        const head = this.stage - (crest - LEVEE_FREEBOARD);
+        if (head > 0) h.counter += head;
+        if (h.counter >= LEVEE_FAILURE) this.leveeBreach(h, crest);
+      }
+    }
+  }
+
+  private landslide(h: HotspotState): void {
+    h.hit = true;
+    for (const c of h.cells) {
+      this.debris[c] = 1;
+      for (const v of this.vehicles) {
+        if (v.cell === c && (v.kind === VehicleKind.Car || v.kind === VehicleKind.Bus)) {
+          v.state = VehicleState.Stalled;
+          this.emit('VEHICLE_STALLED', `${VehicleKind[v.kind]} #${v.id} trapped by the landslide at ${h.name}`, { actor: asVehicleId(v.id), cell: c });
+        }
+      }
+    }
+    const mm = Math.round((h.counter * RAIN_MM_PER_HOUR_AT_FULL) / 3600);
+    const centre = this.centreOf(h.cells);
+    this.emit('LANDSLIDE', `Rain-soaked slope above ${h.name} gave way after ~${mm} mm of rain; ${h.cells.length} road cells buried under mud and rock`, {
+      cell: centre,
+      data: { cells: h.cells.length, rainMm: mm, name: h.name },
+    });
+    // Someone on the road below is caught by the debris.
+    let victim = -1;
+    let best = 3.5;
+    this.walkers.forEach((a, i) => {
+      if (a.role !== NpcRole.Civilian || (a.state !== NpcState.Commuting && a.state !== NpcState.Evacuating)) return;
+      const d = Math.hypot(a.x - this.cx(centre) - 0.5, a.z - this.cz(centre) - 0.5);
+      if (d < best) {
+        best = d;
+        victim = i;
+      }
+    });
+    if (victim >= 0) this.injure(victim, `struck by falling rock in the ${h.name} landslide`);
+    this.openClosure(h.name, h.cells, false);
+    this.computeShelterField();
+  }
+
+  private leveeBreach(h: HotspotState, crest: number): void {
+    h.hit = true;
+    // The middle of the weak section washes out.
+    const sorted = [...h.cells].sort((a, b) => this.cz(a) - this.cz(b) || this.cx(a) - this.cx(b));
+    const mid = Math.floor(sorted.length / 2);
+    const gap = sorted.slice(Math.max(0, mid - 1), mid + 2);
+    for (const c of gap) {
+      this.blocks[c] = BlockType.Dirt;
+      this.ground[c] = Math.max(0, this.ground[c] - 1);
+      this.breach[c] = 1;
+      this.dirty.add(chunkOfCell(this.w, c));
+      for (const nb of this.neighbours(c)) this.dirty.add(chunkOfCell(this.w, nb));
+    }
+    this.rebuildCaches();
+    const district = this.scenario.districts[this.districtOf[gap[0]]]?.name ?? 'the suburb';
+    this.emit(
+      'LEVEE_BREACH',
+      `${h.name} breached: the river stood within ${LEVEE_FREEBOARD} m of the ${round2(crest)} m crest until seepage washed out ${gap.length} cells; water pours into ${district}`,
+      { cell: gap[Math.floor(gap.length / 2)], data: { cells: gap.length, stage: round2(this.stage), name: h.name } },
+    );
+  }
+
+  /** Opens an authority closure and sends the nearest free police car to hold its barricades. */
+  private openClosure(name: string, cells: number[], lifts: boolean): void {
+    const inside = new Set(cells);
+    const barricades = new Set<number>();
+    for (const c of cells) {
+      for (const nb of this.neighbours(c)) if (!inside.has(nb) && this.isRoad(nb) && this.blocks[nb] !== BlockType.Bridge) barricades.add(nb);
+    }
+    const existing = this.closures.find((x) => x.name === name);
+    const cl: Closure = existing ?? { name, cells, barricades: [...barricades], policed: false, since: this.tick, active: true, lifts };
+    if (existing) Object.assign(existing, { cells, barricades: [...barricades], policed: false, since: this.tick, active: true });
+    else this.closures.push(cl);
+    const index = this.closures.indexOf(cl);
+    if (cl.barricades.length === 0) return;
+    let best: Vehicle | null = null;
+    let bestD = Infinity;
+    let goal = -1;
+    for (const v of this.vehicles) {
+      if (v.kind !== VehicleKind.PoliceCar || v.failed || v.state === VehicleState.Stalled || (v.mission !== 'none' && v.mission !== 'return')) continue;
+      const dist = this.distancesFrom(v.cell, MOCK_LIMITS.emergency);
+      for (const b of cl.barricades) {
+        if (dist[b] >= 0 && dist[b] < bestD) {
+          bestD = dist[b];
+          best = v;
+          goal = b;
+        }
+      }
+    }
+    if (!best) return;
+    best.mission = 'roadblock';
+    best.ref = index;
+    best.state = VehicleState.Responding;
+    best.goal = goal;
+    best.stuck = 0;
+    this.replan(best, best.depthLimit, 'route');
+  }
+
+  private liftClosure(cl: Closure, reason: string): void {
+    cl.active = false;
+    for (const c of cl.cells) this.authority[c] = 0;
+    for (const v of this.vehicles) {
+      if (v.kind === VehicleKind.PoliceCar && (v.mission === 'post' || v.mission === 'roadblock') && this.closures[v.ref] === cl) {
+        v.mission = 'none';
+        v.goal = -1;
+        v.state = VehicleState.Driving;
+      }
+    }
+    this.emit('ROAD_REOPENED', reason, { cell: this.centreOf(cl.cells) });
+    this.computeShelterField();
+  }
+
+  /** Barricades go up when police arrive, or after a while by traffic police on foot. */
+  private raiseBarricades(cl: Closure, by: string): void {
+    if (cl.policed || !cl.active) return;
+    cl.policed = true;
+    for (const c of cl.cells) this.authority[c] = 1;
+    // The signed diversion: the shortest way between the two barricades furthest apart.
+    let a = -1;
+    let b = -1;
+    let far = -1;
+    for (const p of cl.barricades) {
+      for (const q of cl.barricades) {
+        const d = Math.abs(this.cx(p) - this.cx(q)) + Math.abs(this.cz(p) - this.cz(q));
+        if (d > far) {
+          far = d;
+          a = p;
+          b = q;
+        }
+      }
+    }
+    const path = a >= 0 && b >= 0 && a !== b ? this.pathTo(a, b, MOCK_LIMITS.car) : null;
+    if (path) for (const c of [a, ...path]) this.detourUntil[c] = this.tick + DETOUR_TICKS * 4;
+    const via = path ? `traffic diverted around it (${(path.length + 1) * 4} m detour)` : 'no way round for traffic';
+    this.emit('ROADBLOCK', `${by} seal off ${cl.name}: ${cl.barricades.length} barricade${cl.barricades.length === 1 ? '' : 's'} up; ${via}`, {
+      cell: cl.barricades[0],
+      data: { barricades: cl.barricades.length, detourCells: path ? path.length + 1 : 0, name: cl.name },
+    });
+    this.computeShelterField();
+  }
+
+  private stepClosures(): void {
+    for (const cl of this.closures) {
+      if (cl.active && !cl.policed && this.tick - cl.since >= ROADBLOCK_FALLBACK) this.raiseBarricades(cl, 'Traffic police on foot');
+    }
+  }
+
+  /** HQ releases boat teams on its own once flooding passes set levels. */
+  private stepTeams(): void {
+    const stranded = this.walkers.filter((a) => a.state === NpcState.Stranded).length;
+    if (this.teamWaves === 0 && (this.floodThresholdsHit >= 2 || stranded >= 6)) {
+      this.teamWaves = 1;
+      this.deployTeams(3, `HQ auto-release: ${this.floodThresholdsHit >= 2 ? 'flooding passed 5% of the city' : `${stranded} people stranded`}. `);
+    } else if (this.teamWaves === 1 && (this.floodThresholdsHit >= 3 || stranded >= 16) && this.tick - this.lastTeamWave() > 300) {
+      this.teamWaves = 2;
+      this.deployTeams(3, `HQ second wave: ${this.floodThresholdsHit >= 3 ? 'flooding passed 10% of the city' : `${stranded} people stranded`}. `);
+    }
+  }
+
+  private lastTeamWave(): number {
+    for (let i = this.log.length - 1; i >= 0; i--) if (this.log[i].type === 'TEAMS_DEPLOYED') return this.log[i].tick;
+    return -Infinity;
+  }
+
+  /** Wading, debris, live wires and gale-blown branches hurt people; each one is a job for an ambulance. */
+  private stepInjuries(): void {
+    if (this.injuries >= MAX_INJURIES || this.rain < 0.3 || this.tick - this.lastInjury < INJURY_GAP) return;
+    const wading: number[] = [];
+    const shocked: number[] = [];
+    const branches: number[] = [];
+    this.walkers.forEach((a, i) => {
+      if (a.role !== NpcRole.Civilian || (a.state !== NpcState.Commuting && a.state !== NpcState.Evacuating)) return;
+      const d = this.depthAt(a.cell);
+      if (d > 0.12) wading.push(i);
+      if (d > 0.2 && this.power[a.cell] === PowerState.Grid) shocked.push(i);
+      if (this.wind > 0.6 && this.neighbours(a.cell).some((nb) => this.blocks[nb] === BlockType.Tree)) branches.push(i);
+    });
+    // The first casualty comes as soon as people start wading; later ones are rarer.
+    const chance = this.injuries === 0 ? 1 : 0.35;
+    if (!this.rng.chance(chance)) return;
+    if (shocked.length && this.rng.chance(0.3)) this.injure(this.rng.pick(shocked), 'electric shock from a submerged junction box');
+    else if (branches.length && this.rng.chance(0.3)) this.injure(this.rng.pick(branches), 'hit by a branch torn off in the gale');
+    else if (wading.length) this.injure(this.rng.pick(wading), this.rng.chance(0.5) ? 'slipped in fast-moving water and broke an ankle' : 'cut by debris hidden under the water');
+  }
+
+  private injure(i: number, how: string): void {
+    const a = this.walkers[i];
+    if (!a || a.state === NpcState.Injured || a.state === NpcState.Rescued || a.state === NpcState.Sheltering) return;
+    a.state = NpcState.Injured;
+    a.injuredAt = this.tick;
+    a.injury = how;
+    a.next = -1;
+    a.progress = 0;
+    a.plan = [];
+    a.requestId = this.nextRequest++;
+    a.assignedTo = -1;
+    this.requestCreated.set(a.requestId, this.tick);
+    this.injuries++;
+    this.lastInjury = this.tick;
+    const nth = this.injuries === 1 ? 'First casualty' : `Casualty ${this.injuries}`;
+    this.emit('INJURY_REPORTED', `${nth}: civilian #${a.id} ${how} at ${this.cellName(a.cell)}; 108 call logged, ambulance requested`, {
+      actor: asNpcId(a.id),
+      cell: a.cell,
+      data: { injuries: this.injuries },
+    });
+  }
+
+  /** Nearest free ambulance by road answers each casualty, oldest first. */
+  private dispatchAmbulances(): void {
+    const waiting = this.walkers
+      .map((a, i) => ({ a, i }))
+      .filter(({ a }) => a.state === NpcState.Injured && a.assignedTo < 0)
+      .sort((p, q) => p.a.injuredAt - q.a.injuredAt);
+    for (const { a, i } of waiting) {
+      const free = this.vehicles.filter(
+        (v) => v.kind === VehicleKind.Ambulance && !v.failed && v.state !== VehicleState.Stalled && (v.mission === 'none' || v.mission === 'return'),
+      );
+      if (!free.length) return;
+      const dist = this.passable(a.cell, MOCK_LIMITS.emergency) ? this.distancesFrom(a.cell, MOCK_LIMITS.emergency) : null;
+      let best: Vehicle | null = null;
+      let bestD = Infinity;
+      for (const v of free) {
+        const d = dist ? dist[v.cell] : -1;
+        if (d >= 0 && d < bestD) {
+          bestD = d;
+          best = v;
+        }
+      }
+      if (!best) {
+        if (this.tick - a.injuredAt >= AMBULANCE_UNREACHABLE) this.handOverCasualty(a, i);
+        continue;
+      }
+      a.assignedTo = best.id;
+      best.mission = 'patient';
+      best.ref = i;
+      best.goal = a.cell;
+      best.state = VehicleState.Responding;
+      best.stuck = 0;
+      this.replan(best, best.depthLimit, 'route');
+      const from = this.hospitalAt(best.cell);
+      this.emit(
+        'AMBULANCE_DISPATCH',
+        `Ambulance #${best.id}${from >= 0 ? ` from ${this.buildingNames[from]}` : ''} sent to #${a.id} (${a.injury}): ${bestD * 4} m by road, ETA ~${Math.round(bestD / best.speed)} s`,
+        { actor: asVehicleId(best.id), target: asNpcId(a.id), cell: a.cell, data: { eta: Math.round(bestD / best.speed), metres: bestD * 4 } },
+      );
+    }
+  }
+
+  /** No road reaches the casualty: it becomes a rescue request for boats and helicopters. */
+  private handOverCasualty(a: Walker, i: number): void {
+    a.state = NpcState.Stranded;
+    a.strandedAt = this.tick;
+    this.emit('NPC_STRANDED', `injured #${a.id} cut off at ${this.cellName(a.cell)}: no ambulance can reach by road for ${AMBULANCE_UNREACHABLE} s; boat or helicopter requested`, {
+      actor: asNpcId(a.id),
+      cell: a.cell,
+    });
+    if (this.tick >= this.commsDownUntil) this.createReport(i, true);
+  }
+
+  private hospitalAt(cell: number): number {
+    return this.buildings.findIndex((b) => b?.type === BlockType.Hospital && b.entrance === cell);
+  }
+
+  /** Hospital index → beds in use. */
+  private bedsUsed(i: number): number {
+    return this.hospitalLoad.get(i) ?? 0;
+  }
+
+  /** A hospital may take patients only with power (grid or generator) and a free bed. */
+  private hospitalProblem(i: number): string | null {
+    const b = this.buildings[i];
+    if (!b) return 'closed';
+    if (this.power[b.cells[0]] === PowerState.Off) return 'no power';
+    if (this.bedsUsed(i) >= b.capacity) return `full (${b.capacity}/${b.capacity} beds)`;
+    return null;
+  }
+
+  private pickHospital(v: Vehicle): { index: number; note: string } | null {
+    const dist = this.distancesFrom(v.cell, v.depthLimit);
+    const options: { i: number; d: number }[] = [];
+    this.buildings.forEach((b, i) => {
+      if (b?.type !== BlockType.Hospital) return;
+      const d = dist[b.entrance];
+      if (d >= 0) options.push({ i, d });
+    });
+    options.sort((p, q) => p.d - q.d);
+    if (!options.length) return null;
+    const ok = options.find((o) => this.hospitalProblem(o.i) === null);
+    if (!ok) return { index: options[0].i, note: `every reachable hospital is full or dark; declared overflow at ${this.buildingNames[options[0].i]}` };
+    const nearest = options[0];
+    if (nearest.i !== ok.i) {
+      return { index: ok.i, note: `${this.buildingNames[nearest.i]} ${this.hospitalProblem(nearest.i)}, diverted to ${this.buildingNames[ok.i]}` };
+    }
+    return { index: ok.i, note: '' };
+  }
+
+  private arriveAmbulance(v: Vehicle): void {
+    if (v.mission === 'patient') {
+      const a = this.walkers[v.ref];
+      if (!a || a.state !== NpcState.Injured) {
+        this.sendBack(v);
+        return;
+      }
+      a.state = NpcState.Rescued;
+      const created = this.requestCreated.get(a.requestId) ?? a.injuredAt;
+      this.served.push({ created, served: this.tick, district: Math.max(0, this.districtOf[a.cell]) });
+      const h = this.pickHospital(v);
+      if (!h) {
+        this.emit('MEDEVAC', `#${a.id} loaded into Ambulance #${v.id} after ${this.tick - a.injuredAt} s, but no hospital is reachable by road; holding on scene`, {
+          actor: asVehicleId(v.id),
+          target: asNpcId(a.id),
+          cell: v.cell,
+        });
+        v.mission = 'none';
+        v.goal = -1;
+        v.state = VehicleState.Parked;
+        return;
+      }
+      v.mission = 'hospital';
+      v.hospital = h.index;
+      v.goal = (this.buildings[h.index] as BuildingDef).entrance;
+      v.state = VehicleState.Transporting;
+      this.replan(v, v.depthLimit, 'route');
+      this.emit('MEDEVAC', `Paramedics load #${a.id} into Ambulance #${v.id} ${this.tick - a.injuredAt} s after the call; heading to ${this.buildingNames[h.index]}`, {
+        actor: asVehicleId(v.id),
+        target: asNpcId(a.id),
+        cell: v.cell,
+      });
+      if (h.note) {
+        this.emit('HOSPITAL_DIVERT', `Ambulance #${v.id}: ${h.note}`, { actor: asVehicleId(v.id), cell: v.cell });
+      }
+      return;
+    }
+    if (v.mission === 'hospital') {
+      const i = v.hospital;
+      const b = this.buildings[i] as BuildingDef;
+      const used = this.bedsUsed(i) + 1;
+      this.hospitalLoad.set(i, used);
+      const adm = this.admitted.get(i) ?? { ambulance: 0, heli: 0 };
+      adm.ambulance++;
+      this.admitted.set(i, adm);
+      const a = this.walkers[v.ref];
+      this.emit('HOSPITAL_ASSIGN', `#${a?.id ?? '?'} admitted to ${this.buildingNames[i]} by Ambulance #${v.id}: ${used}/${b.capacity} beds in use`, {
+        actor: asVehicleId(v.id),
+        ...(a ? { target: asNpcId(a.id) } : {}),
+        cell: b.entrance,
+        data: { beds: used, capacity: b.capacity },
+      });
+      if (used === b.capacity) {
+        this.emit('HOSPITAL_DIVERSION_ON', `${this.buildingNames[i]} full (${b.capacity} beds); new patients diverted`, { actor: asBuildingId(i), cell: b.entrance });
+      }
+      v.mission = 'none';
+      v.goal = -1;
+      v.ref = -1;
+      v.base = v.cell;
+      v.state = VehicleState.Parked;
+      return;
+    }
+    if (v.mission === 'return') {
+      v.mission = 'none';
+      v.goal = -1;
+      v.state = VehicleState.Parked;
+    }
+  }
+
+  private sendBack(v: Vehicle): void {
+    v.mission = 'return';
+    v.goal = v.base;
+    v.ref = -1;
+    v.state = VehicleState.Returning;
+    this.replan(v, v.depthLimit, 'route');
+  }
+
+  /** Idle helicopters carry food and water to people sheltering upstairs in flooded homes. */
+  private dispatchFoodDrops(): void {
+    if (this.windGrounded || this.floodedHomes.size === 0) return;
+    // Rescues come first; supplies go out when the queue is short or people have waited too long for food.
+    const waiting = this.walkers.filter((a) => a.state === NpcState.Stranded && a.assignedTo < 0).length;
+    const lastDrop = Math.max(-Infinity, ...this.dropsAt.values());
+    if (waiting > 2 && this.tick - lastDrop < DROP_INTERVAL * 1.5) return;
+    const heli = this.vehicles.find((v) => v.kind === VehicleKind.Helicopter && v.phase === 'idle' && !v.failed && v.state !== VehicleState.Grounded);
+    if (!heli) return;
+    const byDistrict = new Map<number, { residents: number; cell: number }>();
+    for (const i of this.floodedHomes) {
+      const b = this.buildings[i];
+      if (!b) continue;
+      const d = Math.max(0, this.districtOf[b.entrance]);
+      const acc = byDistrict.get(d) ?? { residents: 0, cell: b.cells[0] };
+      acc.residents += b.capacity;
+      byDistrict.set(d, acc);
+    }
+    let pick = -1;
+    let most = 0;
+    for (const [d, acc] of byDistrict) {
+      if (this.tick - (this.dropsAt.get(d) ?? -Infinity) < DROP_INTERVAL) continue;
+      if (acc.residents > most) {
+        most = acc.residents;
+        pick = d;
+      }
+    }
+    if (pick < 0) return;
+    const target = byDistrict.get(pick) as { residents: number; cell: number };
+    this.dropsAt.set(pick, this.tick);
+    heli.mission = 'drop';
+    heli.ref = pick;
+    heli.phase = 'out';
+    heli.state = VehicleState.Flying;
+    heli.tx = this.cx(target.cell) + 0.5;
+    heli.tz = this.cz(target.cell) + 0.5;
+    heli.goal = target.cell;
+  }
+
+  private foodDrop(v: Vehicle): void {
+    const d = v.ref;
+    let residents = 0;
+    let homes = 0;
+    for (const i of this.floodedHomes) {
+      const b = this.buildings[i];
+      if (!b || Math.max(0, this.districtOf[b.entrance]) !== d) continue;
+      residents += b.capacity;
+      homes++;
+    }
+    const district = this.scenario.districts[d]?.name ?? 'the city';
+    this.emit(
+      'FOOD_DROP',
+      `Helicopter #${v.id} drops ${residents * PACKETS_PER_RESIDENT} food and water packets over ${district}: ${residents} residents of ${homes} flooded homes are sheltering upstairs`,
+      { actor: asVehicleId(v.id), cell: v.goal, data: { packets: residents * PACKETS_PER_RESIDENT, residents, homes } },
+    );
+  }
+
+  // ---------- routing ----------
+
+  /** Road distance (cells) from `from` to every reachable cell, -1 elsewhere. Shared buffer. */
+  private distancesFrom(from: number, limit: number): Int32Array {
+    const dist = this.bfsDist;
+    dist.fill(-1);
+    const q = this.bfsQueue;
+    let head = 0;
+    let tail = 0;
+    dist[from] = 0;
+    q[tail++] = from;
+    while (head < tail) {
+      const c = q[head++];
+      for (const nb of this.neighbours(c)) {
+        if (dist[nb] >= 0 || !this.passable(nb, limit)) continue;
+        dist[nb] = dist[c] + 1;
+        q[tail++] = nb;
+      }
+    }
+    return dist;
+  }
+
+  /** Shortest road path (excluding `from`) or null. */
+  private pathTo(from: number, goal: number, limit: number, avoid = -1): number[] | null {
+    if (from === goal) return [];
+    if (!this.passable(goal, limit)) return null;
+    const prev = this.bfsPrev;
+    prev.fill(-1);
+    const q = this.bfsQueue;
+    let head = 0;
+    let tail = 0;
+    prev[from] = from;
+    q[tail++] = from;
+    while (head < tail) {
+      const c = q[head++];
+      for (const nb of this.neighbours(c)) {
+        if (prev[nb] !== -1 || nb === avoid || !this.passable(nb, limit)) continue;
+        prev[nb] = c;
+        if (nb === goal) {
+          const path: number[] = [];
+          for (let k = goal; k !== from; k = prev[k]) path.push(k);
+          return path.reverse();
+        }
+        q[tail++] = nb;
+      }
+    }
+    return null;
+  }
+
+  private spanCells(span: number): number[] {
+    const out: number[] = [];
+    for (let c = 0; c < this.n; c++) if (this.spanOf[c] === span) out.push(c);
+    return out;
+  }
+
+  /** Marks the road ahead of a vehicle that just turned away from a closure. */
+  private markDetour(m: Mover): void {
+    const until = this.tick + DETOUR_TICKS;
+    for (const c of m.plan.slice(0, 8)) if (this.blocks[c] === BlockType.Road) this.detourUntil[c] = Math.max(this.detourUntil[c], until);
   }
 
   /** Marks homes with water above their floor; one aggregated event per district per minute. */
@@ -1170,6 +1857,7 @@ export class MockSim {
         a.strandedAt = this.tick;
         a.next = -1;
         a.progress = 0;
+        a.assignedTo = -1;
         a.requestId = this.nextRequest++;
         this.requestCreated.set(a.requestId, this.tick);
         this.emit('NPC_STRANDED', `depth ${round2(this.depthAt(a.cell))} at ${this.cellName(a.cell)} above safe wading depth ${MOCK_LIMITS.footSafe}`, {
@@ -1274,7 +1962,7 @@ export class MockSim {
 
   private stepMovement(): void {
     for (const a of this.walkers) {
-      if (a.state === NpcState.Sheltering || a.state === NpcState.Rescued || a.state === NpcState.Stranded) continue;
+      if (a.state === NpcState.Sheltering || a.state === NpcState.Rescued || a.state === NpcState.Stranded || a.state === NpcState.Injured) continue;
       const evac = a.state === NpcState.Evacuating;
       const slow = 1 - Math.min(0.7, this.depthAt(a.cell) * 1.5);
       this.advanceOnRoads(a, MOCK_LIMITS.footSafe, evac ? 'evac' : 'wander', slow, evac ? `npc` : null, asNpcId(a.id));
@@ -1370,6 +2058,14 @@ export class MockSim {
     if (bi < 0) return;
     const b = this.buildings[bi] as BuildingDef;
     const load = (this.shelterLoad.get(bi) ?? 0) + 1;
+    if (!this.openedCamps.has(bi) && load <= b.capacity) {
+      this.openedCamps.add(bi);
+      this.emit('CAMP_OPENED', `${this.buildingNames[bi]} opens as a relief camp: first evacuees registered; ${b.capacity} places, food, water and a medical desk`, {
+        actor: asBuildingId(bi),
+        cell: b.entrance,
+        data: { capacity: b.capacity },
+      });
+    }
     if (load > b.capacity) {
       if (!this.shelterOverflowed.has(bi)) {
         this.shelterOverflowed.add(bi);
@@ -1395,25 +2091,89 @@ export class MockSim {
         actor: asVehicleId(v.id),
         cell: v.cell,
       });
+      if (v.mission === 'patient') {
+        const a = this.walkers[v.ref];
+        if (a) a.assignedTo = -1;
+        this.emit('COMMIT_CANCELLED', `Ambulance #${v.id} stalled on the way; casualty re-queued for the next ambulance`, { actor: asVehicleId(v.id) });
+      }
       return;
     }
+    // Parked: ambulances on standby and police holding a barricade.
+    if ((v.kind === VehicleKind.Ambulance && v.mission === 'none') || v.mission === 'post') {
+      v.next = -1;
+      v.progress = 0;
+      this.placeMover(v);
+      return;
+    }
+    if (v.mission === 'patient' && this.walkers[v.ref]?.state !== NpcState.Injured) this.sendBack(v);
+    if (v.goal >= 0 && v.cell === v.goal) {
+      this.arrive(v);
+      return;
+    }
+    const routed = v.goal >= 0;
     // Cars crawl through standing water and slow down in heavy rain.
     const slow = (1 - Math.min(0.6, this.depthAt(v.cell) * 2)) * (1 - 0.2 * this.rain);
     const before = v.progress;
     const cell = v.cell;
-    this.advanceOnRoads(v, v.depthLimit, 'wander', slow, VehicleKind[v.kind], asVehicleId(v.id), this.trafficCap(v));
+    this.advanceOnRoads(v, v.depthLimit, routed ? 'route' : 'wander', slow, VehicleKind[v.kind], asVehicleId(v.id), this.trafficCap(v));
     v.wait = v.cell === cell && v.progress <= before + 1e-6 ? v.wait + 1 : 0;
+    if (routed && v.next < 0) {
+      v.stuck++;
+      if (v.stuck > AMBULANCE_UNREACHABLE) this.abandonMission(v);
+    } else if (routed) v.stuck = 0;
     if (v.wait > GRIDLOCK_WAIT * 2 && v.next >= 0) {
       // Give up on this way and turn around or take another street.
-      this.replan(v, v.depthLimit, 'wander', v.next);
+      this.replan(v, v.depthLimit, routed ? 'route' : 'wander', v.next);
       v.wait = GRIDLOCK_WAIT;
     }
+  }
+
+  private arrive(v: Vehicle): void {
+    if (v.kind === VehicleKind.PoliceCar) {
+      if (v.mission === 'roadblock') {
+        const cl = this.closures[v.ref];
+        v.mission = 'post';
+        v.goal = -1;
+        v.state = VehicleState.Parked;
+        if (cl) this.raiseBarricades(cl, `Police unit #${v.id}`);
+      } else {
+        v.mission = 'none';
+        v.goal = -1;
+        v.state = VehicleState.Driving;
+      }
+      return;
+    }
+    this.arriveAmbulance(v);
+  }
+
+  private abandonMission(v: Vehicle): void {
+    v.stuck = 0;
+    if (v.mission === 'patient') {
+      const a = this.walkers[v.ref];
+      if (a) a.assignedTo = -1;
+      this.emit('COMMIT_CANCELLED', `Ambulance #${v.id}: no road open to the casualty; returning, casualty re-queued`, { actor: asVehicleId(v.id) });
+      this.sendBack(v);
+      return;
+    }
+    if (v.mission === 'hospital') {
+      // Hold the patient and try again for any hospital.
+      const h = this.pickHospital(v);
+      if (h) {
+        v.hospital = h.index;
+        v.goal = (this.buildings[h.index] as BuildingDef).entrance;
+        this.replan(v, v.depthLimit, 'route');
+      }
+      return;
+    }
+    v.mission = 'none';
+    v.goal = -1;
+    v.state = v.kind === VehicleKind.Ambulance ? VehicleState.Parked : VehicleState.Driving;
   }
 
   private advanceOnRoads(
     m: Mover,
     limit: number,
-    mode: 'wander' | 'evac',
+    mode: 'wander' | 'evac' | 'route',
     speedFactor: number,
     rerouteLabel: string | null,
     actor: SimEvent['actor'],
@@ -1422,12 +2182,17 @@ export class MockSim {
     if (m.next < 0 || !this.passable(m.next, limit)) {
       const blocked = m.next;
       this.replan(m, limit, mode);
+      if (blocked >= 0 && rerouteLabel !== 'npc') this.markDetour(m);
       if (blocked >= 0 && rerouteLabel && this.tick - m.lastReroute > 60) {
         m.lastReroute = this.tick;
         const why =
           this.blocks[blocked] === BlockType.Bridge
             ? 'bridge closed'
-            : `cell ${this.cellName(blocked)} depth ${round2(this.water[blocked])} > ${rerouteLabel === 'npc' ? 'safe wading' : 'vehicle'} limit ${limit}`;
+            : this.debris[blocked]
+              ? `cell ${this.cellName(blocked)} blocked by debris`
+              : this.authority[blocked] && this.water[blocked] <= limit
+                ? `cell ${this.cellName(blocked)} closed by police barricade`
+                : `cell ${this.cellName(blocked)} depth ${round2(this.water[blocked])} > ${rerouteLabel === 'npc' ? 'safe wading' : 'vehicle'} limit ${limit}`;
         this.emit('REROUTE', why, {
           actor,
           actorKind: rerouteLabel === 'npc' ? 'npc' : 'vehicle',
@@ -1453,16 +2218,21 @@ export class MockSim {
     this.placeMover(m);
   }
 
-  private replan(m: Mover, limit: number, mode: 'wander' | 'evac', avoid = -1): void {
+  private replan(m: Mover, limit: number, mode: 'wander' | 'evac' | 'route', avoid = -1): void {
     m.plan = [];
     m.planVersion++;
     m.progress = 0;
     m.next = -1;
-    this.extendPlan(m, limit, mode, 12, avoid);
+    if (mode === 'route') {
+      m.plan = (m.goal >= 0 ? (this.pathTo(m.cell, m.goal, limit, avoid) ?? this.pathTo(m.cell, m.goal, limit)) : null) ?? [];
+    } else {
+      this.extendPlan(m, limit, mode, 12, avoid);
+    }
     m.next = m.plan.shift() ?? -1;
   }
 
-  private extendPlan(m: Mover, limit: number, mode: 'wander' | 'evac', want: number, avoid = -1): void {
+  private extendPlan(m: Mover, limit: number, mode: 'wander' | 'evac' | 'route', want: number, avoid = -1): void {
+    if (mode === 'route') return;
     const chain = [m.prev, m.cell, ...(m.next >= 0 ? [m.next] : []), ...m.plan];
     let last = chain[chain.length - 1];
     let before = chain[chain.length - 2];
@@ -1501,8 +2271,11 @@ export class MockSim {
     const ax = this.cx(m.cell) + 0.5;
     const az = this.cz(m.cell) + 0.5;
     if (m.next < 0 || m.progress === 0) {
-      m.x = ax + Math.cos(m.heading + Math.PI / 2) * m.lateral * 0.5;
-      m.z = az + Math.sin(m.heading + Math.PI / 2) * m.lateral * 0.5;
+      const dx = Math.round(Math.cos(m.heading));
+      const dz = Math.round(Math.sin(m.heading));
+      const lat = m.foot ? this.footLateral(m.cell, dx, dz, m.foot) : m.lateral * 0.5;
+      m.x = ax - dz * lat;
+      m.z = az + dx * lat;
       return;
     }
     const bx = this.cx(m.next) + 0.5;
@@ -1510,8 +2283,29 @@ export class MockSim {
     const dx = bx - ax;
     const dz = bz - az;
     m.heading = Math.atan2(dz, dx);
-    m.x = ax + dx * m.progress - dz * m.lateral;
-    m.z = az + dz * m.progress + dx * m.lateral;
+    // Pedestrians keep to the kerb side that has a footpath, easing across where the street turns.
+    const lat = m.foot
+      ? this.footLateral(m.cell, dx, dz, m.foot) * (1 - m.progress) + this.footLateral(m.next, dx, dz, m.foot) * m.progress
+      : m.lateral;
+    m.x = ax + dx * m.progress - dz * lat;
+    m.z = az + dz * m.progress + dx * lat;
+  }
+
+  /**
+   * Signed footpath offset for walking along (dx, dz) through `cell`: the
+   * preferred side unless that side is more road (a wide avenue or a
+   * junction), in which case the other kerb.
+   */
+  private footLateral(cell: number, dx: number, dz: number, side: number): number {
+    const x = this.cx(cell);
+    const z = this.cz(cell);
+    const roadAt = (s: number) => {
+      const nx = x - dz * s;
+      const nz = z + dx * s;
+      return nx >= 0 && nz >= 0 && nx < this.w && nz < this.h && this.isRoad(nz * this.w + nx);
+    };
+    const s = roadAt(side) && !roadAt(-side) ? -side : side;
+    return s * FOOTPATH_OFFSET;
   }
 
   private moveBoat(v: Vehicle): void {
@@ -1565,8 +2359,14 @@ export class MockSim {
     if (v.phase === 'hover') {
       v.hover--;
       if (v.hover <= 0) {
-        const a = this.walkers[v.targetNpc];
-        if (a) this.rescue(v, a, 'heli');
+        if (v.mission === 'drop') {
+          this.foodDrop(v);
+          v.mission = 'none';
+          v.goal = -1;
+        } else {
+          const a = this.walkers[v.targetNpc];
+          if (a) this.rescue(v, a, 'heli');
+        }
         v.phase = 'back';
         v.tx = this.cx(v.base) + 0.5;
         v.tz = this.cz(v.base) + 0.5;
@@ -1587,7 +2387,7 @@ export class MockSim {
       v.z = v.tz;
       if (v.phase === 'out') {
         v.phase = 'hover';
-        v.hover = 12;
+        v.hover = v.mission === 'drop' ? 20 : 12;
       } else {
         v.phase = 'idle';
         v.state = this.windGrounded ? VehicleState.Grounded : VehicleState.Landed;
@@ -1642,17 +2442,59 @@ export class MockSim {
         actor: asVehicleId(v.id),
         target: asNpcId(a.id),
       });
-      const hosp = this.buildings.findIndex((b) => b?.type === BlockType.Hospital && this.power[b.entrance] !== PowerState.Off);
-      if (hosp >= 0) this.hospitalLoad.set(hosp, (this.hospitalLoad.get(hosp) ?? 0) + 1);
+      // Casualties fly to a hospital with power and a bed; everyone else to a relief camp.
+      const hosp = a.injury ? this.buildings.findIndex((b, i) => b?.type === BlockType.Hospital && this.hospitalProblem(i) === null) : -1;
+      if (hosp >= 0) {
+        this.hospitalLoad.set(hosp, this.bedsUsed(hosp) + 1);
+        const adm = this.admitted.get(hosp) ?? { ambulance: 0, heli: 0 };
+        adm.heli++;
+        this.admitted.set(hosp, adm);
+        this.emit('HELI_DROPOFF', `#${a.id} (${a.injury}) flown to ${this.buildingNames[hosp]}: ${this.bedsUsed(hosp)}/${(this.buildings[hosp] as BuildingDef).capacity} beds`, {
+          actor: asVehicleId(v.id),
+          cell: (this.buildings[hosp] as BuildingDef).entrance,
+        });
+      } else {
+        this.toCamp(a, v, 'flown');
+      }
     } else {
       v.phase = 'idle';
       v.state = VehicleState.Parked;
+      this.toCamp(a, v, 'ferried');
     }
     this.emit('SERVED', `request #${a.requestId} served by ${VehicleKind[v.kind]} #${v.id} in ${this.tick - created} ticks`, {
       actor: asVehicleId(v.id),
       target: asRequestId(a.requestId),
       data: { tts: this.tick - created },
     });
+  }
+
+  /** Rescued people are registered at the nearest relief camp with room. */
+  private toCamp(a: Walker, v: Vehicle, how: 'flown' | 'ferried'): void {
+    let best = -1;
+    let bestD = Infinity;
+    this.buildings.forEach((b, i) => {
+      if (b?.type !== BlockType.Shelter || (this.shelterLoad.get(i) ?? 0) >= b.capacity) return;
+      const d = Math.hypot(this.cx(b.entrance) - a.x, this.cz(b.entrance) - a.z);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    if (best < 0) return;
+    const b = this.buildings[best] as BuildingDef;
+    const load = (this.shelterLoad.get(best) ?? 0) + 1;
+    this.shelterLoad.set(best, load);
+    if (!this.openedCamps.has(best)) {
+      this.openedCamps.add(best);
+      this.emit('CAMP_OPENED', `${this.buildingNames[best]} opens as a relief camp: first rescued residents registered; ${b.capacity} places, food, water and a medical desk`, {
+        actor: asBuildingId(best),
+        cell: b.entrance,
+        data: { capacity: b.capacity },
+      });
+    }
+    if (how === 'flown') {
+      this.emit('HELI_DROPOFF', `#${a.id} flown to ${this.buildingNames[best]}: ${load}/${b.capacity} places taken`, { actor: asVehicleId(v.id), cell: b.entrance });
+    }
   }
 
   private refreshBelief(): void {
@@ -1688,10 +2530,11 @@ export class MockSim {
         const span = ev.cell !== undefined && ev.cell >= 0 && ev.cell < this.n ? this.spanOf[ev.cell] : -1;
         if (span >= 0) this.closedSpans.add(span);
         else this.bridgeClosed = true;
-        this.emit('INJECTED', `${span >= 0 ? `bridge at ${this.cellName(ev.cell as number)}` : 'all bridges'} closed by authorities (injected)`, {
+        this.emit('INJECTED', `${span >= 0 ? `bridge at ${this.cellName(ev.cell as number)}` : 'all bridges'} closed by authorities: debris piling against the piers (injected)`, {
           data: { kind: ev.kind },
           ...(span >= 0 ? { cell: ev.cell } : {}),
         });
+        if (span >= 0) this.openClosure(`the bridge at ${this.cellName(ev.cell as number)}`, this.spanCells(span), false);
         this.computeShelterField();
         break;
       }
@@ -1726,6 +2569,7 @@ export class MockSim {
         if (c !== undefined) {
           this.debris[c] = 1;
           this.emit('ROAD_CLOSED', `debris blocking ${this.cellName(c)} (injected)`, { cell: c });
+          this.openClosure(`debris at ${this.cellName(c)}`, [c], false);
           this.computeShelterField();
         }
         break;
@@ -1869,7 +2713,24 @@ export class MockSim {
       dirtyChunks,
       weather: { rain: this.rain, wind: this.wind },
       hqBelief: { water: this.belief.slice() },
+      zones: this.zones(),
     };
+  }
+
+  private zones(): Uint8Array {
+    const z = new Uint8Array(this.n);
+    if (this.alertIssued) for (let c = 0; c < this.n; c++) if (this.prone[c]) z[c] |= ZONE.prone;
+    for (let c = 0; c < this.n; c++) {
+      if (this.isRoad(c) && (this.closed[c] || this.authority[c] || (this.blocks[c] === BlockType.Bridge && !this.passable(c, Infinity)))) z[c] |= ZONE.closed;
+      if (this.debris[c]) z[c] |= ZONE.debris | ZONE.closed;
+      if (this.breach[c]) z[c] |= ZONE.breach;
+      if (this.detourUntil[c] > this.tick && this.isRoad(c) && !this.closed[c]) z[c] |= ZONE.detour;
+    }
+    for (const cl of this.closures) {
+      if (!cl.active || !cl.policed) continue;
+      for (const c of cl.barricades) z[c] |= ZONE.barricade;
+    }
+    return z;
   }
 
   metrics(): MetricsFrame {
@@ -1895,7 +2756,7 @@ export class MockSim {
     });
     const idle = (kind: VehicleKind) => {
       const vs = this.vehicles.filter((v) => v.kind === kind && !v.failed);
-      return vs.length ? vs.filter((v) => v.targetNpc < 0).length / vs.length : 0;
+      return vs.length ? vs.filter((v) => v.targetNpc < 0 && (v.mission === 'none' || v.mission === 'post')).length / vs.length : 0;
     };
     let roads = 0;
     let closedRoads = 0;
@@ -1916,19 +2777,20 @@ export class MockSim {
       tick: this.tick,
       tts: { mean: round2(mean), p50: q(0.5), p90: q(0.9) },
       unmet: stranded,
-      idleFrac: { boat: round2(idle(VehicleKind.Boat)), helicopter: round2(idle(VehicleKind.Helicopter)), ambulance: 1 },
+      idleFrac: { boat: round2(idle(VehicleKind.Boat)), helicopter: round2(idle(VehicleKind.Helicopter)), ambulance: round2(idle(VehicleKind.Ambulance)) },
       gini: round2(gini(byDistrict)),
-      hospitals: this.buildings
-        .filter((b): b is BuildingDef => b?.type === BlockType.Hospital)
-        .map((b) => {
-          const g = this.generators.find((gg) => gg.building.id === b.id);
-          return {
+      hospitals: this.buildings.flatMap((b, i) => {
+        if (b?.type !== BlockType.Hospital) return [];
+        const g = this.generators.find((gg) => gg.building.id === b.id);
+        return [
+          {
             id: b.id,
-            util: round2((this.hospitalLoad.get(b.id) ?? 0) / Math.max(1, b.capacity)),
-            diversion: g?.exhausted ?? false,
+            util: round2(this.bedsUsed(i) / Math.max(1, b.capacity)),
+            diversion: (g?.exhausted ?? false) || this.bedsUsed(i) >= b.capacity,
             onGenerator: g?.active ?? false,
-          };
-        }),
+          },
+        ];
+      }),
       evacDonePct: round2((100 * sheltered) / Math.max(1, sheltered + evacuating)),
       stranded,
       gridlockCells: this.gridlockCells,
@@ -1978,6 +2840,7 @@ export class MockSim {
           compliance: round2(a.compliance),
           riskTolerance: round2(a.risk),
           speed: round2(a.speed),
+          ...(a.injury ? { injury: a.injury } : {}),
         },
         ...(a.assignedTo >= 0 ? { assignment: { requestId: asRequestId(a.requestId), status: `rescue by vehicle #${a.assignedTo}`, eta: 0 } } : {}),
         route: { cells: [a.cell, ...(a.next >= 0 ? [a.next] : []), ...a.plan], version: a.planVersion },
@@ -2001,6 +2864,7 @@ export class MockSim {
           depthLimit: Number.isFinite(v.depthLimit) ? v.depthLimit : v.kind === VehicleKind.Boat ? `min ${MOCK_LIMITS.boatMin}` : 'n/a',
           ...(v.kind === VehicleKind.Helicopter ? { windLimit: MOCK_LIMITS.heliWind, wind: round2(this.wind) } : {}),
           ...(v.failed ? { failure: 'engine failure' } : {}),
+          ...(v.mission !== 'none' ? { task: MISSION_LABEL[v.mission] } : {}),
         },
         ...(target ? { assignment: { requestId: asRequestId(target.requestId), status: v.phase, eta } } : {}),
         route:
@@ -2027,8 +2891,8 @@ export class MockSim {
           power: PowerState[power],
           floodDepthAtEntrance: round2(this.water[b.entrance]),
           ...(g ? { generatorFuelTicks: g.fuel } : {}),
-          ...(b.type === BlockType.Shelter ? { occupants: this.shelterLoad.get(b.id) ?? 0 } : {}),
-          ...(b.type === BlockType.Hospital ? { patients: this.hospitalLoad.get(b.id) ?? 0 } : {}),
+          ...(b.type === BlockType.Shelter ? this.campAttributes(ref.id, b) : {}),
+          ...(b.type === BlockType.Hospital ? this.hospitalAttributes(ref.id, b) : {}),
         },
       };
     }
@@ -2046,6 +2910,30 @@ export class MockSim {
         power: PowerState[this.power[c]],
         ...(this.closed[c] ? { closed: 'yes' } : {}),
       },
+    };
+  }
+
+  private campAttributes(i: number, b: BuildingDef): Record<string, number | string> {
+    const occupants = Math.min(b.capacity, this.shelterLoad.get(i) ?? 0);
+    return {
+      occupants,
+      status: this.shelterOverflowed.has(i) ? 'Full: sending evacuees on' : this.openedCamps.has(i) ? 'Open' : 'Standing by',
+      familiesRegistered: Math.ceil(occupants / 4),
+      mealsPerDay: occupants * 3,
+    };
+  }
+
+  private hospitalAttributes(i: number, b: BuildingDef): Record<string, number | string> {
+    const used = this.bedsUsed(i);
+    const adm = this.admitted.get(i) ?? { ambulance: 0, heli: 0 };
+    const problem = this.hospitalProblem(i);
+    return {
+      patients: used,
+      beds: `${used} / ${b.capacity}`,
+      byAmbulance: adm.ambulance,
+      byHelicopter: adm.heli,
+      ambulancesOnStandby: this.vehicles.filter((v) => v.kind === VehicleKind.Ambulance && v.mission === 'none' && v.cell === b.entrance).length,
+      status: problem ? `Diverting (${problem})` : 'Accepting patients',
     };
   }
 

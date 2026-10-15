@@ -74,6 +74,9 @@ export class LensLayer {
     lensMap: { value: null as THREE.DataTexture | null },
     lensSize: { value: new THREE.Vector2(1, 1) },
     lensMix: { value: 0 },
+    xrayOn: { value: 0 },
+    xrayMin: { value: new THREE.Vector3() },
+    xrayMax: { value: new THREE.Vector3() },
   };
   private lens: Lens = 'none';
   private texture: THREE.DataTexture | null = null;
@@ -154,13 +157,28 @@ export class LensLayer {
     if (Math.abs(goal - u.value) < 0.002) u.value = goal;
   }
 
-  /** Projects the lens texture onto a material from above. */
-  patch(material: THREE.Material, strength = 1): void {
+  /** Cuts away everything inside a box (a building above its floor) so its interior shows; null restores it. */
+  setXray(box: THREE.Box3 | null): void {
+    this.uniforms.xrayOn.value = box ? 1 : 0;
+    if (box) {
+      this.uniforms.xrayMin.value.copy(box.min);
+      this.uniforms.xrayMax.value.copy(box.max);
+    }
+  }
+
+  /** Projects the lens texture onto a material from above; `xray` also lets it take the cutaway. Chains any existing patch. */
+  patch(material: THREE.Material, strength = 1, xray = false): void {
     const uniforms = this.uniforms;
-    material.onBeforeCompile = (shader) => {
+    const prevCompile = material.onBeforeCompile.bind(material);
+    const prevKey = material.customProgramCacheKey.bind(material);
+    material.onBeforeCompile = (shader, renderer) => {
+      prevCompile(shader, renderer);
       shader.uniforms.lensMap = uniforms.lensMap;
       shader.uniforms.lensSize = uniforms.lensSize;
       shader.uniforms.lensMix = uniforms.lensMix;
+      shader.uniforms.xrayOn = uniforms.xrayOn;
+      shader.uniforms.xrayMin = uniforms.xrayMin;
+      shader.uniforms.xrayMax = uniforms.xrayMax;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vLensWorld;')
         .replace(
@@ -168,10 +186,14 @@ export class LensLayer {
           '#include <project_vertex>\nvLensWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;',
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vLensWorld;\nuniform sampler2D lensMap;\nuniform vec2 lensSize;\nuniform float lensMix;')
+        .replace(
+          '#include <common>',
+          '#include <common>\nvarying vec3 vLensWorld;\nuniform sampler2D lensMap;\nuniform vec2 lensSize;\nuniform float lensMix;\nuniform float xrayOn;\nuniform vec3 xrayMin;\nuniform vec3 xrayMax;',
+        )
         .replace(
           '#include <color_fragment>',
           `#include <color_fragment>
+          ${xray ? 'if (xrayOn > 0.5 && all(greaterThan(vLensWorld, xrayMin)) && all(lessThan(vLensWorld, xrayMax))) discard;' : ''}
           if (lensMix > 0.001) {
             vec4 lensC = texture2D(lensMap, vLensWorld.xz / lensSize);
             float lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
@@ -181,7 +203,7 @@ export class LensLayer {
           }`,
         );
     };
-    material.customProgramCacheKey = () => `lens-${strength}`;
+    material.customProgramCacheKey = () => `${prevKey()}|lens-${strength}${xray ? '-xray' : ''}`;
     material.needsUpdate = true;
   }
 

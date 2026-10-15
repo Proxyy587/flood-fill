@@ -26,9 +26,27 @@ export class TerrainLayer {
   private powered: Uint8Array | null = null;
   private solidMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   private windowMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+  private winNight = { value: 0 };
 
   constructor() {
     this.group.name = 'terrain';
+    // At night powered panes are pushed past 1.0 so the bloom pass picks them up; dark panes stay dark.
+    const winNight = this.winNight;
+    this.windowMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uWinNight = winNight;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float aLit;\nvarying float vLit;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLit = aLit;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uWinNight;\nvarying float vLit;')
+        .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+          float winPowered = step(0.35, max(vColor.r, max(vColor.g, vColor.b)));
+          diffuseColor.rgb *= mix(1.0, mix(0.45, vLit * 2.1, winPowered), uWinNight);`,
+        );
+    };
+    this.windowMat.customProgramCacheKey = () => 'terrain-windows';
   }
 
   get materials(): THREE.Material[] {
@@ -67,7 +85,11 @@ export class TerrainLayer {
       solid.castShadow = true;
       solid.receiveShadow = true;
       solid.userData.chunk = id;
-      const windows = new THREE.Mesh(this.geometry(data.windows), this.windowMat);
+      const winGeo = this.geometry(data.windows);
+      const lit = new Float32Array(data.windows.roles.length);
+      for (let v = 0; v < lit.length; v++) lit[v] = data.windows.baseColors[v * 3];
+      winGeo.setAttribute('aLit', new THREE.BufferAttribute(lit, 1));
+      const windows = new THREE.Mesh(winGeo, this.windowMat);
       this.group.add(solid, windows);
       const chunk = { solid, windows, solidData: data.solid, windowData: data.windows };
       this.chunks.set(id, chunk);
@@ -101,6 +123,7 @@ export class TerrainLayer {
   /** Night 0..1: powered glass warms toward lamplight; dark (blackout) glass stays dark. */
   setNight(night: number, warm: THREE.Color): void {
     this.windowMat.color.setRGB(1, 1, 1).lerp(warm, night);
+    this.winNight.value = night;
   }
 
   dispose(): void {

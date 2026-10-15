@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 
 const DROPS = 6000;
-const BOX = { x: 70, y: 40, z: 70 };
 
-/** Cosmetic rain streaks around the camera target. Never feeds back into the sim. */
+/** Cosmetic rain streaks over the city footprint. Never feeds back into the sim. */
 export class Rain {
   readonly lines: THREE.LineSegments;
   private positions = new Float32Array(DROPS * 6);
   private seeds = new Float32Array(DROPS * 3);
   private material = new THREE.LineBasicMaterial({ color: 0xc8d8e8, transparent: true, opacity: 0.45, depthWrite: false });
   private fall = 0;
+  /** World-space extent of the rain volume (centred on the city, not the camera). */
+  private box = { x: 70, y: 40, z: 70 };
 
   constructor() {
     // Cosmetic only, so a cheap LCG is fine here.
@@ -28,6 +29,13 @@ export class Rain {
     this.lines.name = 'rain';
   }
 
+  /** Fit the rain volume to the city so streaks stay over the map, not the screen centre. */
+  setCity(w: number, h: number): void {
+    this.box.x = Math.max(48, w * 1.15);
+    this.box.z = Math.max(48, h * 1.15);
+    this.box.y = 36;
+  }
+
   update(dt: number, centre: THREE.Vector3, intensity: number, wind: number, enabled: boolean): void {
     const n = enabled ? Math.floor(DROPS * Math.min(1, intensity)) : 0;
     this.lines.visible = n > 0;
@@ -36,11 +44,12 @@ export class Rain {
     const slant = 0.6 + wind * 2.2;
     const len = 0.9;
     const p = this.positions;
+    const { x: bx, y: by, z: bz } = this.box;
     for (let i = 0; i < n; i++) {
       const fy = (this.seeds[i * 3 + 1] - this.fall + 1) % 1;
-      const x = centre.x + (this.seeds[i * 3] - 0.5) * BOX.x;
-      const z = centre.z + (this.seeds[i * 3 + 2] - 0.5) * BOX.z;
-      const y = centre.y + fy * BOX.y - 4;
+      const x = centre.x + (this.seeds[i * 3] - 0.5) * bx;
+      const z = centre.z + (this.seeds[i * 3 + 2] - 0.5) * bz;
+      const y = centre.y + fy * by - 4;
       p[i * 6] = x;
       p[i * 6 + 1] = y;
       p[i * 6 + 2] = z;

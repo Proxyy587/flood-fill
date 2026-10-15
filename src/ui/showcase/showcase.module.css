@@ -1,0 +1,171 @@
+.board {
+  position: absolute;
+  left: 66px;
+  top: 76px;
+  width: 252px;
+  max-height: calc(100vh - 300px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 3;
+  background: var(--paper);
+  backdrop-filter: blur(16px) saturate(1.15);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  border: 1px solid var(--hair-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 6px 12px;
+}
+
+.title {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.title span {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.title small {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.director {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--hair-soft);
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.director[aria-pressed='true'] {
+  background: #15232d;
+  border-color: #15232d;
+  color: #fff;
+}
+
+.progress {
+  height: 3px;
+  margin: 0 12px 6px;
+  border-radius: 2px;
+  background: rgba(21, 35, 45, 0.08);
+  overflow: hidden;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #3fa9f5, #2ec27e);
+  transition: width 0.5s ease;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px 8px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.list button {
+  --c: #999;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.list button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.list button[data-seen='true'] {
+  color: var(--ink);
+}
+
+.list button:not(:disabled):hover {
+  background: rgba(21, 35, 45, 0.06);
+}
+
+.tick {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--c) 55%, transparent);
+  color: #fff;
+}
+
+[data-seen='true'] .tick {
+  background: var(--c);
+  border-color: var(--c);
+  animation: pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+  }
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: inline-flex;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.meta b {
+  font-weight: 600;
+  color: var(--ink-2, var(--ink));
+}
+
+@media (max-height: 640px) {
+  .board {
+    max-height: calc(100vh - 250px);
+  }
+}

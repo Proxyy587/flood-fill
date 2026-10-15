@@ -13,6 +13,15 @@
   inset: 0;
 }
 
+/* Soft vignette so the floating instruments sit on a calmer frame. */
+.stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 78% 72% at 50% 48%, transparent 62%, rgba(4, 8, 14, 0.35) 100%);
+}
+
 .panel {
   background: var(--paper);
   backdrop-filter: blur(16px) saturate(1.15);
@@ -813,31 +822,69 @@
 }
 
 .vitals {
-  padding: 12px;
+  padding: 4px;
   flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+
+.vitals[data-open='true'] {
+  padding-bottom: 12px;
+}
+
+.vitals > :not(.vitalsHead) {
+  margin: 0 8px;
 }
 
 .vitalsHead {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px 7px 10px;
+  border: 0;
+  border-radius: calc(var(--radius) - 4px);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.vitalsHead h2 {
-  margin: 0;
+.vitalsHead:hover {
+  background: rgba(21, 35, 45, 0.045);
+}
+
+.vitalsHead > span:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.vitalsHead strong {
   font-size: 13px;
   font-weight: 650;
+  color: var(--ink);
 }
 
-.vitalsHead span {
-  font-size: 12px;
+.vitalsHead small {
+  font-size: 11.5px;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vitalsHead em {
+  font-style: normal;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .tiles {
@@ -1025,20 +1072,31 @@
   color: var(--muted);
 }
 
-/* ---------- transport (bottom centre) ---------- */
+/* ---------- dock (bottom centre): news strip stacked on the transport ---------- */
 
-.transport {
+.dock {
   position: absolute;
   left: 50%;
-  bottom: 26px;
+  bottom: 24px;
   transform: translateX(-50%);
-  width: min(720px, calc(100vw - 420px));
-  min-width: 460px;
+  /* Fixed width so it doesn't jump with headline length; the timeline takes the slack. */
+  width: min(740px, calc(100vw - 150px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.dock > * {
+  pointer-events: auto;
+}
+
+.transport {
   padding: 8px 10px;
   display: flex;
   align-items: center;
   gap: 10px;
-  z-index: 3;
 }
 
 .play {
@@ -1091,7 +1149,7 @@
 
 .timeline {
   position: relative;
-  flex: 1;
+  flex: 1 1 240px;
   height: 40px;
   cursor: pointer;
   touch-action: none;
@@ -1197,19 +1255,37 @@
 .compass {
   position: absolute;
   right: 12px;
-  bottom: 14px;
+  bottom: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 6px;
+  gap: 2px;
+  padding: 5px;
   z-index: 3;
+}
+
+.viewButton {
+  width: 32px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(21, 35, 45, 0.06);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.viewButton:hover {
+  background: rgba(21, 35, 45, 0.11);
 }
 
 .dial {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 3px;
   border-radius: 999px;
   border: 1px solid var(--hair);
   background: #fff;
@@ -1225,7 +1301,7 @@
 
 .compass .iconButton {
   width: 32px;
-  height: 30px;
+  height: 28px;
   color: var(--ink-2);
 }
 
@@ -1299,77 +1375,6 @@
   font-size: 13px;
   color: var(--ink);
   white-space: nowrap;
-}
-
-/* ---------- toasts (top centre) ---------- */
-
-.toasts {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(420px, calc(100vw - 680px));
-  min-width: 300px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 5;
-  pointer-events: none;
-}
-
-.toast {
-  pointer-events: auto;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
-  align-items: start;
-  padding: 10px 12px;
-  text-align: left;
-  cursor: pointer;
-  animation: drop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-  border-left: 3px solid var(--blue);
-}
-
-.toast[data-tone='bad'] {
-  border-left-color: var(--danger);
-}
-
-.toast[data-tone='warn'] {
-  border-left-color: #e8a317;
-}
-
-.toast[data-tone='good'] {
-  border-left-color: var(--green);
-}
-
-.toast strong {
-  display: block;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.toast p {
-  margin: 1px 0 0;
-  font-size: 12px;
-  color: var(--ink-2);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.toast time {
-  font-size: 11px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-@keyframes drop {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
 }
 
 /* ---------- hover tip ---------- */
@@ -1453,17 +1458,12 @@
     width: 250px;
   }
 
-  .transport {
+  .dock {
     width: calc(100vw - 90px);
     min-width: 0;
+    max-width: none;
     left: 12px;
     transform: none;
-  }
-
-  .toasts {
-    width: calc(100vw - 24px);
-    min-width: 0;
-    top: 70px;
   }
 
   .compass {

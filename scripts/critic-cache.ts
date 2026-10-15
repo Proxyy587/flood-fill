@@ -4,7 +4,7 @@
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { DEFAULT_NPC_PARAMS, type Scenario } from '../src/contracts';
+import { DEFAULT_NPC_PARAMS, DEFAULT_START_SECONDS, type Scenario } from '../src/contracts';
 import { mockScenario } from '../src/contracts/mocks';
 import { prepareCritique } from '../src/ai';
 import type { CachedCritique } from '../src/ai/cache';
@@ -24,7 +24,7 @@ async function main() {
   const out: Record<string, CachedCritique> = {};
   for (const scenario of cities) {
     const seed = scenario.defaults.seed;
-    const base: VerifyOptions = { seeds: [seed], engine: 'preview', ticks: RUN_TICKS, dispatchMode: scenario.defaults.dispatchMode, npcParams: DEFAULT_NPC_PARAMS, startTimeSeconds: 8 * 3600 };
+    const base: VerifyOptions = { seeds: [seed], engine: 'preview', ticks: RUN_TICKS, dispatchMode: scenario.defaults.dispatchMode, npcParams: DEFAULT_NPC_PARAMS, startTimeSeconds: DEFAULT_START_SECONDS };
     const t0 = performance.now();
     const run = runOnce(scenario, seed, base);
     const c = prepareCritique(run, scenario);

@@ -44,6 +44,7 @@ const hash = (a: number, b: number): number => {
 const pick = <T>(list: readonly T[], tick: number, salt: number): T => list[hash(tick, salt) % list.length];
 const typeSalt = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7);
 const num = (e: SimEvent, k: string): number | undefined => (typeof e.data?.[k] === 'number' ? (e.data[k] as number) : undefined);
+const str = (e: SimEvent, k: string): string | undefined => (typeof e.data?.[k] === 'string' ? (e.data[k] as string) : undefined);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
@@ -184,6 +185,49 @@ export function buildNews(events: readonly SimEvent[], metrics: readonly Metrics
         break;
       case 'INJECTED':
         push(e, 'breaking', OUTLETS.tv, e.reason.replace(/\s*\(injected\)$/, '').replace(/^./, (c) => c.toUpperCase()), 'warn');
+        break;
+      case 'FLOOD_ALERT':
+        push(e, 'official', OUTLETS.control, `Flood alert: ${plural(num(e, 'areas') ?? 0, 'flood-prone area')} named`, 'warn', e.reason);
+        push(e, 'breaking', OUTLETS.tv, `Flood alert issued for ${ctx.city}`, 'warn', 'Police and NDRF on standby; residents told to avoid underpasses and low roads.');
+        break;
+      case 'WATERLOGGING': {
+        const name = str(e, 'name') ?? where;
+        push(e, 'update', OUTLETS.paper, `${name} waterlogged`, 'warn', e.reason);
+        social(e, `logged:${name}`, [`${name} is a swimming pool again. Every single year.`, `Car stalled at ${name}. Water above the wheels.`, `Do NOT take ${name}, it's flooded end to end.`]);
+        break;
+      }
+      case 'ROADBLOCK': {
+        const name = str(e, 'name') ?? where;
+        const detour = num(e, 'detourCells') ?? 0;
+        push(e, 'official', OUTLETS.control, `${name} closed to traffic`, 'warn', detour ? `Barricades up; traffic is being diverted by a ${detour * 4} m detour.` : 'Barricades up; there is no road round it.');
+        break;
+      }
+      case 'ROAD_REOPENED':
+        if (e.reason.includes('barricades lifted')) push(e, 'update', OUTLETS.paper, `Road reopens as water drains in ${where}`, 'good', e.reason);
+        break;
+      case 'INJURY_REPORTED':
+        if (e.reason.startsWith('First')) push(e, 'breaking', OUTLETS.tv, `First casualty reported in ${where}`, 'bad', e.reason);
+        else push(e, 'update', OUTLETS.paper, `Casualty reported in ${where}`, 'bad');
+        break;
+      case 'AMBULANCE_DISPATCH':
+        if (!once.has('ambulance')) {
+          once.add('ambulance');
+          push(e, 'official', OUTLETS.control, '108 ambulances responding to flood casualties', 'info', e.reason);
+        }
+        break;
+      case 'CAMP_OPENED':
+        push(e, 'official', OUTLETS.control, `${actorName(e) ?? 'Relief camp'} opens`, 'good', e.reason);
+        break;
+      case 'FOOD_DROP':
+        push(e, 'update', OUTLETS.paper, `Food and water dropped to stranded families in ${where}`, 'good', e.reason);
+        social(e, 'drop', ['Helicopter just dropped food packets on our terrace. God bless them.', 'Packets of rice and water bottles falling from the sky. We are okay for today.']);
+        break;
+      case 'LEVEE_BREACH':
+        push(e, 'breaking', OUTLETS.tv, `Embankment breached: river pours into ${where}`, 'bad', e.reason);
+        social(e, 'breach', ['The embankment just gave way. Water rushing down our street. RUN UPSTAIRS.', 'Heard a roar and then the river was in the colony.']);
+        break;
+      case 'LANDSLIDE':
+        push(e, 'breaking', OUTLETS.tv, `Landslide blocks ${str(e, 'name') ?? 'hill road'}`, 'bad', e.reason);
         break;
       default:
         break;

@@ -347,7 +347,7 @@ float glowOn = 0.0;
 if ( vGlow > 0.5 && vGlow < 1.5 ) glowOn = uNight;
 else if ( vGlow > 1.5 && vGlow < 2.5 ) glowOn = step( 0.0, sin( uTime * 9.0 ) );
 else if ( vGlow > 2.5 ) glowOn = step( 0.0, -sin( uTime * 9.0 ) );
-outgoingLight = mix( outgoingLight, diffuseColor.rgb * 1.7, glowOn );
+outgoingLight = mix( outgoingLight, diffuseColor.rgb * ( 1.7 + 2.3 * uNight ), glowOn );
 #include <opaque_fragment>
 `;
 

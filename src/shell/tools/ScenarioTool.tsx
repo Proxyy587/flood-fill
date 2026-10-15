@@ -2,7 +2,7 @@
 
 import { Plus, Shuffle, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { FleetDef, NpcParams, Scenario } from '../../contracts';
+import { DEFAULT_START_SECONDS, type FleetDef, type NpcParams, type Scenario } from '../../contracts';
 import { RAIN_MM_PER_HOUR_AT_FULL } from '../../contracts/mocks';
 import { NpcParamsSchema } from '../../contracts/schemas';
 import { useSceneStore } from '../../bridge/sceneStore';
@@ -43,9 +43,10 @@ const STORMS: { id: string; label: string; apply: (s: Scenario) => void }[] = [
 ];
 
 const STARTS = [
-  { id: String(8 * 3600), label: 'Morning', title: 'Starts 08:00, commute under way' },
-  { id: String(18 * 3600 + 30 * 60), label: 'Dusk', title: 'Starts 18:30, sunset during the storm' },
-  { id: String(23 * 3600), label: 'Night', title: 'Starts 23:00, a blackout leaves streets dark' },
+  { id: String(8 * 3600), label: 'Morning', title: '08:00 — clear sky-blue morning' },
+  { id: String(14 * 3600), label: 'Afternoon', title: '14:00 — bright afternoon' },
+  { id: String(DEFAULT_START_SECONDS), label: 'Evening', title: '17:15 — daylight into sunset (showcase default)' },
+  { id: String(0), label: 'Midnight', title: '00:00 — deep night, city lights' },
 ];
 
 const ENGINE_HELP = {
@@ -56,6 +57,8 @@ const ENGINE_HELP = {
 function SimulationGroup({ disabled }: { disabled: boolean }) {
   const settings = useSceneStore((s) => s.runSettings);
   const setRunSettings = useSceneStore((s) => s.setRunSettings);
+  const playing = useSceneStore((s) => s.playing);
+  const preset = STARTS.some((s) => Number(s.id) === settings.startSeconds) ? String(settings.startSeconds) : '';
   return (
     <div className={styles.group}>
       <div className={styles.groupTitle}>
@@ -74,10 +77,21 @@ function SimulationGroup({ disabled }: { disabled: boolean }) {
       <p className={styles.hint}>{ENGINE_HELP[settings.engine]}</p>
       <Segmented
         label="Start time"
-        value={String(settings.startSeconds)}
-        disabled={disabled}
+        value={preset}
+        disabled={playing}
         onChange={(v) => setRunSettings({ startSeconds: Number(v) })}
         options={STARTS}
+      />
+      <Slider
+        label="Start clock"
+        value={settings.startSeconds}
+        display={formatTimeOfDay(settings.startSeconds)}
+        min={0}
+        max={86340}
+        step={300}
+        disabled={playing}
+        help="The clock follows the simulation. Pause, set a new start, and the run restarts from that time."
+        onChange={(startSeconds) => setRunSettings({ startSeconds })}
       />
     </div>
   );
@@ -242,7 +256,7 @@ export function ScenarioTool({ onClose }: { onClose: () => void }) {
   };
   return (
     <Flyout title="Scenario" subtitle="The storm, the people and the responders." onClose={onClose}>
-      {disabled && <p className={styles.note}>Settings are locked while the storm runs. Branch the city to change them.</p>}
+      {disabled && <p className={styles.note}>City settings are locked while the storm runs. Pause to change the start time, or branch the city to edit.</p>}
 
       <SimulationGroup disabled={disabled} />
 

@@ -162,9 +162,10 @@ export class EntityLayer {
       const s = this.npcs.sample(i, a, this.sample);
       const id = ids ? ids[i] : i;
       const stranded = this.npcState[i] === NpcState.Stranded;
+      const injured = this.npcState[i] === NpcState.Injured;
       const y = groundY(s.x, s.z);
-      this.dummy.position.set(s.x, y, s.z);
-      this.dummy.rotation.set(0, -s.heading, 0);
+      this.dummy.position.set(s.x, y + (injured ? 0.05 : 0), s.z);
+      this.dummy.rotation.set(0, -s.heading, injured ? Math.PI / 2 : 0);
       this.dummy.scale.setScalar(stranded ? 1.2 : 1);
       this.dummy.updateMatrix();
       mesh.setMatrixAt(i, this.dummy.matrix);

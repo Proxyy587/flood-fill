@@ -63,6 +63,9 @@ export const ScenarioSchema: z.ZodType<Scenario> = z
     buildings: z.array(BuildingDefSchema),
     bridges: z.array(z.object({ cell: nonNeg, deckHeight: z.number().nonnegative() })).optional(),
     districts: z.array(z.object({ id: nonNeg, name: z.string(), cells: z.array(nonNeg) })),
+    hotspots: z
+      .array(z.object({ name: z.string().min(1), kind: z.enum(['waterlogging', 'landslide', 'levee']), cells: z.array(nonNeg).min(1) }))
+      .optional(),
     population: z.object({
       count: nonNeg,
       mix: z.object({ carOwners: unit, limitedMobility: unit, needsAssist: unit }),
