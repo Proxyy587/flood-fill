@@ -29,7 +29,7 @@ src/contracts/contracts.test.ts, docs/CONTRACTS.md, docs/REQUESTS.md.
 - [x] Run `pnpm test src/contracts/contracts.test.ts` and capture missing module failure.
 - [x] Implement types, schema refinements, worker messages, and labelled mock fixtures.
 - [x] Run focused tests, `pnpm typecheck`; update contract decisions and CHANGELOG.
-- [ ] Record reviewed contracts in the atomic foundation implementation checkpoint.
+- [x] Record reviewed contracts in the atomic foundation implementation checkpoint (7c19583).
 
 ## Checkpoint 2: deterministic world and navigation
 
@@ -39,7 +39,7 @@ Files: src/sim/{rng,world/grid,nav/index}.ts plus colocated tests.
 - [x] Test shortest safe routes, disconnected targets, stable ties and flow fields.
 - [x] Run tests before implementation, then implement typed-array world and routing.
 - [x] Enforce purity/determinism through ESLint; test forbidden imports and globals.
-- [ ] Record reviewed world/navigation in the atomic foundation checkpoint.
+- [x] Record reviewed world/navigation in the atomic foundation checkpoint (7c19583).
 
 ## Checkpoint 3: headless flood/power slice
 
@@ -53,8 +53,8 @@ scripts/{batch,compare,validate-scenarios}.ts with tests.
 - [x] CLIs validate JSON scenarios; use explicitly labelled contract mock if none exist.
       Comparison reports both modes but labels dispatch unavailable until M3.
 - [x] Run full health, build, HTTP probe, batch and compare; inspect produced summaries.
-- [ ] Update README, ARCHITECTURE, SIM_SPEC, ROADMAP, AK_STATUS and CHANGELOG with
-      implemented vs planned boundaries. Review and commit verified checkpoint.
+- [x] Update README, ARCHITECTURE, SIM_SPEC, ROADMAP, AK_STATUS and CHANGELOG with
+      implemented vs planned boundaries. Review and commit verified checkpoint (7c19583).
 
 Implementation note: contracts, navigation and headless core were independently
 reviewed as logical checkpoints. Their source checkpoint is consolidated into one

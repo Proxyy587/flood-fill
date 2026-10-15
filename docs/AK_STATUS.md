@@ -59,14 +59,17 @@ roadmap remains pending; see ROADMAP.md.
   no runtime exposure path found in this foundation. ESLint9 also reports deprecation;
   retain compatible scaffold plugins until a separately verified tooling update.
 
-## Source checkpoint and final gates
+## Source checkpoint 7c19583 and final gates
 
-All implementation files are included in the foundation source checkpoint. Logical
+All implementation files are included in source commit 7c19583. Logical
 stages 1-3 are consolidated atomically so public CLI entrypoints and dependencies
 land together. Fresh `pnpm health`: 209/209 tests, lint, strict typecheck and schema
-validation pass. Fresh `pnpm build` succeeds after the final code fixes. Review
-rechecks for extension/seed/resource/doc corrections are pending in AK_REVIEW.md;
-the final docs checkpoint will record their results and the source commit hash.
+validation pass. Fresh `pnpm build` succeeds after the final code fixes. Final
+batch/compare smoke on the committed source succeeds (3 seeds, 600 ticks), and
+HTTP returns 200. Integration re-review passes 111 focused checks. Full five-area
+review results and the inherited development-tool advisory are in AK_REVIEW.md.
+The final docs checkpoint records this evidence; source remains unchanged since
+the 209-test health/build pass. No merge, push or PR was requested or performed.
 
 Remaining: full M1 living-city agents/traffic, mode-specific hazard routing and
 replanning; M3 uncertain reports/dispatch/hospital allocation/aircraft and safety

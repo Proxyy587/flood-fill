@@ -1,6 +1,8 @@
 # CHANGELOG
 One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order changes are marked **[ADR]**.
 
+- 2026-10-15 (AK, documentation checkpoint): recorded source commit 7c19583 and tooling commit d077579; closed the foundation plan and review ledger, with 209 passing tests, build, committed-source batch/compare smoke and HTTP 200 evidence. Full roadmap, absent templates/browser integration and inherited development advisory remain explicitly open.
+
 - 2026-10-15 (AK, source checkpoint verification): full health passes 209 tests plus lint, generated Next.js route types, strict TypeScript and schema validation; production build passes after final review fixes. Five-area review rechecks recorded in AK_REVIEW.md; whole AK roadmap remains active.
 
 - 2026-10-15 (AK, final review fixes): covered all supported sim source extensions in purity/determinism guards; reject sparse/oversized batch seed lists; bound fleet/staff allocation including civilian cars; made schema-only validation explicitly insufficient for release readiness. Reconciled worker changelog/generator/playground permissions, pnpm health merge gates, all five stress failures and initial/deferred critic whitelists. Generator restart/exhaustion events now remain accurate across interior flooding.
