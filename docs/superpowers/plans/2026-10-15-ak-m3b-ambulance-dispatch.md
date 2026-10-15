@@ -77,11 +77,11 @@
 
 **Files:** create `src/sim/dispatch/hotspots.ts`, `src/sim/dispatch/hotspots.test.ts`; integrate priority inputs with both policy algorithms.
 
-- [ ] **Step 1: Write tests** for 8x8 region mapping/map edges; score `2 * uncovered severe + severe admitted during previous 120 ticks`; expiry; stable region tie-break; staging only idle units at safe operational hospital entrances by ETA; active assignments stay intact; absent severe demand keeps units at their current safe hospital.
-- [ ] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/hotspots.test.ts`.
-- [ ] **Step 3: Implement** deterministic zone scoring and a bounded 120-tick ring buffer of severe admissions; return staging targets/priority inputs in stable region order. Stage only the existing fleet and respect road, power, flood, capacity and assignment constraints.
-- [ ] **Step 4: Run GREEN** with hotspot and policy suites.
-- [ ] **Step 5: Commit** with `feat(sim): prioritize ambulance hot zones`.
+- [x] **Step 1: Write tests** for 8x8 region mapping/map edges; score `2 * uncovered severe + severe admitted during previous 120 ticks`; expiry; stable region tie-break; staging only idle units at safe operational hospital entrances by ETA; active assignments stay intact; absent severe demand leaves units in place.
+- [x] **Step 2: Run RED**: `pnpm exec vitest run src/sim/dispatch/hotspots.test.ts`; expected missing-module failure observed.
+- [x] **Step 3: Implement** deterministic zone scoring and a bounded 120-tick ring buffer of severe admissions; choose the operational hospital entrance with lowest safe ETA to the highest-scoring zone. Stage only the existing fleet and respect road, power, flood, capacity and assignment constraints.
+- [x] **Step 4: Run GREEN**: hotspot suite passes, 3 tests; strict TypeScript passes.
+- [x] **Step 5: Commit** with `feat(sim): prioritize ambulance hot zones` (committed with this checkpoint).
 
 ## Task 7: Invariants and runner integration
 

@@ -86,10 +86,12 @@ bases, hazard-aware routes and deterministic replanning; Task 4 adds distinct
 negotiation and centralized dispatch over a shared candidate set without access to
 hidden truth. Task 5 adds bounded scene verification, multi-casualty records, report
 resolution after all admissions, severity-aware destination selection and atomic
-bed reservation/release/retry. RED was observed before each module; current focused
-incident/report/hospital/ambulance/policy/movement suites pass 43 tests and strict
-TypeScript passes. Hospital building cells are represented by their nearest safe
-adjacent road cell for ambulance staging. No shared-contract changes.
+bed reservation/release/retry; Task 6 adds rolling severe-demand hot zones and idle
+ambulance staging at the powered hospital with the lowest safe ETA. RED was observed
+before each module; current focused incident/report/hospital/ambulance/policy/
+hotspot/movement suites pass 46 tests and strict TypeScript passes. Hospital
+building cells are represented by their nearest safe adjacent road cell for
+ambulance staging. No shared-contract changes.
 
 ## 2026-10-15 baseline
 
