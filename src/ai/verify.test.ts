@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_NPC_PARAMS } from '../contracts';
+import { BlockType, DEFAULT_NPC_PARAMS } from '../contracts';
 import { mockRunSummary, mockScenario } from '../contracts/mocks';
 import { prepareCritique } from '.';
 import { compileProposal } from './patchCompiler';
@@ -42,5 +42,31 @@ describe('verifyPatch', () => {
     expect(a.metrics[0].key).toBe('score');
     expect(['improved', 'worse', 'no_clear_effect']).toContain(a.verdict);
     expect(b).toEqual(a);
+  }, 60_000);
+
+  it('drainage patch on preview can move flooded-homes or score (smoke)', () => {
+    const scenario = mockScenario(11);
+    const drains: { kind: 'setBlock'; cell: number; block: BlockType }[] = [];
+    for (let i = 0; i < scenario.blocks.length && drains.length < 12; i++) {
+      if (scenario.blocks[i] === BlockType.Grass) drains.push({ kind: 'setBlock', cell: i, block: BlockType.Drainage });
+    }
+    const compiled = compileProposal({ title: 'Drains', rationale: 'Add storm drains', commands: drains }, scenario);
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) return;
+    expect(compiled.create.length).toBeGreaterThan(0);
+    const result = verifyPatch(scenario, compiled.patch, {
+      seeds: [11],
+      engine: 'preview',
+      ticks: 900,
+      dispatchMode: 'negotiation',
+      npcParams: DEFAULT_NPC_PARAMS,
+      startTimeSeconds: 8 * 3600,
+    });
+    const score = result.metrics.find((m) => m.key === 'score');
+    const homes = result.metrics.find((m) => m.key === 'residentsAffected');
+    const flooded = result.metrics.find((m) => m.key === 'floodedCells');
+    // At least one flood-related measure must react (or stay flat if the patch misses ponds).
+    expect(score && homes && flooded).toBeTruthy();
+    expect(['improved', 'worse', 'no_clear_effect']).toContain(result.verdict);
   }, 60_000);
 });

@@ -167,9 +167,9 @@ function buildSixMile(): SixMileCity {
   }
   stroke([...SIX_MILE_FOREST, SIX_MILE_FOREST[0]], 1, paintRoad);
 
-  // Storm inlets beside hollow roads — help early, then backflow when the channel is high.
+  // Sparse storm inlets beside hollows — imperfect drainage so the first score is improvable.
   for (const hollow of hollows) {
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 6; i += 2) {
       const ang = (i / 6) * Math.PI * 2;
       const x = Math.round(hollow.x + Math.cos(ang) * (hollow.r * 0.55));
       const z = Math.round(hollow.z + Math.sin(ang) * (hollow.r * 0.55));
@@ -274,8 +274,8 @@ function buildSixMile(): SixMileCity {
     if (insideForest(x, z) && mapNoise(x, z, 91) > 0.08) blocks[c] = BlockType.Tree;
     else if (insideSixMile(x, z) && mapNoise(x, z, 63) > 0.86) blocks[c] = BlockType.Tree;
   }
-  // Drains on sand banks help keep overflow from drowning the whole map.
-  for (let c = 0; c < n; c++) if (blocks[c] === BlockType.Sand && c % 7 === 0) blocks[c] = BlockType.Drainage;
+  // Very sparse bank drains — enough for a few dry pockets, not a solved city.
+  for (let c = 0; c < n; c++) if (blocks[c] === BlockType.Sand && c % 19 === 0) blocks[c] = BlockType.Drainage;
 
   const plant = buildings.find(b => b.type === BlockType.PowerPlant)!;
   const sub = buildings.find(b => b.type === BlockType.Substation)!;

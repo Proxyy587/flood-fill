@@ -22,11 +22,27 @@ export class Markers {
   private selectionBox: THREE.LineSegments;
   private selectionFill: THREE.Mesh;
   private highlights: THREE.InstancedMesh;
+  private creates: THREE.InstancedMesh;
+  private alters: THREE.InstancedMesh;
   private highlightGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   private highlightMat = new THREE.MeshBasicMaterial({
     color: UI_COLORS.highlight,
     transparent: true,
     opacity: 0.45,
+    depthWrite: false,
+    depthTest: false,
+  });
+  private createMat = new THREE.MeshBasicMaterial({
+    color: UI_COLORS.create,
+    transparent: true,
+    opacity: 0.5,
+    depthWrite: false,
+    depthTest: false,
+  });
+  private alterMat = new THREE.MeshBasicMaterial({
+    color: UI_COLORS.alter,
+    transparent: true,
+    opacity: 0.5,
     depthWrite: false,
     depthTest: false,
   });
@@ -59,11 +75,18 @@ export class Markers {
     this.selectionFill = new THREE.Mesh(unitBox(), this.selectionFillMat);
     this.selectionFill.renderOrder = 6;
     this.selectionFill.visible = false;
-    this.highlights = new THREE.InstancedMesh(this.highlightGeo, this.highlightMat, 1024);
-    this.highlights.count = 0;
-    this.highlights.frustumCulled = false;
-    this.highlights.renderOrder = 8;
-    this.group.add(this.hover, this.hoverFill, this.selection, this.selectionFill, this.selectionBox, this.highlights);
+    this.highlights = this.makeHighlightMesh(this.highlightMat);
+    this.creates = this.makeHighlightMesh(this.createMat);
+    this.alters = this.makeHighlightMesh(this.alterMat);
+    this.group.add(this.hover, this.hoverFill, this.selection, this.selectionFill, this.selectionBox, this.highlights, this.creates, this.alters);
+  }
+
+  private makeHighlightMesh(mat: THREE.MeshBasicMaterial): THREE.InstancedMesh {
+    const mesh = new THREE.InstancedMesh(this.highlightGeo, mat, 1024);
+    mesh.count = 0;
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 8;
+    return mesh;
   }
 
   /** Outline and soft fill over whatever the pointer is on (a whole building, or one cell). */
@@ -96,19 +119,32 @@ export class Markers {
   }
 
   setHighlights(cells: number[], w: number, heightAt: (c: number) => number): void {
+    this.placeInstances(this.highlights, cells, w, heightAt);
+  }
+
+  /** Green create ghosts and red alter ghosts for AI proposal preview. */
+  setProposalGhosts(create: number[], alter: number[], w: number, heightAt: (c: number) => number): void {
+    this.placeInstances(this.creates, create, w, heightAt);
+    this.placeInstances(this.alters, alter, w, heightAt);
+  }
+
+  private placeInstances(mesh: THREE.InstancedMesh, cells: number[], w: number, heightAt: (c: number) => number): void {
     const n = Math.min(cells.length, 1024);
     for (let i = 0; i < n; i++) {
       const c = cells[i];
       this.dummy.position.set((c % w) + 0.5, heightAt(c) + 0.06, Math.floor(c / w) + 0.5);
       this.dummy.updateMatrix();
-      this.highlights.setMatrixAt(i, this.dummy.matrix);
+      mesh.setMatrixAt(i, this.dummy.matrix);
     }
-    this.highlights.count = n;
-    this.highlights.instanceMatrix.needsUpdate = true;
+    mesh.count = n;
+    mesh.instanceMatrix.needsUpdate = true;
   }
 
   update(now: number): void {
-    this.highlightMat.opacity = 0.35 + Math.sin(now / 220) * 0.15;
+    const pulse = 0.35 + Math.sin(now / 220) * 0.15;
+    this.highlightMat.opacity = pulse;
+    this.createMat.opacity = 0.4 + Math.sin(now / 240) * 0.18;
+    this.alterMat.opacity = 0.4 + Math.sin(now / 200) * 0.18;
     this.selectionFillMat.opacity = 0.13 + Math.sin(now / 320) * 0.05;
   }
 
@@ -121,7 +157,11 @@ export class Markers {
     this.selection.geometry.dispose();
     this.ringMat.dispose();
     this.highlights.dispose();
+    this.creates.dispose();
+    this.alters.dispose();
     this.highlightGeo.dispose();
     this.highlightMat.dispose();
+    this.createMat.dispose();
+    this.alterMat.dispose();
   }
 }

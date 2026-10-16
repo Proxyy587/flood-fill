@@ -49,7 +49,16 @@ export const connectBridge = (bridge: SimBridge): (() => void) => {
     replayBus.onSeek((tick) => bridge.seek(tick)),
     selectBus.onFocus((ref) => scene.getState().focus(ref)),
     selectBus.onSelect((ref) => scene.getState().select(ref)),
-    selectBus.onHighlight((cells) => scene.setState({ highlightCells: cells })),
+    selectBus.onHighlight((cells) =>
+      scene.setState({ highlightCells: cells, ...(cells.length ? { highlightCreate: [] as number[], highlightAlter: [] as number[] } : {}) }),
+    ),
+    selectBus.onProposalGhost(({ create, alter }) =>
+      scene.setState({
+        highlightCreate: create,
+        highlightAlter: alter,
+        ...(create.length || alter.length ? { highlightCells: [] as number[] } : {}),
+      }),
+    ),
   );
 
   // Keep the inspector fresh for the selected entity.

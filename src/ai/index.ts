@@ -3,10 +3,16 @@ import { analyseRun, type Analysis } from './analysers';
 import { cityIndex, type CityIndex } from './cityIndex';
 import { buildEvidencePack, type EvidencePack } from './evidence';
 import { fallbackReport } from './fallback';
+import { DEFAULT_BUDGET } from './patchCompiler';
 import type { CriticReport, CriticResponse } from './schema';
 
 export { analyseRun, cityIndex, buildEvidencePack, fallbackReport };
 export type { Analysis, CityIndex, EvidencePack, CriticReport, CriticResponse };
+
+export interface CritiqueOptions {
+  budget?: number;
+  eco?: boolean;
+}
 
 export interface Critique {
   analyses: Analysis[];
@@ -15,10 +21,15 @@ export interface Critique {
 }
 
 /** Everything the critic needs that can be computed locally, deterministically, with no network. */
-export function prepareCritique(run: RunSummary, scenario: Scenario): Critique {
+export function prepareCritique(run: RunSummary, scenario: Scenario, opts: CritiqueOptions = {}): Critique {
   const city = cityIndex(scenario);
   const analyses = analyseRun(run, city);
-  return { analyses, pack: buildEvidencePack(run, city, analyses), fallback: fallbackReport(analyses, city) };
+  const budget = opts.budget ?? DEFAULT_BUDGET;
+  return {
+    analyses,
+    pack: buildEvidencePack(run, city, analyses, { budget, eco: opts.eco }),
+    fallback: fallbackReport(analyses, city, { budget, eco: opts.eco }),
+  };
 }
 
 /** Asks `/api/critic`; if the network is down the analyser report is returned instead. */

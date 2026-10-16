@@ -8,7 +8,7 @@ import { createRateLimiter, handleCriticRequest } from './criticRoute';
 import { buildEvidencePack, estimateTokens, TOKEN_BUDGET } from './evidence';
 import { fallbackReport } from './fallback';
 import { at, fixtureCity, fixtureRun } from './fixtures';
-import { compileProposal, DEFAULT_BUDGET } from './patchCompiler';
+import { BUDGET_TIERS, compileProposal, DEFAULT_BUDGET } from './patchCompiler';
 import { CriticReportSchema, type CriticReport } from './schema';
 
 const scenario = fixtureCity();
@@ -55,7 +55,8 @@ describe('fallback report', () => {
 });
 
 describe('patch compiler', () => {
-  const ok = (commands: unknown[]) => compileProposal({ title: 't', rationale: 'r', commands }, scenario);
+  const ok = (commands: unknown[], budget = DEFAULT_BUDGET, eco = false) =>
+    compileProposal({ title: 't', rationale: 'r', commands }, scenario, budget, { eco });
   it('accepts whitelisted blocks and costs them', () => {
     const r = ok([{ kind: 'setBlock', cell: at(4, 18), block: BlockType.Drainage }, { kind: 'paintRect', x0: 0, z0: 15, x1: 2, z1: 15, block: BlockType.Levee }]);
     expect(r.ok && r.patch.estimatedCost).toBe(2 + 3 * 2);
@@ -73,7 +74,7 @@ describe('patch compiler', () => {
       [{ kind: 'paintRect', x0: 0, z0: 0, x1: 20, z1: 20, block: BlockType.Road }],
       [{ kind: 'applyPatch', patch: { title: 'x', rationale: 'y', commands: [], estimatedCost: 0 } }],
       [{ kind: 'setBlock', cell: 5, block: BlockType.Road, __proto__: { admin: true }, extra: 1 }],
-      [{ kind: 'placeBuilding', def: { type: BlockType.Hospital, cells: [at(4, 18)], entrance: at(4, 18) } }],
+      [{ kind: 'placeBuilding', def: { type: BlockType.PowerPlant, cells: [at(4, 18)], entrance: at(4, 18) } }],
       [{ kind: 'placeBuilding', def: { type: BlockType.Helipad, cells: [at(4, 18), at(9, 18)], entrance: at(4, 18) } }],
       ['setBlock 5 road'],
       [],
@@ -93,6 +94,37 @@ describe('patch compiler', () => {
     const r = ok([{ kind: 'placeBuilding', def: { type: BlockType.Helipad, cells: [at(16, 16), at(17, 16), at(16, 17), at(17, 17)], entrance: at(16, 16) } }]);
     expect(r.ok).toBe(true);
     if (r.ok) expect(applyCommands(scenario, r.patch.commands).buildings.at(-1)?.type).toBe(BlockType.Helipad);
+  });
+  it('places hospital and police within budget and tags create cells', () => {
+    const r = ok([
+      { kind: 'placeBuilding', def: { type: BlockType.Hospital, cells: [at(16, 16), at(17, 16), at(16, 17), at(17, 17)], entrance: at(16, 16) } },
+    ]);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.create.length).toBe(4);
+      expect(r.alter.length).toBe(0);
+      expect(r.patch.estimatedCost).toBe(50 + 4);
+      expect(applyCommands(scenario, r.patch.commands).buildings.at(-1)?.type).toBe(BlockType.Hospital);
+    }
+    const police = ok([{ kind: 'placeBuilding', def: { type: BlockType.PoliceStation, cells: [at(4, 18)], entrance: at(4, 18) } }]);
+    expect(police.ok).toBe(true);
+    if (police.ok) expect(police.patch.estimatedCost).toBe(25 + 1);
+  });
+  it('eco mode rejects roads and accepts drainage', () => {
+    expect(ok([{ kind: 'setBlock', cell: at(4, 18), block: BlockType.Road }], DEFAULT_BUDGET, true).ok).toBe(false);
+    const drain = ok([{ kind: 'setBlock', cell: at(4, 18), block: BlockType.Drainage }], BUDGET_TIERS.low, true);
+    expect(drain.ok).toBe(true);
+    if (drain.ok) expect(drain.create).toContain(at(4, 18));
+  });
+  it('tags alter when replacing an existing road', () => {
+    const roadCell = scenario.blocks.findIndex((b, i) => b === BlockType.Road && !scenario.buildings.some((x) => x.cells.includes(i)));
+    expect(roadCell).toBeGreaterThanOrEqual(0);
+    const alt = ok([{ kind: 'setBlock', cell: roadCell, block: BlockType.Drainage }]);
+    expect(alt.ok).toBe(true);
+    if (alt.ok) {
+      expect(alt.alter).toContain(roadCell);
+      expect(alt.create).not.toContain(roadCell);
+    }
   });
 });
 

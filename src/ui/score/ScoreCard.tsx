@@ -181,7 +181,7 @@ export function ScorePanel({ onAskCritic }: { onAskCritic: () => void }) {
           </p>
         ))}
         <button type="button" className={styles.ask} onClick={onAskCritic}>
-          <Sparkles size={14} /> Ask the AI critic for a tested fix
+          <Sparkles size={14} /> Ask for feedback and suggestions
         </button>
       </section>
 

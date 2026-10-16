@@ -1,7 +1,7 @@
 import { BlockType, type RunSummary } from '../contracts';
 import type { Analysis } from './analysers';
 import type { CityIndex } from './cityIndex';
-import { CELL_COST, CRITIC_BLOCKS, DEFAULT_BUDGET } from './patchCompiler';
+import { BUDGET_TIERS, CELL_COST, CRITIC_BLOCKS, CRITIC_FACILITIES, DEFAULT_BUDGET, FACILITY_COST } from './patchCompiler';
 import { scoreRun } from './score';
 
 export const TOKEN_BUDGET = 6000;
@@ -32,7 +32,16 @@ export interface EvidencePack {
   };
   floodRules: string[];
   findings: { id: string; severity: string; title: string; explanation: string; cells: { cell: number; where: string }[]; ticks: number[] }[];
-  allowedChanges: { blocks: string[]; helipad: string; budget: number; costPerCell: Record<string, number>; gridIndex: string };
+  allowedChanges: {
+    blocks: string[];
+    facilities: string[];
+    budget: number;
+    budgetTiers: typeof BUDGET_TIERS;
+    eco: boolean;
+    costPerCell: Record<string, number>;
+    facilityCost: Record<string, number>;
+    gridIndex: string;
+  };
   miniMap?: string[];
 }
 
@@ -53,7 +62,12 @@ export const FLOOD_RULES = [
   'Cars stall above 0.3 m. A bridge keeps a crossing open until the river tops its deck. Helipads let helicopters reach rooftops when roads are under water.',
 ];
 
-export function buildEvidencePack(run: RunSummary, city: CityIndex, analyses: readonly Analysis[], opts: { budget?: number; tokenBudget?: number; miniMap?: boolean } = {}): EvidencePack {
+export function buildEvidencePack(
+  run: RunSummary,
+  city: CityIndex,
+  analyses: readonly Analysis[],
+  opts: { budget?: number; eco?: boolean; tokenBudget?: number; miniMap?: boolean } = {},
+): EvidencePack {
   const { scenario, w, h } = city;
   const last = run.metrics.at(-1);
   const step = Math.max(1, Math.ceil(run.metrics.length / 10));
@@ -108,9 +122,15 @@ export function buildEvidencePack(run: RunSummary, city: CityIndex, analyses: re
     ),
     allowedChanges: {
       blocks: CRITIC_BLOCKS.map((b) => `${BlockType[b]} (${b})`),
-      helipad: `placeBuilding with def { type: ${BlockType.Helipad}, cells: up to 4 adjacent free cells, entrance: one of them }`,
+      facilities: CRITIC_FACILITIES.map(
+        (t) =>
+          `placeBuilding { type: ${t} (${BlockType[t]}), cells: compact free footprint, entrance: one of them${t === BlockType.Helipad ? ', max 4 cells' : ''} }`,
+      ),
       budget: opts.budget ?? DEFAULT_BUDGET,
+      budgetTiers: BUDGET_TIERS,
+      eco: !!opts.eco,
       costPerCell: Object.fromEntries(Object.entries(CELL_COST).map(([k, v]) => [BlockType[Number(k)], v])),
+      facilityCost: Object.fromEntries(Object.entries(FACILITY_COST).map(([k, v]) => [BlockType[Number(k)], v])),
       gridIndex: `cell = z * ${w} + x, 0 <= x < ${w}, 0 <= z < ${h}`,
     },
   };

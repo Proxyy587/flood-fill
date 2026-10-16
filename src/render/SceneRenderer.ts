@@ -236,7 +236,13 @@ export class SceneRenderer {
         if (s.inspector !== prev.inspector || s.overlays.routes !== prev.overlays.routes || !sameEntity(s.selected, prev.selected)) this.applyRoute(s);
         if (!sameEntity(s.selected, prev.selected)) this.selectionBox = this.boxFor(s.selected);
         if (s.inspector !== prev.inspector || !sameEntity(s.selected, prev.selected)) this.applyInterior(s);
-        if (s.highlightCells !== prev.highlightCells) this.applyHighlights(s.highlightCells);
+        if (
+          s.highlightCells !== prev.highlightCells ||
+          s.highlightCreate !== prev.highlightCreate ||
+          s.highlightAlter !== prev.highlightAlter
+        ) {
+          this.applyHighlights(s);
+        }
         if (s.overlays !== prev.overlays) this.applyOverlays(s);
       }),
     );
@@ -291,7 +297,7 @@ export class SceneRenderer {
       this.rig.overview(w.w, w.h, true);
     }
     this.selectionBox = this.boxFor(this.store.getState().selected);
-    this.applyHighlights(this.store.getState().highlightCells);
+    this.applyHighlights(this.store.getState());
   }
 
   private setSnapshot(s: RenderSnapshot): void {
@@ -356,10 +362,12 @@ export class SceneRenderer {
     this.route.setRoute(showable && s.inspector?.route ? s.inspector.route.cells : null, this.world?.w ?? 1);
   }
 
-  private applyHighlights(cells: number[]): void {
+  private applyHighlights(s: Pick<SceneState, 'highlightCells' | 'highlightCreate' | 'highlightAlter'>): void {
     if (!this.world) return;
     const w = this.world;
-    this.markers.setHighlights(cells, w.w, (c) => Math.max(columnTop(w, c) * Y_SCALE, this.water.surfaceAt(c)));
+    const heightAt = (c: number) => Math.max(columnTop(w, c) * Y_SCALE, this.water.surfaceAt(c));
+    this.markers.setHighlights(s.highlightCells, w.w, heightAt);
+    this.markers.setProposalGhosts(s.highlightCreate, s.highlightAlter, w.w, heightAt);
   }
 
   private applyCamera(s: SceneState): void {

@@ -89,7 +89,12 @@ export interface SceneState {
   lens: Lens;
   overlays: Overlays;
   labels: MapLabel[];
+  /** Generic evidence highlight (findings) — pink. */
   highlightCells: number[];
+  /** Proposal create ghosts — green. */
+  highlightCreate: number[];
+  /** Proposal alter ghosts — red. */
+  highlightAlter: number[];
   fps: number;
 
   setHover: (cell: number | null, entity: EntityRef | null) => void;
@@ -137,6 +142,8 @@ export const useSceneStore = create<SceneState>()((set, get) => ({
   overlays: { routes: true, reports: true, signals: true, rain: true, shadows: true, labels: true },
   labels: [],
   highlightCells: [],
+  highlightCreate: [],
+  highlightAlter: [],
   fps: 0,
 
   setHover: (cell, entity) => {

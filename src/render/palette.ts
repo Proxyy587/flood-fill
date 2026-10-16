@@ -111,6 +111,10 @@ export const UI_COLORS = {
   selection: 0x1e6fd9,
   route: 0x1e6fd9,
   highlight: 0xd6336c,
+  /** Create / add ghosts for AI proposals. */
+  create: 0x2f9e44,
+  /** Alter / replace ghosts for AI proposals. */
+  alter: 0xe03131,
 } as const;
 
 /**

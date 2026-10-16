@@ -18,6 +18,7 @@ const channel = <T>() => {
 const focus = channel<EntityRef>();
 const select = channel<EntityRef | null>();
 const highlight = channel<number[]>();
+const proposalGhost = channel<{ create: number[]; alter: number[] }>();
 
 /** Selection and camera focus requests from any panel (inspector, replay, critic). */
 export const selectBus = {
@@ -27,9 +28,17 @@ export const selectBus = {
   select: (ref: EntityRef | null) => select.emit(ref),
   /** Highlight evidence cells on the map (empty array clears). */
   highlightCells: (cells: number[]) => highlight.emit(cells),
+  /** Green create / red alter ghosts for an AI proposal. */
+  highlightProposal: (create: number[], alter: number[]) => proposalGhost.emit({ create, alter }),
+  /** Clear all map highlights. */
+  clearHighlights: () => {
+    highlight.emit([]);
+    proposalGhost.emit({ create: [], alter: [] });
+  },
   onFocus: focus.on,
   onSelect: select.on,
   onHighlight: highlight.on,
+  onProposalGhost: proposalGhost.on,
 };
 
 const seek = channel<number>();

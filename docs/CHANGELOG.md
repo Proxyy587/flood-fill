@@ -119,6 +119,7 @@ One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order 
 - 2026-10-16 (AJ, UX): transport bar redesigned (controls row + full-width timeline); timeline scrub commits on pointer-up/capture-loss so seek/skip-ahead works; speed is a snapping slider through **256×** (worker clamp raised).
 - 2026-10-16 (AJ, UX): repaired timeline scrub end-to-end — optimistic playhead, growing time window (not crushed on 24 h runs), ±10 min skip buttons, live reverse scrub, faster catch-up slices, forward seeks no longer drop rising ticks.
 - 2026-10-16 (AJ→AK): `docs/AK_HANDOFF.md` — intelligence-only import summary, engine policy (core default / Six Mile preview), open core follow-ups.
+- 2026-10-16 (AJ, critic/UX): Score → Suggestions loop — Low/Mid/High + Eco budget strip, hospital/police/shelter/boat-depot patches, green create / red alter map ghosts with camera focus, verify score delta, thinner Six Mile drainage for an imperfect first run.
 
 ## 2026-10-16 — Guwahati atlas / Six Mile (AJ + Worker 2)
 

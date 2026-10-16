@@ -12,6 +12,7 @@ import { verifyInWorker } from '../../ai/verifyClient';
 import { Comparison } from '../../ui/dashboard/Compare';
 import { Dashboard } from '../../ui/dashboard/Dashboard';
 import { runReportMarkdown } from '../../ui/dashboard/runStats';
+import { selectBus } from '../../bridge/buses';
 import { CriticPanel, verifyPlan } from '../../ui/critic/CriticPanel';
 import { Limitations } from '../../ui/critic/Limitations';
 import { topIncidents } from '../../ui/replay/afterAction';
@@ -72,6 +73,7 @@ function CompareModes({ run }: { run: RunSummary }) {
 /** Charts, the replay explainer, the AI critic and the policy comparison for the current run. */
 export function ReportTool({ onClose, onApply, initialTab = 'score' }: { onClose: () => void; onApply: (patch: ScenarioPatch) => void; initialTab?: ReportTab }) {
   const [tab, setTab] = useState<ReportTab>(initialTab);
+  const [autoAsk, setAutoAsk] = useState(initialTab === 'critic');
   const scenario = useEditorStore((s) => s.scenario);
   const params = useEditorStore((s) => s.params);
   const { events, metrics, done } = useSimFeedStore();
@@ -85,6 +87,14 @@ export function ReportTool({ onClose, onApply, initialTab = 'score' }: { onClose
     [done, scenario, seed, metrics, events],
   );
   if (!scenario) return null;
+  const close = () => {
+    selectBus.clearHighlights();
+    onClose();
+  };
+  const askCritic = () => {
+    setAutoAsk(true);
+    setTab('critic');
+  };
   const exportReport = () => {
     if (!run) return;
     const md = runReportMarkdown({ run, scenario, analyses: analyseRun(run, cityIndex(scenario)), incidents: topIncidents(run.events), clock: clockOf });
@@ -92,20 +102,23 @@ export function ReportTool({ onClose, onApply, initialTab = 'score' }: { onClose
   };
 
   return (
-    <Flyout title="Report" subtitle="What happened, why, and what to change." onClose={onClose} wide>
+    <Flyout title="Report" subtitle="Score, feedback, and budgeted city fixes." onClose={close} wide>
       <Segmented
         label="Report section"
         value={tab}
-        onChange={setTab}
+        onChange={(next) => {
+          if (next !== 'critic') setAutoAsk(false);
+          setTab(next);
+        }}
         options={[
           { id: 'score', label: 'Score' },
           { id: 'charts', label: 'Charts' },
           { id: 'why', label: 'Why' },
-          { id: 'critic', label: 'Critic' },
+          { id: 'critic', label: 'Suggestions' },
           { id: 'compare', label: 'Compare' },
         ]}
       />
-      {tab === 'score' && <ScorePanel onAskCritic={() => setTab('critic')} />}
+      {tab === 'score' && <ScorePanel onAskCritic={askCritic} />}
       {tab === 'charts' && (
         <>
           <Dashboard metrics={metrics} events={events} scenario={scenario} names={names} />
@@ -115,7 +128,15 @@ export function ReportTool({ onClose, onApply, initialTab = 'score' }: { onClose
         </>
       )}
       {tab === 'why' && <ReplayPanel events={events} selected={selected} clock={clockOf} />}
-      {tab === 'critic' && <CriticPanel run={run} scenario={scenario} settings={{ engine, dispatchMode: run?.mode ?? scenario.defaults.dispatchMode, npcParams: params, startTimeSeconds: startSeconds }} onApply={onApply} />}
+      {tab === 'critic' && (
+        <CriticPanel
+          run={run}
+          scenario={scenario}
+          settings={{ engine, dispatchMode: run?.mode ?? scenario.defaults.dispatchMode, npcParams: params, startTimeSeconds: startSeconds }}
+          onApply={onApply}
+          autoAsk={autoAsk}
+        />
+      )}
       {tab === 'compare' && (run ? <CompareModes run={run} /> : <p className={styles.hint}>Start the storm first; the comparison re-runs this city in the background.</p>)}
     </Flyout>
   );

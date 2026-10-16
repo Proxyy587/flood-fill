@@ -8,12 +8,19 @@ import { LIMITATIONS, type CriticReport, type Proposal } from './schema';
 const FREE = new Set<number>([BlockType.Grass, BlockType.Dirt, BlockType.Sand, BlockType.Tree]);
 
 /** A complete report from the deterministic analysers alone: the critic works with no key and no network. */
-export function fallbackReport(analyses: readonly Analysis[], city: CityIndex): CriticReport {
+export function fallbackReport(analyses: readonly Analysis[], city: CityIndex, opts: { budget?: number; eco?: boolean } = {}): CriticReport {
   const findings = analyses.flatMap((a) => a.findings).slice(0, 10);
   const proposals: Proposal[] = [];
   for (const a of analyses) {
-    const p = a.kind === 'drainage' ? drainProposal(a, city) : a.kind === 'power_cascade' ? leveeProposal(a, city) : a.kind === 'isolated_rooftops' || a.kind === 'isolated_zones' ? helipadProposal(a, city) : null;
-    if (p && !proposals.some((x) => x.title === p.title)) proposals.push(p);
+    const p =
+      a.kind === 'drainage'
+        ? drainProposal(a, city)
+        : a.kind === 'power_cascade'
+          ? leveeProposal(a, city)
+          : !opts.eco && (a.kind === 'isolated_rooftops' || a.kind === 'isolated_zones')
+            ? helipadProposal(a, city)
+            : null;
+    if (p && (opts.budget === undefined || p.cost <= opts.budget) && !proposals.some((x) => x.title === p.title)) proposals.push(p);
   }
   const top = findings.slice(0, 3).map((f) => f.title.replace(/\.$/, ''));
   const summary = findings.length
