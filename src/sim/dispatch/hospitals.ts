@@ -111,15 +111,8 @@ export function releaseHospitalReservation(system: HospitalSystem, patient: numb
   return true;
 }
 
-export function reserveHospitalBed(system: HospitalSystem, patient: number, health: number, fromCell: number, world: World, scenario: Scenario, blocked: Uint8Array): HospitalDestination | undefined {
-  if (!Number.isInteger(patient) || patient < 0 || patient >= system.patientCapacity) throw new RangeError("Patient index is outside the hospital reservation table");
-  if (system.patientAdmitted[patient]) return undefined;
-  const current = system.patientReservation[patient];
-  if (current >= 0) {
-    const existing = routeToHospital(system, current, fromCell, world, scenario, blocked);
-    if (existing) return existing;
-    releaseHospitalReservation(system, patient);
-  }
+/** Pure shortlist used by deterministic selection and observational decision policies. */
+export function listHospitalCandidates(system: HospitalSystem, health: number, fromCell: number, world: World, scenario: Scenario, blocked: Uint8Array): HospitalDestination[] {
   const severity = triageHealth(health);
   const severityScore = severity === "severe" ? 1 : severity === "minor" ? 0 : Math.min(1, Math.max(0, (75 - health) / 25));
   const candidates: HospitalDestination[] = [];
@@ -131,8 +124,19 @@ export function reserveHospitalBed(system: HospitalSystem, patient: number, heal
     destination.score = severity === "severe" ? destination.eta : destination.eta + 60 * (1 - severityScore) * projectedUtilization;
     candidates.push(destination);
   }
-  candidates.sort((a, b) => a.score - b.score || a.hospitalId - b.hospitalId || a.accessCell - b.accessCell);
-  const selected = candidates[0];
+  return candidates.sort((a, b) => a.score - b.score || a.hospitalId - b.hospitalId || a.accessCell - b.accessCell);
+}
+
+export function reserveHospitalBed(system: HospitalSystem, patient: number, health: number, fromCell: number, world: World, scenario: Scenario, blocked: Uint8Array): HospitalDestination | undefined {
+  if (!Number.isInteger(patient) || patient < 0 || patient >= system.patientCapacity) throw new RangeError("Patient index is outside the hospital reservation table");
+  if (system.patientAdmitted[patient]) return undefined;
+  const current = system.patientReservation[patient];
+  if (current >= 0) {
+    const existing = routeToHospital(system, current, fromCell, world, scenario, blocked);
+    if (existing) return existing;
+    releaseHospitalReservation(system, patient);
+  }
+  const selected = listHospitalCandidates(system, health, fromCell, world, scenario, blocked)[0];
   if (!selected) return undefined;
   system.reserved[selected.hospitalIndex]++;
   system.patientReservation[patient] = selected.hospitalIndex;

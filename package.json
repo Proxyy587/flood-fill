@@ -21,8 +21,10 @@
     "critic:cache": "tsx scripts/critic-cache.ts"
   },
   "dependencies": {
+    "laya-ts": "file:vendor\\laya-ts",
     "lucide-react": "^1.57.0",
     "next": "16.4.1",
+    "onnxruntime-web": "1.30.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "three": "^0.186.1",
@@ -38,9 +40,9 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.1",
     "tailwindcss": "^4",
+    "tsx": "4.22.4",
     "typescript": "^5",
-    "vitest": "5.0.4",
-    "tsx": "4.22.4"
+    "vitest": "5.0.4"
   },
   "packageManager": "pnpm@10.28.0"
 }

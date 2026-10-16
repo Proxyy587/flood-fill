@@ -10,8 +10,8 @@ Run Laya entirely in a dedicated browser worker and compare its bounded hospital
 
 - Keep `src/sim` pure and deterministic. It produces a stable list of feasible hospital candidates with route, capacity and power evidence at the point where it already chooses and reserves a bed.
 - The browser worker lazily loads a pinned `laya-ts` source revision with ONNX Runtime Web. It fetches an official checkpoint exported to Laya's split ONNX format (`encoder.onnx`, `head.onnx`, tokenizer and config). WebGPU is attempted first; the upstream runtime falls back to WASM.
-- A browser-side broker receives bounded candidate observations, caps outstanding work, and discards results from an old run generation. It records Laya's choice and distribution separately from the simulator's deterministic choice.
-- A small diagnostics view shows model loading, the last shadow comparison, inference latency, and failures. It explicitly labels shadow output as unvalidated simulation evidence.
+- A browser-side client accepts bounded candidate observations and discards results from an old run generation. This first slice feeds it one synthetic sample; the live simulator does not publish decision observations yet.
+- A small diagnostics view shows model loading, the sample shadow comparison, inference latency, and failures. It explicitly labels shadow output as unvalidated simulation evidence.
 
 ## Model assets
 
@@ -23,4 +23,4 @@ Only feasible candidate IDs can appear in a comparison. Validate finite probabil
 
 ## Follow-on gate
 
-Assisted choices require separate review of the versioned worker contract and decision tape in `docs/CONTRACTS.md`, plus held-out accuracy and latency evaluation. The shadow slice does not claim Laya improves rescue outcomes.
+Live shadow observations and assisted choices require review of the versioned worker contract and decision tape in `docs/CONTRACTS.md`, plus held-out accuracy and latency evaluation before model choices can affect outcomes. The sample shadow slice does not claim Laya improves rescue outcomes.
