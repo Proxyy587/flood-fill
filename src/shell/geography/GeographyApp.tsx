@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowUpRight, Check, Compass, Crosshair, Layers, MapPin, Minus, Plus, Waves } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSixMile } from '../../editor/geography/sixMile';
 import { CITY_ANCHORS } from '../../render/geography/GeographyRenderer';
 import { GeographyCanvas, type GeographyControls } from '../../render/geography/GeographyCanvas';
@@ -14,9 +14,30 @@ import styles from './geography.module.css';
 const EMPTY_PLACES: ReturnType<typeof createSixMile>['places'] = [];
 
 const HOTSPOTS = [
-  { id: 'six-mile', name: 'Six Mile', area: 'Southeast Guwahati', ready: true, href: '/six-mile/simulate' },
-  { id: 'paltan', name: 'Paltan Bazaar', area: 'Central Guwahati', ready: false, href: null },
-  { id: 'biswanath', name: 'Biswanath Town', area: 'Regional · Assam', ready: false, href: null },
+  {
+    id: 'six-mile',
+    name: 'Six Mile',
+    area: 'Southeast Guwahati',
+    blurb: 'Channel hollows, ridge shelves and street ponding — open the district storm.',
+    ready: true,
+    href: '/six-mile/simulate',
+  },
+  {
+    id: 'paltan',
+    name: 'Paltan Bazaar',
+    area: 'Central Guwahati',
+    blurb: 'Opens the riverside test city sandbox for freeform edit and storm runs.',
+    ready: true,
+    href: '/sandbox',
+  },
+  {
+    id: 'biswanath',
+    name: 'Biswanath Town',
+    area: 'Regional · Assam',
+    blurb: 'Smaller river-town layout for regional comparison runs.',
+    ready: false,
+    href: null,
+  },
 ] as const;
 
 export function GeographyApp({ district = false }: { district?: boolean }) {
@@ -36,6 +57,13 @@ export function GeographyApp({ district = false }: { district?: boolean }) {
   const mapError = useCallback((message: string) => setError(message), []);
   const place = model?.places.find(p => p.id === selected);
 
+  // Warm the simulate route + district generation so the wipe feels instant.
+  useEffect(() => {
+    router.prefetch('/six-mile/simulate');
+    router.prefetch('/sandbox');
+    void createSixMile();
+  }, [router]);
+
   const choosePlace = (id: number) => {
     const p = model?.places.find(p => p.id === id);
     setSelected(id);
@@ -50,12 +78,18 @@ export function GeographyApp({ district = false }: { district?: boolean }) {
     setActivePin(id);
     setNotice('');
     setTransitioning(true);
-    // Soft lean toward the pin while clouds gather — the wipe does the real handoff.
-    void controls.current?.flyInto(anchor.x, anchor.z, hotspot.ready ? 2.4 : 2.2);
+    if (hotspot.href) router.prefetch(hotspot.href);
+    // Soft lean toward the pin while clouds gather — keep the fly short so the wipe leads.
+    void controls.current?.flyInto(anchor.x, anchor.z, hotspot.ready ? 0.85 : 1.1);
     if (hotspot.ready && hotspot.href) {
       pendingHref.current = hotspot.href;
-      armCloudEnter(hotspot.href);
-      setWipe('covering');
+      // Cloud wipe only for the district sim handoff; sandbox jumps cleanly.
+      if (hotspot.href.startsWith('/six-mile')) {
+        armCloudEnter(hotspot.href);
+        setWipe('covering');
+      } else {
+        router.push(hotspot.href);
+      }
       return;
     }
     await new Promise(r => setTimeout(r, 700));
@@ -73,16 +107,19 @@ export function GeographyApp({ district = false }: { district?: boolean }) {
     <CloudWipe phase={wipe} onCovered={onCovered} />
     <header className={styles.header}>
       <Link href="/" className={styles.brand} aria-label="FloodSim city atlas home">
-        <span className={styles.brandIcon}><Waves size={21} /></span>
+        <span className={styles.brandIcon}><Waves size={18} /></span>
         <strong>flood<span>sim</span></strong>
         <span className={styles.brandDivider} />
         <span className={styles.brandSuffix}>{district ? 'SIX MILE' : 'CITY ATLAS'}</span>
       </Link>
       <nav aria-label="City navigation" className={styles.headerNav}>
         {district
-          ? <Link href="/"><ArrowLeft size={14} /> Assam overview</Link>
-          : <span className={styles.region}><span /> ASSAM · GUWAHATI</span>}
-        <Link href="/sandbox" prefetch={false} className={styles.sandboxLink}>Test sandbox <ArrowUpRight size={14} /></Link>
+          ? <Link href="/" className={styles.navQuiet}><ArrowLeft size={14} /> Overview</Link>
+          : null}
+        <button type="button" className={styles.labelToggle} aria-pressed={labels} onClick={() => setLabels(!labels)}>
+          <Layers size={14} /> Labels {labels && <Check size={12} />}
+        </button>
+        <Link href="/sandbox" prefetch={false} className={styles.sandboxLink}>Sandbox <ArrowUpRight size={14} /></Link>
       </nav>
     </header>
 
@@ -91,18 +128,33 @@ export function GeographyApp({ district = false }: { district?: boolean }) {
         onAnchors={setAnchors} onSelect={select} onError={mapError} controlsRef={controls} />
       {!error && anchors.length === 0 && <div className={styles.mapLoading} role="status"><Compass size={20} /> Building the map…</div>}
 
-      <div className={styles.mapTop}>
-        <div className={styles.breadcrumb}>
-          <MapPin size={14} />
-          <span>Assam</span>
-          <span className={styles.crumbSep}>/</span>
-          <strong>Guwahati</strong>
-          {district && <><span className={styles.crumbSep}>/</span><strong>Six Mile</strong></>}
-        </div>
-        <button type="button" className={styles.labelToggle} aria-pressed={labels} onClick={() => setLabels(!labels)}>
-          <Layers size={14} /> Labels {labels && <Check size={12} />}
-        </button>
-      </div>
+      {!district && <aside className={styles.atlasPanel} aria-label="District hotspots">
+        <p className={styles.atlasKicker}>Assam · Guwahati</p>
+        <h1>Pick a district storm</h1>
+        <p className={styles.atlasLead}>
+          Brahmaputra north, forested ridges inland, basins that pond. Six Mile runs the district storm; Paltan opens the sandbox city.
+        </p>
+        <ul className={styles.hotspotList}>
+          {HOTSPOTS.map((h) => (
+            <li key={h.id}>
+              <button
+                type="button"
+                className={`${styles.hotspotCard} ${activePin === h.id ? styles.hotspotCardActive : ''}`}
+                disabled={transitioning}
+                onClick={() => void openHotspot(h.id)}
+              >
+                <span className={styles.hotspotCardMark}><MapPin size={14} /></span>
+                <span className={styles.hotspotCardBody}>
+                  <strong>{h.name}</strong>
+                  <small>{h.area}</small>
+                  <span>{h.blurb}</span>
+                </span>
+                <em>{h.ready ? 'Open' : 'Soon'}</em>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </aside>}
 
       {error ? <div className={styles.mapError} role="alert"><Compass size={26} /><strong>Explore by location</strong><p>{error}</p></div> : <div className={styles.annotations}>
         {labels && anchors.filter(a => a.visible).map(a => a.kind === 'place' ? <button type="button" key={a.id}
@@ -113,7 +165,10 @@ export function GeographyApp({ district = false }: { district?: boolean }) {
           onClick={() => district ? choosePlace(Number(a.id)) : void openHotspot(a.id)}>
           <span className={styles.pinMarker}><MapPin size={district ? 12 : 15} fill="currentColor" /></span>
           <span>{a.text}</span>
-          {!district && <small>{HOTSPOTS.find(h => h.id === a.id)?.ready ? 'ENTER DISTRICT' : 'PREVIEW'}</small>}
+          {!district && <small>{
+            a.id === 'paltan' ? 'OPEN SANDBOX'
+              : HOTSPOTS.find(h => h.id === a.id)?.ready ? 'ENTER DISTRICT' : 'PREVIEW'
+          }</small>}
         </button> : <span key={a.id} className={a.kind === 'water' ? styles.waterLabel : styles.areaLabel} style={{ left: a.left, top: a.top }}>{a.text}</span>)}
       </div>}
 
@@ -124,7 +179,6 @@ export function GeographyApp({ district = false }: { district?: boolean }) {
         <button type="button" onClick={() => controls.current?.reset()} aria-label="Reset map view"><Crosshair size={17} /></button>
       </div>
 
-      {!district && <p className={styles.atlasHint}>Three demonstration hotspots · pick a pin to fly in</p>}
       {district && place && <article className={styles.districtChip} aria-live="polite">
         <strong>{place.name}</strong>
         <span>{place.source === 'reference' ? 'From your reference' : 'Illustrative structure'}</span>

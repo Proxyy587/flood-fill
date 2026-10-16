@@ -48,12 +48,12 @@ export function CloudWipe({
 }) {
   useEffect(() => {
     if (phase === 'covering') {
-      // Hold until clouds fully opaque and the atlas fly-in has mostly finished.
-      const t = window.setTimeout(() => onCovered?.(), 1750);
+      // Cover just long enough to hide the route swap — keep the handoff snappy.
+      const t = window.setTimeout(() => onCovered?.(), 720);
       return () => window.clearTimeout(t);
     }
     if (phase === 'revealing') {
-      const t = window.setTimeout(() => onRevealed?.(), 1300);
+      const t = window.setTimeout(() => onRevealed?.(), 680);
       return () => window.clearTimeout(t);
     }
   }, [phase, onCovered, onRevealed]);

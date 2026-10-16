@@ -136,11 +136,10 @@ export class CoreEngine implements Engine {
     return worldFromScenario(this.scenario);
   }
   drain() {
-    // The core only exposes a cloned summary; AK has a request open for an incremental drain.
-    const all = this.sim.summary();
+    const updates = this.sim.updatesSince(this.eventsSeen, this.metricsSeen);
     const events: SimEvent[] = [];
-    for (let i = this.eventsSeen; i < all.events.length; i++) {
-      const e = eventFromCore(all.events[i]);
+    for (const rawEvent of updates.events) {
+      const e = eventFromCore(rawEvent);
       if (!e) continue;
       if (e.type === 'WEATHER') {
         const band = weatherBand(e);
@@ -149,9 +148,9 @@ export class CoreEngine implements Engine {
         events.push({ ...e, data: { ...e.data, wind: Number(e.data?.wind ?? 0) / WIND_MS_AT_FULL } });
       } else events.push(e);
     }
-    this.eventsSeen = all.events.length;
-    const metrics = all.metrics.slice(this.metricsSeen) as unknown as MetricsFrame[];
-    this.metricsSeen = all.metrics.length;
+    this.eventsSeen += updates.events.length;
+    const metrics = updates.metrics as unknown as MetricsFrame[];
+    this.metricsSeen += updates.metrics.length;
     if (metrics.length) this.lastFrame = metrics[metrics.length - 1];
     return { events, metrics };
   }
@@ -174,9 +173,10 @@ export class CoreEngine implements Engine {
     return false;
   }
   rejects(event: InjectedEvent) {
-    if (!CORE_INJECTABLE.has(event.kind)) return `${event.kind.replace(/_/g, ' ')} is not modelled by the core simulator yet. Switch the engine to Preview to try it.`;
     const r = injectedToAk(event);
-    return 'error' in r ? r.error : null;
+    if ('error' in r) return r.error;
+    if (!CORE_INJECTABLE.has(event.kind)) return `${event.kind.replace(/_/g, ' ')} is not modelled by the core simulator yet.`;
+    return null;
   }
   summary(): RunSummary {
     const s = this.sim.summary();

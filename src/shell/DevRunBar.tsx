@@ -5,7 +5,7 @@ import type { SimBridge } from '../bridge/SimBridge';
 import { useSimFeedStore } from '../bridge/simFeedStore';
 import type { InjectedEventKind } from '../contracts';
 
-const SPEEDS = [1, 4, 16, 64];
+const SPEEDS = [1, 4, 16, 64, 128, 256];
 
 const INJECTIONS: { kind: InjectedEventKind; label: string }[] = [
   { kind: 'bridge_closed', label: 'Close bridge' },

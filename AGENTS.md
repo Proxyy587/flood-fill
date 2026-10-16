@@ -41,7 +41,7 @@ Problem-statement mapping (Flood Rescue Dispatch, PS 27). Judges will look for t
 - **Sim runs in a Web Worker**, never on the main thread
 - **Zustand** for UI state, **Zod** for schema validation, **Vitest** for tests
 - **Chart.js** (or Recharts) for metrics
-- Anthropic API called **only from a Next.js route handler** (`app/api/critic`), never from the browser
+- OpenRouter (LLM critic/reports) called **only from a Next.js route handler** (`app/api/critic` via `OPENROUTER_API_KEY`), never from the browser
 
 ## 3. The five rules that stop us breaking each other
 

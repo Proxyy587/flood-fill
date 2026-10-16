@@ -13,11 +13,16 @@ integration and independent review approval are still pending. M2 now has delaye
 warnings and capacity-reserved shelter evacuation; powered pump configuration and
 expanded hazard integration remain. Blackout traffic is implemented.
 M3A uncertain reports and M3B ambulance dispatch, field triage, hospital balancing
-and hot-zone staging are implemented in the AK headless core. Boats, police,
-helicopters, full stress scenario, browser rendering, and M4-M6 remain pending.
+and hot-zone staging are implemented in the AK headless core. M3C boat rescue and
+M3D independent police gridlock traffic control, M3E independent police civilian
+escort, and M3F adaptive police crowd control are implemented. Helicopter rooftop
+rescue/medevac and weather constraints, the full compound stress scenario, browser
+rendering/integration, and M4-M6 remain pending.
 Both dispatch policies can be compared on identical seeds; no universal
-performance/response winner is claimed. W1 templates are
-missing and the strict release-validation command correctly fails.
+performance/response winner is claimed. Four W1 templates are present and the
+`pnpm validate --require-templates` required-presence gate passes. This validation is
+schema-only; template quality, connectivity and full release readiness are separate
+gates and are not confirmed by it.
 
 ## AJ integration status (2026-10-15)
 
@@ -65,8 +70,10 @@ missing and the strict release-validation command correctly fails.
 ### M3 — Rescue, Aerial Ops & Dispatch (H18–H26) · MUST
 - Requests, reports with uncertainty, HQ belief map (AK)
 - Negotiation and centralised baseline, same seed (AK)
-- Boats, ambulances, police; hospital balancing with diversion (AK)
-- **Helicopters**: Rooftop rescue of stranded civilians; medevac transfers between helipads; weather constraints (grounded if wind > threshold); air graph routing (AK)
+- Ambulance dispatch, hospital balancing/diversion and adaptive hot-zone staging (M3B, implemented, AK)
+- Boat rescue with injured-patient handoff into ambulance hospital balancing (M3C, implemented, AK)
+- Independent finite police dispatch for gridlock traffic control (M3D), civilian escort (M3E), and adaptive crowd control (M3F), implemented by AK
+- **Helicopters (planned)**: Rooftop rescue of stranded civilians; medevac transfers between helipads; weather constraints (grounded if wind > threshold); air graph routing (AK)
 - Metrics and `sim:compare`; dashboard with comparison charts, power outage %, and aerial rescue stats (W3)
 - Event log, replay timeline, "why was this rerouted" panel (W3 + W2)
 - **Demo:** negotiation vs baseline with numbers, including blackout handling and air rescues
@@ -79,7 +86,7 @@ missing and the strict release-validation command correctly fails.
 - **Demo:** "the AI says add a generator and helipad here, and the sim confirms response improved 18%"
 
 ### M5 — Chaos and polish (H31–H34) · MUST
-- Full stress scenario: Simultaneous bridge closure + boat failure + shelter overflow + substation flood + gale wind grounding helicopters (AK + W1 + W2)
+- Full stress scenario (pending): simultaneous bridge closure + boat failure + shelter overflow + substation flood + gale wind grounding helicopters (AK + W1 + W2)
 - Injected-event panel: trip substation, ground helicopters, cut comms, flood bridge (AK + W2)
 - Truth vs HQ-belief toggle (AJ)
 - Visual polish: blackout building tint, darkened signals, rotating helicopter blades (AJ)

@@ -5,17 +5,18 @@ import { insideForest, mapNoise, SIX_MILE_BOUNDARY, type DistrictPlace } from '.
 
 export interface MapAnchor { id: string; text: string; x: number; z: number; kind: 'place' | 'water' | 'area' }
 export interface ScreenAnchor extends MapAnchor { left: number; top: number; visible: boolean }
+/** Synthetic Guwahati atlas anchors — north = low Z (Brahmaputra), south = high Z (NH27). */
 export const CITY_ANCHORS: MapAnchor[] = [
-  { id: 'six-mile', text: 'Six Mile', x: 155, z: 88, kind: 'place' },
-  { id: 'paltan', text: 'Paltan Bazaar', x: 127, z: 54, kind: 'place' },
-  { id: 'biswanath', text: 'Biswanath Town', x: 248, z: 18, kind: 'place' },
-  { id: 'river', text: 'BRAHMAPUTRA', x: 113, z: 25, kind: 'water' },
-  { id: 'wetland', text: 'Deepor Bil', x: 56, z: 87, kind: 'water' },
-  { id: 'assam', text: 'ASSAM', x: 200, z: 48, kind: 'area' },
-  { id: 'north', text: 'NORTH GUWAHATI', x: 94, z: 10, kind: 'area' },
-  { id: 'jalukbari', text: 'JALUKBARI', x: 67, z: 62, kind: 'area' },
-  { id: 'dispur', text: 'DISPUR', x: 147, z: 77, kind: 'area' },
-  { id: 'airport', text: 'AIRPORT', x: 29, z: 97, kind: 'area' },
+  { id: 'six-mile', text: 'Six Mile', x: 168, z: 96, kind: 'place' },
+  { id: 'paltan', text: 'Paltan Bazaar', x: 118, z: 48, kind: 'place' },
+  { id: 'biswanath', text: 'Biswanath Town', x: 238, z: 22, kind: 'place' },
+  { id: 'river', text: 'BRAHMAPUTRA', x: 110, z: 22, kind: 'water' },
+  { id: 'wetland', text: 'Deepor Bil', x: 48, z: 92, kind: 'water' },
+  { id: 'north', text: 'NORTH GUWAHATI', x: 96, z: 8, kind: 'area' },
+  { id: 'nilachal', text: 'NILACHAL', x: 72, z: 58, kind: 'area' },
+  { id: 'jalukbari', text: 'JALUKBARI', x: 58, z: 68, kind: 'area' },
+  { id: 'dispur', text: 'DISPUR', x: 142, z: 78, kind: 'area' },
+  { id: 'airport', text: 'AIRPORT', x: 28, z: 102, kind: 'area' },
 ];
 
 type Box = { x: number; y: number; z: number; w: number; h: number; d: number; id?: number; angle?: number };
@@ -44,8 +45,9 @@ export class GeographyRenderer {
   constructor(private element: HTMLElement, scenario: Scenario | null, places: DistrictPlace[],
     private onAnchors: (anchors: ScreenAnchor[]) => void, private onSelect: (id: number) => void) {
     this.places = places;
-    this.span = scenario ? 150 : 268;
-    this.origin = new THREE.Vector3(scenario ? 64 : 130, 0, scenario ? 64 : 58);
+    // Atlas: fill the frame with Guwahati (river→NH27). District keeps a wider local view.
+    this.span = scenario ? 150 : 178;
+    this.origin = new THREE.Vector3(scenario ? 64 : 118, 0, scenario ? 64 : 64);
     this.anchors = scenario ? places.slice(0, 10).filter(p => [1, 2, 5, 8].includes(p.id)).map(p => ({ id: String(p.id), text: p.name, x: p.x, z: p.z, kind: 'place' })) : CITY_ANCHORS;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
@@ -65,12 +67,13 @@ export class GeographyRenderer {
     this.controls.target.set(0, 0, 12);
     this.controls.enableDamping = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.controls.dampingFactor = .12;
-    this.controls.minZoom = .65;
-    this.controls.maxZoom = 4;
+    // Ortho: higher zoom = closer. Atlas cannot pull back past city overview.
+    this.controls.minZoom = scenario ? 0.75 : 1.05;
+    this.controls.maxZoom = scenario ? 4 : 2.8;
     this.controls.minPolarAngle = .2;
     this.controls.maxPolarAngle = 1.1;
-    this.controls.minAzimuthAngle = -.6;
-    this.controls.maxAzimuthAngle = .6;
+    this.controls.minAzimuthAngle = -.55;
+    this.controls.maxAzimuthAngle = .55;
     this.controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
     this.controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     this.controls.addEventListener('change', this.changed);
@@ -185,63 +188,154 @@ export class GeographyRenderer {
     this.box('#7d9a7b', { x, z, y: y + size * 1.9, w: 1.5 * size, d: 1.5 * size, h: 1.7 * size });
     this.box('#93aa86', { x: x - size * .15, z, y: y + size * 2.8, w: size, d: size, h: size * .65 });
   }
+  /** Layered ridge mound — forested highs like Nilachal / Kahilipara / zoo ridge. */
+  private hill(x: number, z: number, rx: number, rz: number, height: number, stretch = 1) {
+    for (let level = 0; level < height; level += 1.25) {
+      const t = level / (height + 2);
+      const points: [number, number][] = Array.from({ length: 20 }, (_, i) => {
+        const angle = i * Math.PI * 2 / 20;
+        const wobble = 1 + Math.sin(i * 2.4 + x * 0.1) * 0.1;
+        return [
+          x + Math.cos(angle) * rx * (1 - t * 0.72) * wobble,
+          z + Math.sin(angle) * rz * (1 - t * 0.72) * stretch * wobble,
+        ];
+      });
+      const green = level > height * 0.55 ? 0x6f8a62 : level > height * 0.25 ? 0x7d966c : 0x8fa186;
+      this.shape(points, green, 0.2 + level, 1.2);
+    }
+  }
+
+  /** Shallow floodable basin tint between ridges. */
+  private basin(x: number, z: number, rx: number, rz: number) {
+    const points: [number, number][] = Array.from({ length: 18 }, (_, i) => {
+      const angle = i * Math.PI * 2 / 18;
+      return [x + Math.cos(angle) * rx * (1 + Math.sin(i * 2) * 0.1), z + Math.sin(angle) * rz];
+    });
+    this.shape(points, 0x7fa4a0, 0.22, 0.4);
+    this.shape(points.map(([px, pz]) => [px * 0.78 + x * 0.22, pz * 0.78 + z * 0.22] as [number, number]), 0x6a949c, 0.28, 0.2);
+  }
+
   private city() {
-    // Soft Assam landmass under Guwahati so the three demo pins sit in one composition.
-    this.shape([[-40, 140], [40, -20], [280, -40], [300, 80], [220, 150], [40, 160]], 0xb7c2ae, -3.2, 1.4);
-    this.ribbon([[-10, 70], [60, 40], [140, 18], [220, 8], [290, 2]], 18, 0xc5c9b0, -1.6);
-    this.ribbon([[-10, 70], [60, 40], [140, 18], [220, 8], [290, 2]], 11, 0x8eb0b6, -1.5);
-    const boundary: [number, number][] = [[7, 112], [19, 73], [47, 54], [66, 27], [88, 9], [126, 16], [182, 13], [194, 38], [196, 82], [176, 103], [126, 113], [87, 112], [50, 129], [22, 121]];
-    this.shape(boundary, 0x9daa90, -2, 2.2);
-    // City relief follows the supplied overview: river north, wetland west, hills south/east.
-    for (const [x, z, r, height] of [[90, 103, 24, 8], [177, 66, 19, 10], [111, 93, 15, 6], [77, 49, 14, 5], [45, 109, 12, 5]]) {
-      for (let level = 0; level < height; level += 1.5) {
-        const points: [number, number][] = Array.from({ length: 18 }, (_, i) => {
-          const angle = i * Math.PI * 2 / 18, radius = r * (1 - level / (height + 3)) * (1 + Math.sin(i * 3) * .08);
-          return [x + Math.cos(angle) * radius, z + Math.sin(angle) * radius * .6];
-        });
-        this.shape(points, level > height * .6 ? 0x83977b : 0x8fa186, .3 + level, 1.4);
-      }
-    }
-    const river: [number, number][] = [[10, 78], [42, 62], [66, 40], [85, 27], [115, 26], [144, 30], [170, 24], [188, 21]];
-    this.ribbon(river, 13, 0xc4c7aa, .35);
-    this.ribbon(river, 10.5, 0x85aeb7, .4);
-    this.ribbon([[20, 74], [55, 54], [88, 26], [124, 27], [163, 26], [184, 22]], .18, 0xb5d2d4, .43);
-    this.shape([[59, 40], [65, 36], [73, 33], [69, 38], [62, 43]], 0xd3cdb0, .48, .12);
-    this.shape([[99, 24], [110, 23], [121, 25], [112, 25.5]], 0xd3cdb0, .48, .12);
-    this.shape([[47, 83], [53, 79], [63, 80], [67, 86], [59, 93], [50, 91]], 0x89adb0, .4);
-    const roads: [number, number][][] = [
-      [[21, 103], [48, 80], [68, 64], [90, 62], [124, 54], [155, 58], [177, 51]],
-      [[68, 64], [74, 81], [87, 91], [119, 96], [155, 99], [174, 89]],
-      [[124, 54], [130, 68], [147, 77], [155, 88], [155, 99]],
-      [[96, 61], [104, 74], [127, 81], [147, 77]],
-      [[140, 52], [149, 63], [163, 74], [174, 89]],
-      [[103, 34], [116, 43], [124, 54]],
+    // Guwahati-like composition from the overview map: river north, Deepor SW,
+    // Nilachal + southern ridges, dense basins, Six Mile SE, NH27 south edge.
+    this.shape([[-10, 125], [40, -8], [230, -18], [250, 70], [210, 130], [40, 140]], 0xb4c0ab, -3.0, 1.3);
+
+    // Urban platform (south bank) — not a perfect oval; river-cut northern edge.
+    const cityPoly: [number, number][] = [
+      [14, 108], [22, 78], [38, 52], [58, 34], [82, 22], [112, 18], [148, 20],
+      [178, 28], [196, 48], [202, 78], [192, 104], [168, 118], [132, 124],
+      [96, 122], [62, 120], [34, 116],
     ];
-    roads.forEach(r => { this.ribbon(r, 2.1, 0xb3b3a1, .65); this.ribbon(r, 1.4, 0xe2d9c5, .68); });
-    this.ribbon([[65, 38], [73, 50], [76, 62]], 1.6, 0xe3dfd2, 2.4);
-    for (let z = 40; z < 98; z += 3.3) for (let x = 51; x < 171; x += 3.4) {
+    this.shape(cityPoly, 0x9aaa8e, -1.8, 2.0);
+
+    // —— Highs: Nilachal (W), south-central hills, eastern / zoo ridge ——
+    this.hill(70, 56, 18, 14, 12, 0.85);   // Nilachal / Kamakhya mass
+    this.hill(88, 78, 12, 10, 8, 0.9);    // mid shoulder
+    this.hill(108, 98, 20, 14, 10, 0.75); // Kahilipara / Jyotikuchi band
+    this.hill(128, 92, 14, 11, 8, 0.8);
+    this.hill(152, 70, 16, 12, 11, 0.7);  // eastern ridge toward Six Mile
+    this.hill(168, 78, 11, 9, 7, 0.85);
+    this.hill(48, 88, 10, 8, 5, 1);       // Jalukbari rise
+    this.hill(178, 52, 9, 7, 5, 1);       // NE shelf
+
+    // —— Lows: river fringe, GS Road / Six Mile hollows, central dips ——
+    this.basin(118, 58, 11, 7);   // Paltan / Ulubari low
+    this.basin(138, 72, 10, 7);   // Dispur fringe
+    this.basin(158, 92, 14, 10);  // Six Mile / Beltola hollow
+    this.basin(148, 100, 9, 6);
+    this.basin(98, 68, 8, 5);     // between Nilachal and south hills
+    this.basin(72, 74, 7, 5);
+
+    // Brahmaputra — wide northern ribbon + sand chars
+    const river: [number, number][] = [
+      [8, 42], [36, 30], [62, 22], [90, 18], [120, 16], [150, 18], [178, 22], [205, 26], [230, 20],
+    ];
+    this.ribbon(river, 22, 0xc5c8ad, 0.2);
+    this.ribbon(river, 17, 0x7eacb4, 0.28);
+    this.ribbon(river, 12.5, 0x6b9eab, 0.34);
+    this.ribbon([[20, 38], [55, 26], [95, 18], [140, 17], [185, 22]], 0.2, 0xb8d4d6, 0.38);
+    // Sandbars / chars
+    this.shape([[58, 24], [72, 20], [86, 22], [78, 28], [64, 28]], 0xd4ceb0, 0.42, 0.14);
+    this.shape([[108, 14], [124, 12], [138, 15], [128, 19], [112, 18]], 0xd4ceb0, 0.42, 0.14);
+    this.shape([[156, 18], [170, 16], [182, 20], [170, 24]], 0xd0c9a8, 0.42, 0.12);
+    // Saraighat-ish crossing west
+    this.ribbon([[48, 36], [52, 28], [56, 18], [58, 8]], 1.8, 0xe3dfd2, 1.1);
+
+    // Deepor Bil — large SW wetland
+    this.shape([[34, 82], [44, 76], [58, 78], [64, 88], [58, 98], [42, 100], [32, 92]], 0x6f9aa0, 0.3, 0.15);
+    this.shape([[38, 84], [48, 80], [56, 84], [54, 92], [42, 94]], 0x5f8d96, 0.34, 0.1);
+
+    // North Guwahati bank strip
+    this.shape([[70, 2], [90, -2], [120, 0], [140, 4], [130, 10], [100, 8], [78, 8]], 0xa3b094, -0.4, 1.2);
+    for (let i = 0; i < 14; i++) {
+      const x = 82 + mapNoise(i, 1) * 48, z = 2 + mapNoise(i, 4) * 8;
+      this.box('#c9c4b0', { x, z, y: 0.9, w: 1.4, d: 1.5, h: 0.8 + mapNoise(i, 6) * 1.6 });
+    }
+
+    // Arterials: Assam Trunk (river), GS Road SE, NH27 south, ring links
+    const roads: [number, number][][] = [
+      [[24, 70], [48, 52], [78, 40], [112, 36], [148, 40], [178, 46]], // river road
+      [[112, 36], [118, 48], [124, 62], [142, 78], [158, 90], [172, 100]], // GS Road → Six Mile
+      [[40, 112], [72, 114], [110, 116], [148, 114], [180, 108], [198, 96]], // NH27
+      [[58, 68], [78, 72], [98, 78], [118, 82], [138, 86]], // mid belt
+      [[88, 40], [98, 56], [108, 70], [120, 82]],
+      [[148, 40], [156, 58], [164, 76], [170, 92]],
+    ];
+    roads.forEach((r) => {
+      this.ribbon(r, 2.2, 0xb0b09e, 0.55);
+      this.ribbon(r, 1.45, 0xe4dcc8, 0.6);
+    });
+
+    // Dense urban fabric in basins; sparse / none on ridges and wetland
+    const onHill = (x: number, z: number) =>
+      Math.hypot((x - 70) / 18, (z - 56) / 14) < 1
+      || Math.hypot((x - 108) / 20, (z - 98) / 14) < 1
+      || Math.hypot((x - 152) / 16, (z - 70) / 12) < 1
+      || Math.hypot((x - 128) / 14, (z - 92) / 11) < 1
+      || Math.hypot((x - 48) / 10, (z - 88) / 8) < 1;
+    const inBasin = (x: number, z: number) =>
+      Math.hypot((x - 158) / 14, (z - 92) / 10) < 1
+      || Math.hypot((x - 118) / 11, (z - 58) / 7) < 1
+      || Math.hypot((x - 138) / 10, (z - 72) / 7) < 1
+      || Math.hypot((x - 98) / 8, (z - 68) / 5) < 1;
+    const inDeepor = (x: number, z: number) => Math.hypot((x - 48) / 16, (z - 90) / 12) < 1;
+
+    for (let z = 32; z < 118; z += 2.6) for (let x = 40; x < 198; x += 2.7) {
+      if (z < 28 || onHill(x, z) || inDeepor(x, z)) continue;
       const value = mapNoise(Math.round(x), Math.round(z));
-      const hillside = Math.hypot((x - 90) / 1.3, (z - 103) * 1.8) < 23 || Math.hypot(x - 177, (z - 66) * 1.7) < 20 || Math.hypot(x - 77, (z - 49) * 1.7) < 14;
-      const built = z > 43 && x > 65 && !hillside && value > .17 && !(x < 68 && z > 77);
-      if (!built) continue;
-      const height = 1 + value * 4.2;
-      this.box(value > .74 ? '#c1b8a3' : value < .4 ? '#d8d4c1' : '#b6c0b2', { x, z, y: height / 2 + .7, w: 1.9, d: 2, h: height });
-      this.box('#cfd3c6', { x, z, y: height + .8, w: 2, d: 2.1, h: .2 });
+      const basin = inBasin(x, z);
+      const core = (x > 95 && x < 155 && z > 40 && z < 90) || (x > 145 && z > 80);
+      const density = basin ? 0.08 : core ? 0.14 : 0.28;
+      if (value < density) continue;
+      const base = basin ? 0.28 : 0.65;
+      const height = (basin ? 0.6 : 0.9) + value * (basin ? 2.2 : core ? 4.8 : 3.2);
+      const color = basin ? '#a4b4a4' : value > 0.78 ? '#bdb4a0' : value < 0.35 ? '#d5d1be' : '#b4beaf';
+      this.box(color, { x, z, y: height / 2 + base, w: 1.7, d: 1.8, h: height });
+      this.box('#cfd3c6', { x, z, y: height + base + 0.08, w: 1.85, d: 1.95, h: 0.16 });
     }
-    for (let i = 0; i < 270; i++) {
-      const x = 39 + mapNoise(i, 5) * 141, z = 40 + mapNoise(i, 9) * 63;
-      if (mapNoise(i, 12) > .55) this.tree(x, z, .5, .7);
+
+    // Forest canopy on ridges
+    for (let i = 0; i < 420; i++) {
+      const x = 40 + mapNoise(i, 5) * 150, z = 36 + mapNoise(i, 9) * 78;
+      if (!onHill(x, z) && mapNoise(i, 12) > 0.35) continue;
+      if (inDeepor(x, z)) continue;
+      this.tree(x, z, onHill(x, z) ? 2.2 : 0.45, onHill(x, z) ? 0.95 : 0.65);
     }
-    this.box('#e3e1d2', { x: 29, z: 97, y: .55, w: 2.2, d: 16, h: .3, angle: -.6 });
-    // Biswanath sits as a small regional town NE of Guwahati on the Assam landmass.
-    for (let i = 0; i < 18; i++) {
-      const x = 240 + mapNoise(i, 3) * 18, z = 10 + mapNoise(i, 7) * 14;
-      this.box(mapNoise(i, 2) > .6 ? '#c4bba6' : '#d2cebb', { x, z, y: 1.1, w: 1.6, d: 1.7, h: 1 + mapNoise(i, 4) * 2.2 });
+
+    // Airport runway west of Deepor
+    this.box('#e3e1d2', { x: 28, z: 102, y: 0.5, w: 2.4, d: 18, h: 0.28, angle: -0.55 });
+    this.box('#d8d6c8', { x: 32, z: 100, y: 0.7, w: 4, d: 3, h: 0.5 });
+
+    // Biswanath — small regional town NE on the Assam shelf
+    for (let i = 0; i < 20; i++) {
+      const x = 228 + mapNoise(i, 3) * 16, z = 14 + mapNoise(i, 7) * 14;
+      this.box(mapNoise(i, 2) > 0.6 ? '#c4bba6' : '#d2cebb', { x, z, y: 1.0, w: 1.5, d: 1.6, h: 0.9 + mapNoise(i, 4) * 2 });
     }
-    for (const a of CITY_ANCHORS.filter(a => a.kind === 'place')) {
+
+    for (const a of CITY_ANCHORS.filter((a) => a.kind === 'place')) {
       const pad = a.id === 'biswanath' ? 3.2 : 5;
-      this.box('#39777c', { x: a.x, z: a.z, y: 1.2, w: pad, d: pad, h: 1.6 });
-      this.box('#e8efe6', { x: a.x, z: a.z, y: 2.2, w: pad * .8, d: pad * .8, h: .4 });
+      this.box('#39777c', { x: a.x, z: a.z, y: 1.15, w: pad, d: pad, h: 1.5 });
+      this.box('#e8efe6', { x: a.x, z: a.z, y: 2.1, w: pad * 0.8, d: pad * 0.8, h: 0.35 });
     }
   }
   private district(s: Scenario) {
@@ -378,7 +472,9 @@ export class GeographyRenderer {
     });
   }
   zoom(factor: number) {
-    this.camera.zoom = THREE.MathUtils.clamp(this.camera.zoom * factor, .65, 4);
+    const min = this.controls.minZoom;
+    const max = this.controls.maxZoom;
+    this.camera.zoom = THREE.MathUtils.clamp(this.camera.zoom * factor, min, max);
     this.camera.updateProjectionMatrix(); this.dirty = true;
   }
   reset() {

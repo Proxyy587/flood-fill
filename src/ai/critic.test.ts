@@ -23,7 +23,8 @@ const llmReport: CriticReport = {
   proposals: [],
   limitations: ['Synthetic.'],
 };
-const reply = (text: string, status = 200) => new Response(JSON.stringify({ content: [{ type: 'text', text }] }), { status });
+const reply = (text: string, status = 200) =>
+  new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status });
 
 describe('evidence pack', () => {
   it('names places instead of dumping the grid, and fits the token budget', () => {
@@ -109,13 +110,13 @@ describe('critic call', () => {
     expect(r.source).toBe('llm');
     expect(r.report.findings[0].evidence[0].cells).toEqual([at(12, 10)]);
     const init = f.mock.calls[0][1] as RequestInit;
-    expect((init.headers as Record<string, string>)['x-api-key']).toBe('sk-test');
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer sk-test');
   });
   it('retries once with the validation error, then succeeds', async () => {
     const f = vi.fn().mockResolvedValueOnce(reply('{"summary": 3}')).mockResolvedValueOnce(reply(JSON.stringify(llmReport)));
     const r = await critique(pack, fallback, { apiKey: 'k', fetch: f });
     expect(r.source).toBe('llm');
-    const second = JSON.parse((f.mock.calls[1][1] as RequestInit).body as string) as { messages: { content: string }[] };
+    const second = JSON.parse((f.mock.calls[1][1] as RequestInit).body as string) as { messages: { role: string; content: string }[] };
     expect(second.messages.at(-1)?.content).toMatch(/failed validation: summary/);
   });
   it('falls back after two invalid replies, on HTTP errors and on network failure, without leaking the key', async () => {

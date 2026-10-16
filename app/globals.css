@@ -60,13 +60,15 @@ button {
 
 .fs-beacon-dock {
   position: absolute;
-  left: 72px;
-  bottom: 118px;
+  left: 68px;
+  bottom: 108px;
   display: flex;
   flex-direction: column-reverse;
   gap: 6px;
-  width: min(280px, calc(100% - 160px));
+  width: min(260px, calc(100vw - 360px));
+  max-width: 280px;
   pointer-events: none;
+  z-index: 2;
 }
 
 .fs-beacon {

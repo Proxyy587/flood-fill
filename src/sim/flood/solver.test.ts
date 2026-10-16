@@ -29,7 +29,7 @@ it("accounts for rain, half-open source intervals and drainage sinks", () => {
   const w = basin(); w.block[0] = BlockType.Drainage;
   const sources = [{ cell: 0, startT: 1, endT: 2, rate: 3 }];
   const result = stepFlood(w, { rain: 0.01, sources, tick: 1, soakRate: 0, drainRate: 0.1 });
-  expect(result.added).toBeCloseTo(3.64, 5);
+  expect(result.added).toBeCloseTo(3.45, 5);
   expect(totalWater(w)).toBeCloseTo(result.before + result.added - result.removed, 5);
   const next = stepFlood(w, { rain: 0, sources, tick: 2, soakRate: 0, drainRate: 0 });
   expect(next.added).toBe(0);

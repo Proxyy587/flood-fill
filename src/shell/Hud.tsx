@@ -1,6 +1,7 @@
 'use client';
 
-import { ChevronDown, ChevronUp, Crosshair, Footprints, Minus, Plus, Scan, Waves, X } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, ChevronDown, ChevronUp, Crosshair, Footprints, Minus, Plus, Scan, Waves, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSceneStore } from '../bridge/sceneStore';
 import { useSimFeedStore } from '../bridge/simFeedStore';
@@ -19,7 +20,7 @@ const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 // ---------- identity ----------
 
-export function Identity() {
+export function Identity({ atlasBack = false }: { atlasBack?: boolean } = {}) {
   const scenario = useEditorStore((s) => s.scenario);
   const mode = useEditorStore((s) => s.mode);
   const playing = useSceneStore((s) => s.playing);
@@ -35,6 +36,12 @@ export function Identity() {
           : { text: 'Paused', tone: 'paused' };
   return (
     <div className={`${styles.panel} ${styles.identity}`}>
+      {atlasBack && (
+        <Link href="/" className={styles.atlasBack} prefetch aria-label="Back to city atlas">
+          <ArrowLeft size={14} />
+          <span>Atlas</span>
+        </Link>
+      )}
       <div className={styles.mark} aria-hidden>
         <Waves size={17} />
       </div>
@@ -336,8 +343,14 @@ export function HoverTip() {
         : entity?.kind === 'building'
           ? (names[entity.id] ?? 'Building')
           : blockName(scenario.blocks[info.cell]);
+  // Keep the tip above the bottom dock so it does not collide with news/transport.
+  const nearDock = typeof window !== 'undefined' && info.screen.y > window.innerHeight - 140;
   return (
-    <div className={styles.hoverTip} style={{ left: info.screen.x, top: info.screen.y }}>
+    <div
+      className={styles.hoverTip}
+      data-above={nearDock || undefined}
+      style={{ left: info.screen.x, top: info.screen.y }}
+    >
       <b>{what}</b>
       <br />
       <span>Ground {info.elevation} m</span>

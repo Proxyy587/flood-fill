@@ -20,12 +20,17 @@ import {
 import { applyCommands } from '../editor/commands';
 import { createEngine, type Engine } from './engines';
 
-export const DEFAULT_ENGINE: SimEngine = 'preview';
+export const DEFAULT_ENGINE: SimEngine = 'core';
 /** A snapshot is kept every this many ticks for seek and replay. */
 export const RECORD_EVERY = 10;
 const MAX_TICKS_PER_FRAME = 240;
+const MAX_PLAY_TICKS_PER_SLICE = 8;
+const MAX_PENDING_PLAY_TICKS = 240;
+const PLAY_SLICE_MS = 40;
 const FLUSH_MS = 200;
-const BUSY_SLICE_MS = 40;
+/** Wall budget per catch-up slice — higher so timeline skip-ahead feels responsive. */
+const BUSY_SLICE_MS = 80;
+const BUSY_TICKS_PER_SLICE = 480;
 
 export interface Clock {
   now(): number;
@@ -48,6 +53,8 @@ interface Busy {
   /** Events and frames at or before this tick were already sent. */
   silentUntil: number;
   resume: boolean;
+  /** A forward timeline seek reveals the sim as it catches up. */
+  advanceView: boolean;
 }
 
 const cloneSnapshot = (s: RenderSnapshot): RenderSnapshot => structuredClone(s);
@@ -187,14 +194,7 @@ export class SimHost {
   private sendView() {
     if (!this.engine) return;
     if (this.viewTick >= this.live) {
-      const snapshot = this.engine.snapshot();
-      if (snapshot.dirtyChunks.length && snapshot.tick > 0 && this.options?.mode === 'run') {
-        // The run itself changed the terrain (e.g. a levee breach).
-        const world = this.engine.world();
-        world.dirtyChunks = [...snapshot.dirtyChunks];
-        this.post({ type: 'world', world }, worldTransferables(world));
-      }
-      this.postSnapshot(snapshot);
+      this.postSnapshot(this.engine.snapshot());
       return;
     }
     const frame = this.frames.get(Math.floor(this.viewTick / RECORD_EVERY) * RECORD_EVERY);
@@ -211,7 +211,17 @@ export class SimHost {
 
   private schedule(ms: number) {
     if (this.timer !== null) this.clock.cancel(this.timer);
-    this.timer = this.clock.schedule(() => this.loop(), ms);
+    this.timer = this.clock.schedule(() => {
+      try {
+        this.loop();
+      } catch (err) {
+        this.stop();
+        this.playing = false;
+        this.busy = null;
+        this.post({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+        this.postStatus();
+      }
+    }, ms);
   }
 
   private stop() {
@@ -228,13 +238,16 @@ export class SimHost {
 
     if (this.busy) {
       const b = this.busy;
-      while (engine.tick < b.target && this.clock.now() - now < BUSY_SLICE_MS) {
+      let stepped = 0;
+      while (engine.tick < b.target && stepped < BUSY_TICKS_PER_SLICE && this.clock.now() - now < BUSY_SLICE_MS) {
         engine.step();
         this.record();
+        stepped++;
       }
       const fresh = this.collect(b.silentUntil);
-      this.send(fresh.events, fresh.metrics);
-      if (engine.tick >= b.target) {
+      const beforeView = this.viewTick;
+      const reachedTarget = engine.tick >= b.target;
+      if (reachedTarget) {
         this.busy = null;
         this.viewTick = engine.tick;
         this.replayCursor = engine.tick;
@@ -242,8 +255,19 @@ export class SimHost {
         this.playing = b.resume && engine.tick < options.maxTicks;
         this.lastWall = this.clock.now();
         this.carry = 0;
+      } else if (b.advanceView && this.clock.now() - this.lastSnapshotWall >= 1000 / MAX_SNAPSHOT_HZ - 2) {
+        this.viewTick = this.replayCursor = engine.tick;
+        this.sendView();
       }
-      this.postStatus();
+      // Advance the visible clock/snapshot before appending its events so the
+      // decision timeline never shows choices from a later tick than the map.
+      if (b.advanceView) {
+        this.postStatus();
+        this.sendRange(beforeView, this.viewTick);
+      } else {
+        this.send(fresh.events, fresh.metrics);
+        this.postStatus();
+      }
       if (this.busy || this.playing) this.schedule(this.busy ? 0 : 1000 / 60);
       return;
     }
@@ -251,8 +275,8 @@ export class SimHost {
     if (!this.playing) return;
     const due = ((now - this.lastWall) / 1000) * options.speed + this.carry;
     this.lastWall = now;
-    const ticks = Math.min(Math.floor(due), MAX_TICKS_PER_FRAME);
-    this.carry = Math.min(due - ticks, 1);
+    const ticks = Math.min(Math.floor(due), MAX_PLAY_TICKS_PER_SLICE);
+    this.carry = Math.min(Math.max(0, due - ticks), MAX_PENDING_PLAY_TICKS);
     if (ticks > 0) {
       if (this.viewTick < this.live) {
         const before = this.viewTick;
@@ -263,10 +287,13 @@ export class SimHost {
           this.sendView();
         }
       } else {
-        for (let i = 0; i < ticks && engine.tick < options.maxTicks; i++) {
+        let stepped = 0;
+        while (stepped < ticks && engine.tick < options.maxTicks && this.clock.now() - now < PLAY_SLICE_MS) {
           engine.step();
           this.record();
+          stepped++;
         }
+        this.carry = Math.min(this.carry + ticks - stepped, MAX_PENDING_PLAY_TICKS);
         this.viewTick = this.replayCursor = engine.tick;
         const atEnd = engine.tick >= options.maxTicks;
         if (atEnd || now - this.lastFlushWall >= FLUSH_MS) {
@@ -297,8 +324,8 @@ export class SimHost {
     this.sendView();
   }
 
-  private catchUp(label: string, target: number, silentUntil: number, resume: boolean) {
-    this.busy = { label, from: this.live, target, silentUntil, resume };
+  private catchUp(label: string, target: number, silentUntil: number, resume: boolean, advanceView = false) {
+    this.busy = { label, from: this.live, target, silentUntil, resume, advanceView };
     this.playing = false;
     this.schedule(0);
   }
@@ -368,7 +395,7 @@ export class SimHost {
         break;
       }
       case 'setSpeed':
-        if (this.options) this.options = { ...this.options, speed: Math.max(0.25, Math.min(64, msg.speed)) };
+        if (this.options) this.options = { ...this.options, speed: Math.max(0.25, Math.min(256, msg.speed)) };
         break;
       case 'setDispatchMode':
         this.requireEdit('change the dispatch policy');
@@ -419,6 +446,11 @@ export class SimHost {
       }
       case 'seek': {
         if (!this.engine || !this.options) return;
+        // A later scrub supersedes any previous seek/catch-up. Otherwise its
+        // scheduled loop can continue after the view moved and publish stale
+        // snapshots or decision events over the newly selected timeline point.
+        this.stop();
+        this.busy = null;
         this.playing = false;
         const target = Math.max(0, Math.min(Math.floor(msg.tick), this.options.maxTicks));
         // The bridge has cleared the UI feed; resend history up to the new view.
@@ -430,7 +462,7 @@ export class SimHost {
         } else {
           this.viewTick = this.replayCursor = this.live;
           this.sendRange(-1, this.live);
-          this.catchUp('Simulating ahead', target, this.live, false);
+          this.catchUp('Simulating ahead', target, this.live, false, true);
         }
         break;
       }

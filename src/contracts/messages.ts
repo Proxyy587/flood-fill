@@ -18,12 +18,13 @@ export interface RunOptions {
   mode: 'edit' | 'run' | 'replay';
   /** 'core' = AK's validated simulator (default); 'preview' = the wider mock model. */
   engine?: SimEngine;
-  /** Time of day at tick 0, in seconds after midnight (default 17:15, so the storm runs into the night). */
+  /** Time of day at tick 0, in seconds after midnight (default 08:00 morning). */
   startTimeSeconds?: number;
 }
 
 export type SimEngine = 'core' | 'preview';
-export const DEFAULT_START_SECONDS = 17 * 3600 + 15 * 60;
+/** Morning start — the 24 h storm then runs through afternoon and night. */
+export const DEFAULT_START_SECONDS = 8 * 3600;
 
 export type MainToWorker =
   | { type: 'load'; scenario: Scenario; seed: number; options: RunOptions }

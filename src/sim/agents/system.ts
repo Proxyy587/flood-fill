@@ -1,13 +1,13 @@
 import { BlockType, NpcRole, NpcState, VehicleState } from "../../contracts/types";
 import type { EntitySelection, InspectorData, NpcId, RenderSnapshot, Scenario, SimEvent, VehicleId } from "../../contracts/types";
 import type { World } from "../world/grid";
-import { buildFlowField, type NavGrid } from "../nav";
+import { buildFlowField, findPath, type NavGrid } from "../nav";
 import { buildHazardGrid } from "../nav/hazards";
 import { beginTrafficTick, congestionFactors, finishTrafficTick, markTrafficWaiting, tryEnterTraffic, type TrafficState } from "../traffic";
 import type { PopulationState } from "./population";
 import { assertMovementEntry } from "../invariants/movement";
 
-interface Route { cells: number[]; modes: number[]; cursor: number; progress: number; goal: number; version: number }
+export interface AgentRoute { cells: number[]; modes: number[]; cursor: number; progress: number; goal: number; version: number; guidanceVersion?: number; crowdReroutePending?: boolean }
 interface Routing {
   foot: NavGrid; road: NavGrid;
   footFields: Map<number, ReturnType<typeof buildFlowField>>;
@@ -17,12 +17,13 @@ interface Routing {
 class PlanningDeferred extends Error {}
 export interface AgentSystem {
   population: PopulationState;
-  routes: Map<number, Route>;
+  routes: Map<number, AgentRoute>;
   shelters: Scenario["buildings"];
   shelterRemaining: Int32Array;
   shelterAssignment: Int32Array;
   hazardSince: number;
   intent: Uint8Array;
+  rescueHandoff: Uint8Array;
   retry: Int32Array;
   decisions: Map<number, NonNullable<InspectorData["lastDecision"]>>;
   version: number;
@@ -30,6 +31,8 @@ export interface AgentSystem {
   planningQueued: Uint8Array;
   planningStats: { fields: number; plans: number; deferred: number; retainedBytes: number };
   routeCells: number;
+  guidanceVersion: number;
+  crowdGuidance: Uint8Array;
 }
 
 function pathToField(grid: NavGrid, start: number, field: ReturnType<typeof buildFlowField>): number[] | null {
@@ -59,8 +62,9 @@ export function createAgentSystem(population: PopulationState, world: World, sce
   }
   const shelters = scenario.buildings.filter((building) => building.type === BlockType.Shelter).sort((a, b) => a.id - b.id);
   return { population, routes: new Map(), shelters, shelterRemaining: Int32Array.from(shelters.map((b) => b.capacity)), shelterAssignment: new Int32Array(population.npcs.id.length).fill(-1), hazardSince: -1,
-    intent: new Uint8Array(population.npcs.id.length), retry: new Int32Array(population.npcs.id.length), decisions: new Map(), version: 0, lastTick: 0,
-    planningQueued: new Uint8Array(population.npcs.id.length), planningStats: { fields: 0, plans: 0, deferred: 0, retainedBytes: 0 }, routeCells: 0 };
+    intent: new Uint8Array(population.npcs.id.length), rescueHandoff: new Uint8Array(population.npcs.id.length), retry: new Int32Array(population.npcs.id.length), decisions: new Map(), version: 0, lastTick: 0,
+    planningQueued: new Uint8Array(population.npcs.id.length), planningStats: { fields: 0, plans: 0, deferred: 0, retainedBytes: 0 }, routeCells: 0,
+    guidanceVersion: 0, crowdGuidance: new Uint8Array(world.width * world.height) };
 }
 function discardRoute(a: AgentSystem, i: number): void {
   const route = a.routes.get(i);
@@ -68,9 +72,100 @@ function discardRoute(a: AgentSystem, i: number): void {
   a.routes.delete(i);
 }
 
-function walkingSpeed(a: AgentSystem, i: number): number {
+/** Atomically reserves shelter capacity before a rescue boat boards a civilian. */
+export function reserveRescuedShelter(a: AgentSystem, npc: number, cell: number, world: World, scenario: Scenario, blocked: Uint8Array): boolean {
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount || !Number.isInteger(cell) || cell < 0 || cell >= world.width * world.height) {
+    throw new RangeError("Rescued civilian or landing cell is outside the simulation");
+  }
+  const foot = buildHazardGrid(world, scenario, "foot", blocked);
+  const existing = a.shelterAssignment[npc];
+  if (existing >= 0) {
+    const shelter = a.shelters[existing];
+    if (shelter && shelter.capacity > 0 && !shelter.cells.some((candidate) => world.water[candidate] > shelter.floorHeight) && findPath(foot, cell, shelter.entrance)) return true;
+    a.shelterAssignment[npc] = -1;
+  }
+  const reservations = new Int32Array(a.shelters.length);
+  for (const assignment of a.shelterAssignment) if (assignment >= 0) reservations[assignment]++;
+  let selected = -1;
+  let bestLength = Infinity;
+  for (let index = 0; index < a.shelters.length; index++) {
+    const shelter = a.shelters[index];
+    if (shelter.capacity <= reservations[index] || shelter.cells.some((candidate) => world.water[candidate] > shelter.floorHeight)) continue;
+    const path = findPath(foot, cell, shelter.entrance);
+    if (!path) continue;
+    if (selected < 0 || path.length < bestLength || path.length === bestLength && shelter.id < a.shelters[selected].id) {
+      selected = index;
+      bestLength = path.length;
+    }
+  }
+  if (selected < 0) return false;
+  a.shelterAssignment[npc] = selected;
+  return true;
+}
+
+export function releaseRescuedShelter(a: AgentSystem, npc: number): boolean {
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Rescued civilian is outside the shelter reservation table");
+  if (a.shelterAssignment[npc] < 0) return false;
+  a.shelterAssignment[npc] = -1;
+  if (a.population.npcs.state[npc] === NpcState.Respond) {
+    a.intent[npc] = 0;
+    a.population.npcs.state[npc] = NpcState.Stranded;
+  }
+  return true;
+}
+
+/** Removes an aboard civilian from foot-route processing until shore handoff. */
+export function markRescuedAboard(a: AgentSystem, npc: number): void {
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Rescued civilian is outside the agent table");
+  discardRoute(a, npc);
+  a.intent[npc] = 0;
+  a.rescueHandoff[npc] = 0;
+  a.planningQueued[npc] = 0;
+  a.population.npcs.state[npc] = NpcState.Respond;
+}
+
+export function requeueFailedRescue(a: AgentSystem, npc: number): void {
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Rescued civilian is outside the agent table");
+  discardRoute(a, npc);
+  a.intent[npc] = 0;
+  a.rescueHandoff[npc] = 0;
+  a.planningQueued[npc] = 0;
+  a.population.npcs.state[npc] = NpcState.Stranded;
+}
+
+/** Transfers a shore-landed civilian to a reachable home or one reserved shelter place. */
+export function handoffRescuedCivilian(a: AgentSystem, npc: number, cell: number, world: World, scenario: Scenario, blocked: Uint8Array, shelterRequired: boolean): boolean {
   const n = a.population.npcs;
-  return 0.35 * n.speed[i] * (n.mobility[i] === 2 ? 0.35 : n.mobility[i] === 1 ? 0.65 : 1) * (1 - 0.5 * n.fatigue[i]);
+  if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount || !Number.isInteger(cell) || cell < 0 || cell >= world.width * world.height) {
+    throw new RangeError("Rescued civilian or landing cell is outside the simulation");
+  }
+  const foot = buildHazardGrid(world, scenario, "foot", blocked);
+  if (shelterRequired) {
+    if (!reserveRescuedShelter(a, npc, cell, world, scenario, blocked)) return false;
+    a.intent[npc] = 3;
+    a.rescueHandoff[npc] = 0;
+    n.state[npc] = NpcState.Evacuate;
+  } else {
+    const home = scenario.buildings.find((building) => building.id === n.homeBuilding[npc]);
+    if (!home || home.cells.some((candidate) => world.water[candidate] > home.floorHeight) || !findPath(foot, cell, home.entrance)) return false;
+    a.intent[npc] = 2;
+    a.rescueHandoff[npc] = 1;
+    n.state[npc] = NpcState.ReturnHome;
+  }
+  discardRoute(a, npc);
+  a.planningQueued[npc] = 0;
+  a.retry[npc] = 0;
+  n.cell[npc] = cell;
+  n.x[npc] = cell % world.width + 0.5;
+  n.z[npc] = Math.floor(cell / world.width) + 0.5;
+  return true;
+}
+
+const POLICE_ESCORT_SPEED_FACTOR = 1.1;
+
+function walkingSpeed(a: AgentSystem, i: number, escorted = false): number {
+  const n = a.population.npcs;
+  return 0.35 * n.speed[i] * (n.mobility[i] === 2 ? 0.35 : n.mobility[i] === 1 ? 0.65 : 1) * (1 - 0.5 * n.fatigue[i]) * (escorted ? POLICE_ESCORT_SPEED_FACTOR : 1);
 }
 function cachedField(grid: NavGrid, goal: number, cache: Routing["footFields"], routing: Routing) {
   let field = cache.get(goal);
@@ -84,7 +179,7 @@ function cachedField(grid: NavGrid, goal: number, cache: Routing["footFields"], 
   }
   return field;
 }
-function plan(a: AgentSystem, i: number, goal: number, routing: Routing): Route | null {
+function plan(a: AgentSystem, i: number, goal: number, routing: Routing): AgentRoute | null {
   if (routing.plans >= 256) throw new PlanningDeferred();
   routing.plans++;
   const { foot, road, footFields, carFields } = routing;
@@ -121,10 +216,27 @@ function plan(a: AgentSystem, i: number, goal: number, routing: Routing): Route 
 }
 
 /** One deterministic second. All entry checks use the current hazard graph. */
-export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tick: number, blocked: Uint8Array, traffic: TrafficState): SimEvent[] {
+export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tick: number, blocked: Uint8Array, traffic: TrafficState, policeControlled?: Uint8Array, escortGuidance?: ReadonlySet<number>, crowdGuidance?: Uint8Array): SimEvent[] {
   if (!Number.isSafeInteger(tick) || tick !== a.lastTick + 1) throw new RangeError("Agents require consecutive one-second ticks");
-  const foot = buildHazardGrid(world, scenario, "foot", blocked);
-  beginTrafficTick(traffic, world);
+  for (const npc of escortGuidance ?? []) if (!Number.isInteger(npc) || npc < 0 || npc >= a.population.civilianCount) throw new RangeError("Police escort guidance contains an invalid civilian index");
+  const count = world.width * world.height;
+  if (crowdGuidance !== undefined && (!(crowdGuidance instanceof Uint8Array) || crowdGuidance.length !== count)) throw new RangeError("Police crowd guidance mask must be a grid-sized Uint8Array");
+  const nextGuidance = crowdGuidance ?? new Uint8Array(count);
+  const guidanceChangedCells = new Uint8Array(count);
+  let guidanceChanged = false;
+  for (let cell = 0; cell < count; cell++) {
+    if (nextGuidance[cell] > 1) throw new RangeError("Police crowd guidance mask must contain only binary values");
+    if (nextGuidance[cell] !== a.crowdGuidance[cell]) { guidanceChanged = true; guidanceChangedCells[cell] = 1; }
+  }
+  if (guidanceChanged) { a.guidanceVersion++; a.crowdGuidance = nextGuidance.slice(); }
+  const baseFoot = buildHazardGrid(world, scenario, "foot", blocked);
+  let foot = baseFoot;
+  if (nextGuidance.some((value) => value !== 0)) {
+    const costs = baseFoot.costs!.slice();
+    for (let cell = 0; cell < count; cell++) if (nextGuidance[cell] && baseFoot.passable[cell]) costs[cell] = Math.min(65536, costs[cell] * 4);
+    foot = { ...baseFoot, costs };
+  }
+  beginTrafficTick(traffic, world, policeControlled);
   const road = buildHazardGrid(world, scenario, "car", blocked, congestionFactors(traffic));
   const routing: Routing = { foot, road, footFields: new Map(), carFields: new Map(), remainingCells: 49152, fields: 0, plans: 0 };
   a.planningStats = { fields: 0, plans: 0, deferred: 0, retainedBytes: 0 };
@@ -250,7 +362,14 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
     const goal = shelterTrip ? a.shelters[a.shelterAssignment[i]].entrance : a.intent[i] === 1 ? n.work[i] : n.home[i];
     if (goal < 0) { n.state[i] = NpcState.SeekHelp; continue; }
     let route = a.routes.get(i);
+    let pendingCrowdReroute = false;
     if (route) {
+      const guidanceStale = (route.guidanceVersion ?? 0) !== a.guidanceVersion;
+      const guidedRouteChanged = guidanceStale && (route.cursor > 0 && route.modes[route.cursor - 1] === 0 && guidanceChangedCells[route.cells[route.cursor - 1]] !== 0 ||
+        route.cells.slice(route.cursor).some((cell, offset) => route!.modes[route!.cursor + offset] === 0 && guidanceChangedCells[cell] !== 0));
+      pendingCrowdReroute = route.crowdReroutePending === true || guidedRouteChanged && route.progress > 0;
+      route.crowdReroutePending = pendingCrowdReroute;
+      if (guidanceStale && !guidedRouteChanged && !pendingCrowdReroute) route.guidanceVersion = a.guidanceVersion;
       const carFailed = n.car[i] >= 0 && cars.state[n.car[i]] === VehicleState.Failed;
       if (carFailed) n.role[i] = n.baseRole[i];
       if (carFailed && route.progress > 0 && route.modes[route.cursor] === 1) {
@@ -260,18 +379,20 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
         route.goal = -1; // Finish this edge walking, then replan before any next edge.
       }
       const invalid = route.goal !== goal || route.cells.slice(route.cursor).some((cell, j) => !(route!.modes[route!.cursor + j] ? road : foot).passable[cell]);
-      if (route.progress === 0 && (invalid || carFailed && route.modes.includes(1))) {
+      const crowdReroute = route.progress === 0 && (guidedRouteChanged || pendingCrowdReroute);
+      if (route.progress === 0 && (invalid || carFailed && route.modes.includes(1) || crowdReroute)) {
+        if (crowdReroute) { route.guidanceVersion = a.guidanceVersion; route.crowdReroutePending = false; }
         discardRoute(a, i); route = undefined; a.retry[i] = tick;
         const car = n.car[i]; if (car >= 0 && cars.state[car] !== VehicleState.Failed) cars.state[car] = VehicleState.Idle;
         n.role[i] = n.baseRole[i];
-        event(i, "REROUTE", "Remaining route or vehicle is unavailable; recomputing without teleporting");
+        event(i, "REROUTE", crowdReroute ? "Police crowd guidance changed the foot-route cost; recomputing at a safe node" : "Remaining route or vehicle is unavailable; recomputing without teleporting");
       }
     }
     if (!route && tick >= a.retry[i] && goal >= 0) {
         route = plan(a, i, goal, routing) ?? undefined;
       a.planningQueued[i] = 0;
       if (route) {
-        route.version = ++a.version; a.routeCells += route.cells.length + route.modes.length;
+        route.version = ++a.version; route.guidanceVersion = a.guidanceVersion; a.routeCells += route.cells.length + route.modes.length;
         a.routes.set(i, route); n.state[i] = shelterTrip ? NpcState.Evacuate : a.intent[i] === 1 ? NpcState.Commute : NpcState.ReturnHome;
         event(i, "ROUTE_PLANNED", "Selected the fastest currently reachable walking or walk-drive-walk route");
       } else {
@@ -297,7 +418,7 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
       if (n.state[i] === NpcState.Stranded) n.state[i] = a.intent[i] === 1 ? NpcState.Commute : NpcState.ReturnHome;
       assertMovementEntry(world, route.cells[route.cursor - 1], target, driving ? "car" : "foot", blocked);
       if (driving && route.progress === 0 && !tryEnterTraffic(traffic, target)) { markTrafficWaiting(traffic, target); break; }
-      const speed = (driving ? 2 : walkingSpeed(a, i)) / (grid.costs?.[target] ?? 1);
+      const speed = (driving ? 2 : walkingSpeed(a, i, escortGuidance?.has(i) === true)) / (grid.costs?.[target] ?? 1);
       const used = Math.min(remaining, (1 - route.progress) / speed);
       route.progress = Math.min(1, route.progress + used * speed); remaining -= used;
       const source = route.cells[route.cursor - 1];
@@ -313,13 +434,13 @@ export function stepAgents(a: AgentSystem, world: World, scenario: Scenario, tic
       }
       if (route.progress >= 1) {
         n.cell[i] = target; route.cursor++; route.progress = 0;
-        if (route.goal !== goal) break; // Replan at this node next tick, never reset a partial edge.
+        if (route.goal !== goal || pendingCrowdReroute) break; // Replan at this node next tick, never reset a partial edge.
       }
     }
     if (route.cursor === route.cells.length && route.goal === goal) {
       if (shelterTrip) { n.state[i] = NpcState.ShelterInPlace; a.intent[i] = 0; }
       else if (a.intent[i] === 1) { n.state[i] = NpcState.Work; n.workUntil[i] = tick + n.workDuration[i]; }
-      else { n.state[i] = NpcState.AtHome; while (n.departTick[i] <= tick) n.departTick[i] += 86400; }
+      else { n.state[i] = NpcState.AtHome; a.rescueHandoff[i] = 0; while (n.departTick[i] <= tick) n.departTick[i] += 86400; }
       a.intent[i] = 0; discardRoute(a, i); n.role[i] = n.baseRole[i];
       const car = n.car[i]; if (car >= 0 && cars.state[car] !== VehicleState.Failed) cars.state[car] = VehicleState.Idle;
       event(i, "ARRIVED", "Completed the planned journey through safe adjacent cells");

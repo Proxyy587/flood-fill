@@ -21,3 +21,14 @@ it("uses bridge deck overtopping and forbids off-road car entry", () => {
   w.water[25] = 1; expect(() => assertMovementEntry(w, 24, 25, "car", blocked)).toThrow(/deck/);
   expect(() => assertMovementEntry(w, 24, 16, "car", blocked)).toThrow(/road/);
 });
+
+it("independently enforces boat draft and excludes bridges", () => {
+  const s = mockScenario(); const w = createWorld(s); const blocked = new Uint8Array(64);
+  w.water[25] = 0.6;
+  expect(() => assertMovementEntry(w, 24, 25, "boat", blocked)).not.toThrow();
+  w.water[25] = 0.59;
+  expect(() => assertMovementEntry(w, 24, 25, "boat", blocked)).toThrow(/draft/);
+  w.block[25] = BlockType.Bridge;
+  w.water[25] = 1;
+  expect(() => assertMovementEntry(w, 24, 25, "boat", blocked)).toThrow(/bridge/);
+});

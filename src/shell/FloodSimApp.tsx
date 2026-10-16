@@ -9,7 +9,7 @@ import { createSimWorker } from '../bridge/createSimWorker';
 import { useSceneStore } from '../bridge/sceneStore';
 import { SimBridge } from '../bridge/SimBridge';
 import { useSimFeedStore } from '../bridge/simFeedStore';
-import { BlockType, type ScenarioPatch } from '../contracts';
+import { BlockType, type Scenario, type ScenarioPatch } from '../contracts';
 import { mockScenario } from '../contracts/mocks';
 import { ScenarioSchema } from '../contracts/schemas';
 import { startAutosave } from '../editor/autosave';
@@ -73,11 +73,13 @@ const loadOptions = (mode: 'edit' | 'run') => {
     speed: scene.speed,
     engine: scene.runSettings.engine,
     startTimeSeconds: scene.runSettings.startSeconds,
+    /** 24 h compound flood so morning starts reach night (docs/FLOOD_DESIGN.md). */
+    maxTicks: mode === 'run' ? 86_400 : 3_600,
   };
 };
 
 /** Worker lifetime, editor ↔ simulation sync, and the tool-based shell. */
-export function FloodSimApp() {
+export function FloodSimApp({ atlasBack = false }: { atlasBack?: boolean } = {}) {
   const [bridge, setBridge] = useState<SimBridge | null>(null);
   const [tool, setToolState] = useState<RailTool>('inspect');
   const [branch, setBranch] = useState(false);
@@ -133,8 +135,7 @@ export function FloodSimApp() {
         if (cur.playing) b.pause();
         useSimFeedStore.getState().reset();
         b.load(editor.scenario, editor.scenario.defaults.seed, {
-          mode: 'run',
-          npcParams: editor.params,
+          ...loadOptions('run'),
           speed: cur.speed,
           engine: cur.runSettings.engine,
           startTimeSeconds: cur.runSettings.startSeconds,
@@ -264,13 +265,18 @@ export function FloodSimApp() {
     const s = mockScenario();
     if (name === 'demo:stress') {
       s.name = 'riverside-everything-fails';
-      s.injected = [
-        { t: 600, kind: 'bridge_closed', cell: s.blocks.findIndex((b) => b === BlockType.Bridge) },
-        { t: 600, kind: 'boat_failure' },
-        { t: 600, kind: 'shelter_overflow' },
-        { t: 600, kind: 'substation_flooded' },
-        { t: 600, kind: 'helicopter_grounded_wind', durationTicks: 600 },
+      // Core-safe stress pack: only injections the validated runner accepts.
+      const incidents: Scenario['injected'] = [
+        { t: 600, kind: 'bridge_closed', cell: s.blocks.findIndex((block) => block === BlockType.Bridge) },
       ];
+      if (s.fleet.boats > 0 && s.fleet.boatOperators > 0) {
+        incidents.push({ t: 600, kind: 'boat_failure', target: s.fleet.ambulances + s.fleet.policeCars + 1 });
+      }
+      const shelter = s.buildings.find((building) => building.type === BlockType.Shelter);
+      if (shelter) incidents.push({ t: 600, kind: 'shelter_overflow', target: shelter.id });
+      const substation = s.powerGrid.nodes.find((node) => node.kind === 'substation');
+      if (substation) incidents.push({ t: 600, kind: 'substation_flooded', target: substation.id });
+      s.injected = incidents;
     }
     useEditorStore.getState().load(s);
   };
@@ -284,7 +290,7 @@ export function FloodSimApp() {
         {bridge ? <SceneCanvas bridge={bridge} /> : <p className={styles.loading}>Starting the simulation…</p>}
       </section>
 
-      <Identity />
+      <Identity atlasBack={atlasBack} />
 
       <nav className={`${styles.panel} ${styles.rail}`} aria-label="Tools">
         {RAIL.map((r, i) =>
@@ -314,6 +320,7 @@ export function FloodSimApp() {
 
       <div className={styles.right}>
         <Vitals onScore={() => setTool('report')} />
+        {tool === 'inspect' && mode === 'run' && <IncidentBoard />}
         <Inspector />
       </div>
 
@@ -327,7 +334,6 @@ export function FloodSimApp() {
       </div>
       <Compass />
       {tool === 'inspect' && <LensCard />}
-      {tool === 'inspect' && mode === 'run' && <IncidentBoard />}
       <Footer />
       <HoverTip />
 

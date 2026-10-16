@@ -1,8 +1,13 @@
 import { CriticReportSchema, type CriticReport, type CriticResponse } from './schema';
 import type { EvidencePack } from './evidence';
 
-export const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-export const DEFAULT_MODEL = 'claude-sonnet-4-5';
+/** OpenRouter OpenAI-compatible chat completions. */
+export const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+/** Non-Anthropic default; override with `OPENROUTER_MODEL`. */
+export const DEFAULT_MODEL = 'openai/gpt-4o-mini';
+
+/** @deprecated Use OPENROUTER_URL — kept so older imports keep compiling. */
+export const ANTHROPIC_URL = OPENROUTER_URL;
 
 export const SYSTEM_PROMPT = [
   'You are an emergency-planning simulation analyst reviewing one run of a synthetic flood simulation.',
@@ -29,7 +34,7 @@ export interface CriticDeps {
   timeoutMs?: number;
 }
 
-type Message = { role: 'user' | 'assistant'; content: string };
+type Message = { role: 'system' | 'user' | 'assistant'; content: string };
 
 /** Pulls the first JSON object out of a model reply, tolerating code fences. */
 export function extractJson(text: string): unknown {
@@ -62,7 +67,10 @@ function sanitise(report: CriticReport, pack: EvidencePack): CriticReport {
 export async function critique(pack: EvidencePack, fallback: CriticReport, deps: CriticDeps = {}): Promise<CriticResponse> {
   const doFetch = deps.fetch ?? fetch;
   if (!deps.apiKey) return { source: 'fallback', report: fallback, notice: 'No API key is configured, so this report comes from the rule-based analysers.' };
-  const messages: Message[] = [{ role: 'user', content: `Evidence pack:\n${JSON.stringify(pack)}` }];
+  const messages: Message[] = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: `Evidence pack:\n${JSON.stringify(pack)}` },
+  ];
   for (let attempt = 0; attempt < 2; attempt++) {
     let text: string;
     try {
@@ -85,17 +93,29 @@ async function callModel(doFetch: typeof fetch, deps: CriticDeps, messages: Mess
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), deps.timeoutMs ?? 45_000);
   try {
-    const res = await doFetch(ANTHROPIC_URL, {
+    const res = await doFetch(OPENROUTER_URL, {
       method: 'POST',
       signal: controller.signal,
-      headers: { 'content-type': 'application/json', 'x-api-key': deps.apiKey ?? '', 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: deps.model ?? DEFAULT_MODEL, max_tokens: 4000, temperature: 0.2, system: SYSTEM_PROMPT, messages }),
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${deps.apiKey ?? ''}`,
+        'http-referer': 'https://floodsim.local',
+        'x-title': 'FloodSim critic',
+      },
+      body: JSON.stringify({
+        model: deps.model ?? DEFAULT_MODEL,
+        max_tokens: 4000,
+        temperature: 0.2,
+        messages,
+      }),
     });
     if (res.status === 401 || res.status === 403) throw new CriticHttpError('The critic service rejected the configured API key, so this report comes from the rule-based analysers.');
     if (res.status === 429) throw new CriticHttpError('The critic service is rate-limited right now, so this report comes from the rule-based analysers.');
     if (!res.ok) throw new CriticHttpError(`The critic service returned HTTP ${res.status}, so this report comes from the rule-based analysers.`);
-    const body = (await res.json()) as { content?: { type: string; text?: string }[] };
-    return (body.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n');
+    const body = (await res.json()) as { choices?: { message?: { content?: string | null } }[] };
+    const content = body.choices?.[0]?.message?.content;
+    if (!content) throw new CriticHttpError('The critic service returned an empty reply, so this report comes from the rule-based analysers.');
+    return content;
   } finally {
     clearTimeout(timer);
   }

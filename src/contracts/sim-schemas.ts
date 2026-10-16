@@ -77,7 +77,9 @@ export const ScenarioSchema: z.ZodType<Scenario> = z.strictObject({
     if (ids.has(b.id)) issue(["buildings", i, "id"], "Duplicate building ID"); ids.add(b.id);
     if (!buildingTypes.has(b.type)) issue(["buildings", i, "type"], "Not a building block");
     inGrid(b.entrance, ["buildings", i, "entrance"]);
-    if (!b.cells.includes(b.entrance)) issue(["buildings", i, "entrance"], "Entrance must be in footprint");
+    const entranceX = b.entrance % s.size.w; const entranceZ = Math.floor(b.entrance / s.size.w);
+    const hasExternalAccess = b.cells.some((cell) => Math.abs(cell % s.size.w - entranceX) + Math.abs(Math.floor(cell / s.size.w) - entranceZ) === 1);
+    if (!b.cells.includes(b.entrance) && !hasExternalAccess) issue(["buildings", i, "entrance"], "Entrance must be in or adjacent to footprint");
     b.cells.forEach((cell, j) => {
       inGrid(cell, ["buildings", i, "cells", j]);
       if (occupied.has(cell)) issue(["buildings", i, "cells", j], "Overlapping footprint"); occupied.add(cell);

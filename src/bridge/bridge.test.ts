@@ -25,13 +25,33 @@ const inProcessWorker = async (): Promise<WorkerLike> => {
 };
 
 describe('SimBridge + sim worker', () => {
+  it('drops events already queued from a future view after a backward seek', () => {
+    const worker: WorkerLike = { onmessage: null, onerror: null, postMessage: () => {}, terminate: () => {} };
+    const bridge = new SimBridge(worker);
+    const received: number[] = [];
+    bridge.on('events', (events) => received.push(...events.map((event) => event.tick)));
+    const status = (tick: number, liveTick: number): WorkerToMain => ({
+      type: 'status',
+      status: { tick, liveTick, playing: false, speed: 16, dispatchMode: 'negotiation', scenario: 'demo', seed: 7, maxTicks: 3600 },
+    });
+    worker.onmessage?.({ data: status(900, 900) } as MessageEvent<WorkerToMain>);
+
+    bridge.seek(400);
+    worker.onmessage?.({ data: { type: 'events', events: [{ tick: 500, type: 'WEATHER', reason: 'stale future event' }] } } as MessageEvent<WorkerToMain>);
+    expect(received).toEqual([]);
+
+    worker.onmessage?.({ data: status(400, 900) } as MessageEvent<WorkerToMain>);
+    worker.onmessage?.({ data: { type: 'events', events: [{ tick: 400, type: 'WEATHER', reason: 'selected history' }] } } as MessageEvent<WorkerToMain>);
+    expect(received).toEqual([400]);
+  });
+
   it('loads, steps, inspects and routes edits through the editor bus', async () => {
     const bridge = new SimBridge(await inProcessWorker());
     const disconnect = connectBridge(bridge);
     const worlds: number[][] = [];
     bridge.on('world', (w) => worlds.push(w.dirtyChunks));
 
-    bridge.load(mockScenario(), 7, { maxTicks: 100 });
+    bridge.load(mockScenario(), 7, { maxTicks: 100, engine: 'preview' });
     expect(useSceneStore.getState().connection).toBe('ready');
     expect(bridge.world?.w).toBe(96);
     expect(bridge.snapshot?.tick).toBe(0);
@@ -47,7 +67,7 @@ describe('SimBridge + sim worker', () => {
 
     editorBus.dispatch({ kind: 'setBlock', cell: 0, block: BlockType.Drainage });
     expect(bridge.world?.blocks[0]).not.toBe(BlockType.Drainage);
-    bridge.load(mockScenario(), 7, { maxTicks: 100, mode:'edit' });
+    bridge.load(mockScenario(), 7, { maxTicks: 100, mode:'edit', engine: 'preview' });
     editorBus.dispatch({ kind: 'setBlock', cell: 0, block: BlockType.Drainage });
     expect(worlds[worlds.length - 1]).toContain(0);
     expect(bridge.world?.blocks[0]).toBe(BlockType.Drainage);
@@ -56,7 +76,7 @@ describe('SimBridge + sim worker', () => {
     expect(useSceneStore.getState().camera.mode).toBe('focus');
     expect(useSceneStore.getState().selected).toEqual({ kind: 'npc', id: npcId });
 
-    bridge.load(mockScenario(), 7, { maxTicks:100 });
+    bridge.load(mockScenario(), 7, { maxTicks:100, engine: 'preview' });
     bridge.step(20);
     bridge.seek(10);
     expect(bridge.snapshot?.tick).toBe(10);
@@ -71,7 +91,7 @@ describe('SimBridge + sim worker', () => {
     expect((await bridge.inspect({ kind: 'npc', id: coreNpc }))?.kind).toBe('npc');
     bridge.inject({ kind: 'boat_failure', t: 0 });
     expect(useSceneStore.getState()).toMatchObject({ connection: 'ready' });
-    expect(useSceneStore.getState().error).toMatch(/not modelled/);
+    expect(useSceneStore.getState().error).toMatch(/needs target/);
 
     disconnect();
   });

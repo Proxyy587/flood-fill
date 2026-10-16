@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DEFAULT_START_SECONDS } from '../../contracts';
 import { useSceneStore } from '../../bridge/sceneStore';
 import { AUTOSAVE_KEY } from '../../editor/autosave';
 import { createSixMile } from '../../editor/geography/sixMile';
@@ -10,27 +9,20 @@ import { citySlot } from '../../editor/persistence';
 import { useEditorStore } from '../../ui/store/editorStore';
 import { FloodSimApp } from '../FloodSimApp';
 import { CloudWipe, peekCloudEnter, takeCloudEnter, type WipePhase } from './CloudWipe';
-import styles from './geography.module.css';
 
 /** Additive adapter: waits for the shell's initial worker handshake, then loads the district. */
 export function SixMileSimulation() {
   const loaded = useRef(false);
-  const entering = useRef(false);
-  const [wipe, setWipe] = useState<WipePhase>('idle');
+  const [wipe, setWipe] = useState<WipePhase>(() => (peekCloudEnter() ? 'holding' : 'idle'));
 
   useEffect(() => {
-    if (peekCloudEnter()) {
-      entering.current = true;
-      takeCloudEnter();
-      // Defer past paint so we don't sync-set in the effect body.
-      const hold = window.setTimeout(() => setWipe('holding'), 0);
-      return () => window.clearTimeout(hold);
-    }
-  }, []);
+    if (wipe === 'holding') takeCloudEnter();
+  }, [wipe]);
 
   useEffect(() => {
     loaded.current = false;
-    useSceneStore.getState().setRunSettings({ engine: 'preview' });
+    useSceneStore.getState().setRunSettings({ engine: 'preview', startSeconds: DEFAULT_START_SECONDS });
+    useSceneStore.setState({ speed: 16 });
     const apply = () => {
       const { scenario } = createSixMile();
       const params = useEditorStore.getState().params;
@@ -39,18 +31,13 @@ export function SixMileSimulation() {
     };
     const load = () => {
       if (useSceneStore.getState().connection !== 'ready') return;
-      if (!loaded.current) {
-        loaded.current = true;
-        apply();
-      }
+      if (loaded.current) return;
+      loaded.current = true;
+      apply();
     };
     const off = useSceneStore.subscribe(load);
     load();
-    const retry = window.setTimeout(apply, 450);
-    return () => {
-      off();
-      window.clearTimeout(retry);
-    };
+    return () => off();
   }, []);
 
   useEffect(() => {
@@ -62,21 +49,23 @@ export function SixMileSimulation() {
       const city = useEditorStore.getState().scenario?.name ?? '';
       if (st.connection !== 'ready' || !city.includes('Six Mile')) return;
       done = true;
-      entering.current = false;
-      // Brief hold so the 3D city paints under the clouds before they peel away.
-      window.setTimeout(() => setWipe('revealing'), 700);
+      window.setTimeout(() => setWipe('revealing'), 320);
     };
     tryReveal();
     const offScene = useSceneStore.subscribe(tryReveal);
     const offEditor = useEditorStore.subscribe(tryReveal);
-    return () => { offScene(); offEditor(); };
+    return () => {
+      offScene();
+      offEditor();
+    };
   }, [wipe]);
 
   const onRevealed = useCallback(() => setWipe('idle'), []);
 
-  return <>
-    <CloudWipe phase={wipe} onRevealed={onRevealed} />
-    <FloodSimApp />
-    <Link href="/" className={styles.returnLink}><ArrowLeft size={13} /> Assam overview</Link>
-  </>;
+  return (
+    <>
+      <CloudWipe phase={wipe} onRevealed={onRevealed} />
+      <FloodSimApp atlasBack />
+    </>
+  );
 }

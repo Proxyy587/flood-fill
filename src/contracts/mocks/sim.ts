@@ -11,11 +11,13 @@ import { asBuildingId, asNpcId, asRequestId, asVehicleId, type EntityRef } from 
 import type { InspectorData } from '../inspector';
 import type { MetricsFrame, RunSummary } from '../metrics';
 import { DEFAULT_NPC_PARAMS, type NpcParams } from '../params';
-import type { BuildingDef, DispatchMode, HotspotKind, InjectedEvent, Scenario } from '../scenario';
+import { RAIN_MM_PER_HOUR_AT_FULL, type BuildingDef, type DispatchMode, type HotspotKind, type InjectedEvent, type Scenario } from '../scenario';
 import { chunkOfCell, ZONE, type RenderSnapshot, type WorldSnapshot } from '../snapshot';
 import { bridgeDeckHeights, isSignalJunction, signalPhase } from '../world';
 import { createMockRng, type MockRng } from './rng';
 import { mockBuildingNames } from './scenario';
+
+export { RAIN_MM_PER_HOUR_AT_FULL };
 
 export const MOCK_LIMITS = {
   footSafe: 0.3,
@@ -76,8 +78,6 @@ const DROP_INTERVAL = 600;
 const PACKETS_PER_RESIDENT = 2;
 
 // Local (pluvial) flooding. Volumes are in cell·metres (1 cell = 16 m²).
-/** Rain intensity 1.0 is a 150 mm/h cloudburst. */
-export const RAIN_MM_PER_HOUR_AT_FULL = 150;
 const RAIN_M_PER_TICK = RAIN_MM_PER_HOUR_AT_FULL / 1000 / 3600;
 /**
  * One storm-drain inlet with a pump: 0.05 m³/s. Gravity only (no power): 30 %,
@@ -946,9 +946,13 @@ export class MockSim {
   private stepFlood(): void {
     const wx = this.scenario.weather;
     this.rainSmooth += (this.rain - this.rainSmooth) / 300;
-    const sourceBoost = wx.sources.some((s) => this.tick >= s.startT && this.tick <= s.endT) ? 0.5 : 0;
+    // Active channel sources add stage; after they end, recession is faster than rise
+    // so overnight water slowly drains (multi-day urban flood, not a permanent lake).
+    const sourceOn = wx.sources.some((s) => this.tick >= s.startT && this.tick < s.endT);
+    const sourceBoost = sourceOn ? 0.45 : 0;
     const target = RIVER_BASE_STAGE + 2.5 * this.rainSmooth * this.riverRunoff + sourceBoost;
-    this.stage += (target - this.stage) * 0.01;
+    const approach = target >= this.stage ? 0.01 : 0.004;
+    this.stage += (target - this.stage) * approach;
     this.stepPonds();
 
     const fill = new Float32Array(this.n);

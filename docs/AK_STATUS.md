@@ -1,8 +1,40 @@
 # AK execution checkpoints
 
-> **Integration note (AJ, 2026-10-15):** the browser now runs this core through `src/worker/host.ts`, and W1 templates load through `src/worker/scenarioAdapter.ts`. "Browser/template integration pending" below is historical. Open core items found during integration are listed under `[AJ -> AK]` in REQUESTS.md.
+## Current AK status (2026-10-15): M3A-M3F implemented; follow-ons remain
 
-## M1/M2 checkpoints; active M3A reports slice (2026-10-15)
+The AK headless core now includes M3C boat rescue and M3D independent police
+gridlock traffic control, M3E civilian escort, and M3F crowd control, in addition to M3A reports and M3B ambulance dispatch,
+field triage, hospital balancing and adaptive hot-zone staging. Independent police
+work remains separate from rescue dispatch. Still planned
+are helicopter rooftop rescue/medevac and
+weather constraints, and the full compound stress scenario. Browser/worker integration,
+independent review, remaining invariants and later M4-M6 work also remain open; this
+status is not release approval.
+
+> **Integration note (AJ, 2026-10-15):** the browser runs this core through `src/worker/host.ts`, and W1 templates load through `src/worker/scenarioAdapter.ts`. "Browser/template integration pending" below is historical. Playback and live decision-panel verification remain open. Open core items found during integration are listed under `[AJ -> AK]` in REQUESTS.md.
+
+### M3F: adaptive police crowd control implemented
+
+The existing finite, officer-staffed police fleet now shares deterministic dispatch
+between gridlock, escort, and crowd-control tasks. Crowd pressure is measured at
+chokepoints and shelter approaches: 4 people in a 4 m × 4 m cell (0.25 people/m²)
+for 2 ticks activates control; pressure below 2 for 5 ticks clears it. Critical
+pressure (at least 8 people, 0.5 people/m², with approach depth at least 0.3 m)
+can preempt lower-priority work. Cars approach only reachable safe roads; after
+arrival, guidance raises the walking cost of the managed cell by 4× without making
+unsafe routes passable or changing a civilian's destination, shelter reservation,
+rescue ownership, or medical assignment. Active work is stable outside critical
+preemption; canceled work can retry. Deterministic pressure/replay, dispatch,
+partial-edge reroute, and runner integration are covered by focused tests (124/124).
+Full health passes lint, strict types, all 538 tests and schema-only validation;
+production build and standalone validation pass. A 120-tick comparison on seeds
+0/42/77 produces byte-identical outputs across independent runs. No contract or
+renderer changes; browser integration, compound stress, and release approval remain open.
+
+### Earlier checkpoint evidence
+
+The records below preserve earlier milestone snapshots; pending-work statements in
+those snapshots describe the status at that time, not the current implementation.
 
 Local source checkpoint: **b5ad965** on codex/ak-foundation. Source, tests and stage
 docs committed together. It is a progress checkpoint, not aggregate review approval.
@@ -55,7 +87,7 @@ the 10000-resident/30-tick run takes about 2.7s. This is not full rescue stress 
 proof of the 8ms target. Dispatch comparison and worker/template release gates remain
 unavailable.
 
-### M3A/M3B: synthetic reports and ambulance response implemented
+### M3A/M3B checkpoint record (historical scope): reports and ambulance response
 
 Detailed reports-first design and inline plan are committed in 1f9c471. The managed
 worktree `codex/ak-m3-reports` excludes active untracked W1 assets. Frozen-lockfile
@@ -72,8 +104,23 @@ runner tests pass 19/19. Final health passes lint, strict types, 366 tests and
 schema-only validation (`releaseReady:false`); production build, batch/compare and
 the living-city script pass. Its three-seed report smoke confirms 15,000 deterministic
 deliveries/run at 10,000 civilians without exceeding capacity. No contract, renderer,
-or W1 files have been changed. Boats, police, helicopters, full stress scenario and
-UI integration remain pending.
+or W1 files were changed in this M3A/M3B checkpoint. At that point, boats, police,
+helicopters, the full stress scenario and UI integration were pending; M3C boat rescue
+and M3D police gridlock control have since been implemented as summarized above.
+
+### M3E: independent police civilian escort implemented
+
+Finite staffed police cars can guide eligible evacuation groups and safe boat-to-home
+handoffs beside their existing safe walking routes. An assigned car affects movement
+only after reaching its safe roadside waypoint, applying a deterministic 10% walking
+progress modifier to escorted civilians. Escort grouping preserves civilian
+destinations, route arrays, shelter reservations and rescue ownership; unsafe current
+or future route cells exclude a group. Police do not carry passengers or enter the
+traffic-control mask. Focused unit and runner coverage verifies escort dispatch,
+arrival-only guidance, route/reservation immutability, M3D police behavior and a
+same-seed summary/snapshot replay. Spec-compliance review found no remaining gaps.
+M3F crowd control, helicopters, and broader integration/review gates remain
+outstanding.
 
 M3B design and implementation plan are approved and committed:
 `docs/superpowers/specs/2026-10-15-ak-m3b-ambulance-dispatch-hospital-design.md` and
@@ -96,8 +143,9 @@ building cells are represented by their nearest safe adjacent road cell for
 ambulance staging. The frozen summary schema has no ambulance-hot-zone kind, so
 staging is exposed via assignments and reroute events while the legacy hotspots
 array remains empty. No shared-contract changes. Full health, scale, production,
-verification: `pnpm health` passes lint, strict types and 407 tests; schema validation
-remains explicitly schema-only (`releaseReady:false`) because W1 templates are absent.
+verification: `pnpm health` passes lint, strict types and 407 tests; at that M3B
+checkpoint, schema validation remained schema-only (`releaseReady:false`) because W1
+templates had not yet landed.
 `pnpm build`, three-seed `pnpm sim:batch`, three-seed `pnpm sim:compare`,
 `pnpm exec tsx scripts/health-living.ts`, and `git diff --check` pass. The living-city
 smoke covers 12/1,000/10,000 civilians, seven configured ambulances at the 10,000
@@ -106,6 +154,16 @@ staging is recorded as assignment/reroute events; the frozen summary hotspot enu
 does not include ambulance demand, so no shared-contract change was made. Production
 build passes. No policy superiority is claimed. This does not constitute release
 approval or a full rescue stress test.
+
+### M3C/M3D: boats and independent police gridlock control implemented
+
+M3C adds finite boat rescue and injured-patient handoff into ambulance hospital
+balancing. M3D adds finite officer-staffed police cars, safe police-station road
+launch, deterministic ranked gridlock assignments and arrival-only traffic control;
+controlled dark intersections gain capacity while powered intersections remain at
+1.0. Police remain independent of rescue dispatch. M3E civilian escort and M3F crowd
+control are the next police slices. Helicopter operations, the full compound stress
+scenario, browser integration and wider release/review gates are still pending.
 
 ## 2026-10-15 baseline
 

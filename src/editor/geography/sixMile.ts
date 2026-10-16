@@ -49,8 +49,28 @@ export function mapNoise(x: number, z: number, seed = 27): number {
   return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
 }
 
+type SixMileCity = {
+  scenario: Scenario;
+  places: DistrictPlace[];
+  landmarkCount: number;
+  origin: { x: number; z: number };
+};
+
+/** Cached generation — atlas→sim transition must not rebuild the district twice. */
+let sixMileCache: SixMileCity | null = null;
+
 /** Image-inspired, compressed district. All capacities and hazards are synthetic. */
-export function createSixMile() {
+export function createSixMile(): SixMileCity {
+  if (!sixMileCache) sixMileCache = buildSixMile();
+  return {
+    scenario: structuredClone(sixMileCache.scenario),
+    places: sixMileCache.places.map((p) => ({ ...p })),
+    landmarkCount: sixMileCache.landmarkCount,
+    origin: { ...sixMileCache.origin },
+  };
+}
+
+function buildSixMile(): SixMileCity {
   const w = 128, h = 128, n = w * h;
   const index = (x: number, z: number) => z * w + x;
   // High shelf (like the riverside mock): river stage can rise without drowning the city.
@@ -79,26 +99,51 @@ export function createSixMile() {
     }
   };
 
-  // Channel at 0; banks at 2; floodable corridor at 3; city shelf at 6 stays dry.
+  // Channel at 0; banks at 2; floodable corridor at 3; ridges at 8–9; shelf at 6 stays mostly dry.
   stroke(SIX_MILE_CHANNEL, 2.2, c => { water.add(c); blocks[c] = BlockType.WaterSource; ground[c] = 0; });
   for (let c = 0; c < n; c++) {
     if (!water.has(c) && neighbours(c).some(p => water.has(p))) { blocks[c] = BlockType.Sand; ground[c] = 2; }
   }
-  // Low corridor + named hollows — river overflow and rain pond here, not across the whole map.
+  // Named hollows (deep) + wider channel fringe + gentle ridges so some streets flood and others stay dry.
+  const hollows: readonly { x: number; z: number; r: number; floor: number }[] = [
+    { x: 70, z: 28, r: 10, floor: 2 }, // Six Mile junction
+    { x: 56, z: 96, r: 9, floor: 2 },  // southern underpass
+    { x: 24, z: 80, r: 8, floor: 2 },  // westbank low street
+    { x: 96, z: 52, r: 7, floor: 2 },  // east of campus
+    { x: 44, z: 70, r: 8, floor: 2 },  // channel-side lanes
+    { x: 88, z: 88, r: 6, floor: 3 },  // southern side-street dip
+  ];
+  const ridges: readonly { x: number; z: number; r: number; crest: number }[] = [
+    { x: 100, z: 30, r: 14, crest: 9 }, // northeast shelf
+    { x: 30, z: 30, r: 12, crest: 8 },  // northwest rise
+    { x: 108, z: 100, r: 11, crest: 8 }, // southeast rise
+    { x: 70, z: 60, r: 9, crest: 7 },   // campus shoulder
+  ];
   for (let c = 0; c < n; c++) {
     const x = c % w, z = Math.floor(c / w);
     if (!insideSixMile(x, z) || water.has(c)) continue;
     let nearWater = false;
-    for (let dz = -6; dz <= 6 && !nearWater; dz++) for (let dx = -6; dx <= 6; dx++) {
+    for (let dz = -8; dz <= 8 && !nearWater; dz++) for (let dx = -8; dx <= 8; dx++) {
       const px = x + dx, pz = z + dz;
       if (px < 0 || pz < 0 || px >= w || pz >= h) continue;
-      if (water.has(index(px, pz)) && dx * dx + dz * dz <= 36) nearWater = true;
+      if (water.has(index(px, pz)) && dx * dx + dz * dz <= 64) nearWater = true;
     }
     if (nearWater) ground[c] = Math.min(ground[c], 3);
-    if (Math.hypot(x - 70, z - 28) < 8) ground[c] = Math.min(ground[c], 3); // junction hollow
-    if (Math.hypot(x - 56, z - 96) < 7) ground[c] = Math.min(ground[c], 3); // southern underpass
-    if (Math.hypot(x - 24, z - 80) < 6) ground[c] = Math.min(ground[c], 3); // westbank low street
-    if (Math.hypot(x - 96, z - 52) < 5) ground[c] = Math.min(ground[c], 3); // east of campus
+    for (const hollow of hollows) {
+      const d = Math.hypot(x - hollow.x, z - hollow.z);
+      if (d < hollow.r) ground[c] = Math.min(ground[c], hollow.floor);
+      else if (d < hollow.r + 4) ground[c] = Math.min(ground[c], hollow.floor + 1);
+    }
+    for (const ridge of ridges) {
+      const d = Math.hypot(x - ridge.x, z - ridge.z) / ridge.r;
+      if (d < 1) ground[c] = Math.max(ground[c], Math.round(ridge.crest - d * 2));
+    }
+    // Mild noise so lots aren't ruler-flat between hollow and ridge.
+    if (ground[c] >= 5 && ground[c] <= 7) {
+      const n0 = mapNoise(x, z, 41);
+      if (n0 > 0.72) ground[c] = Math.min(9, ground[c] + 1);
+      else if (n0 < 0.18) ground[c] = Math.max(4, ground[c] - 1);
+    }
   }
 
   const paintRoad = (c: number) => {
@@ -106,7 +151,8 @@ export function createSixMile() {
     blocks[c] = water.has(c) ? BlockType.Bridge : BlockType.Road;
     if (water.has(c)) { ground[c] = 0; bridges.add(c); }
     else if (ground[c] <= 3) { /* keep floodable grade */ }
-    else ground[c] = 5; // high shelf roads stay above typical river stage
+    else if (ground[c] >= 8) ground[c] = Math.max(ground[c], 7); // ridge roads stay dry
+    else ground[c] = Math.max(5, Math.min(ground[c], 6)); // mid shelf
   };
   stroke([...SIX_MILE_BOUNDARY, SIX_MILE_BOUNDARY[0]], 1, paintRoad);
   for (const z of [18, 28, 38, 48, 58, 68, 78, 88, 98, 108]) {
@@ -120,6 +166,22 @@ export function createSixMile() {
     if (start >= 0) stroke([[x, start - 1], [x, end + 1]], 0, paintRoad);
   }
   stroke([...SIX_MILE_FOREST, SIX_MILE_FOREST[0]], 1, paintRoad);
+
+  // Storm inlets beside hollow roads — help early, then backflow when the channel is high.
+  for (const hollow of hollows) {
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2;
+      const x = Math.round(hollow.x + Math.cos(ang) * (hollow.r * 0.55));
+      const z = Math.round(hollow.z + Math.sin(ang) * (hollow.r * 0.55));
+      if (x < 1 || z < 1 || x >= w - 1 || z >= h - 1) continue;
+      const c = index(x, z);
+      if (!insideSixMile(x, z) || water.has(c) || occupied.has(c)) continue;
+      if (blocks[c] !== BlockType.Grass && blocks[c] !== BlockType.Tree) continue;
+      if (!neighbours(c).some((nb) => road(nb))) continue;
+      blocks[c] = BlockType.Drainage;
+      ground[c] = Math.min(ground[c], hollow.floor);
+    }
+  }
 
   const addBuilding = (x: number, z: number, bw: number, bd: number, type: BlockType, capacity: number, name: string, detail: string, source: DistrictPlace['source'], allowForest = false) => {
     const cells: number[] = [];
@@ -241,20 +303,23 @@ export function createSixMile() {
     return out;
   };
   const hotspots: Hotspot[] = ([
-    { name: 'Channel-side lanes', kind: 'waterlogging' as const, cells: roadsNear(44, 70, 6) },
-    { name: 'Six Mile junction hollow', kind: 'waterlogging' as const, cells: roadsNear(70, 28, 6) },
-    { name: 'Southern underpass', kind: 'waterlogging' as const, cells: roadsNear(56, 96, 5) },
-    { name: 'Westbank low street', kind: 'waterlogging' as const, cells: roadsNear(24, 80, 5) },
+    { name: 'Channel-side lanes', kind: 'waterlogging' as const, cells: roadsNear(44, 70, 8) },
+    { name: 'Six Mile junction hollow', kind: 'waterlogging' as const, cells: roadsNear(70, 28, 8) },
+    { name: 'Southern underpass', kind: 'waterlogging' as const, cells: roadsNear(56, 96, 7) },
+    { name: 'Westbank low street', kind: 'waterlogging' as const, cells: roadsNear(24, 80, 7) },
+    { name: 'East campus dip', kind: 'waterlogging' as const, cells: roadsNear(96, 52, 6) },
+    { name: 'Southern side-street', kind: 'waterlogging' as const, cells: roadsNear(88, 88, 5) },
   ] satisfies Hotspot[]).filter(s => s.cells.length >= 3);
 
   const bridgeCell = [...bridges][Math.floor([...bridges].length / 2)] ?? [...water][0];
   const blockRoad = roadsNear(80, 60, 2)[0] ?? roadsNear(50, 50, 4)[0];
   // Stick to kinds both engines accept without notes so core batch runs stay clean.
   const injected: InjectedEvent[] = [
-    { t: 420, kind: 'road_blocked_by_debris', cell: blockRoad },
-    { t: 900, kind: 'bridge_closed', cell: bridgeCell },
-    { t: 1100, kind: 'substation_flooded', target: 1 },
-    { t: 1400, kind: 'comms_outage', durationTicks: 180 },
+    { t: 3_600, kind: 'road_blocked_by_debris', cell: blockRoad },
+    { t: 8_000, kind: 'bridge_closed', cell: bridgeCell },
+    { t: 14_000, kind: 'substation_flooded', target: 1 },
+    { t: 18_000, kind: 'comms_outage', durationTicks: 1_800 },
+    { t: 40_000, kind: 'road_blocked_by_debris', cell: blockRoad },
   ];
 
   const districts: Scenario['districts'] = ['Westbank lanes', 'Six Mile junction', 'APDCL campus', 'Southern neighbourhood'].map((name, id) => ({ id, name, cells: [] }));
@@ -264,10 +329,12 @@ export function createSixMile() {
   }
 
   const waterCells = [...water];
-  const sources = [36, 60, 84, 108].map(z => {
+  // Channel sources follow the compound-flood design (docs/FLOOD_DESIGN.md):
+  // day-1 rise, night hold — rates feed hollows/corridor, not a city-wide dunk.
+  const sources = [36, 60, 84, 108].map((z, i) => {
     const cell = waterCells.find(c => Math.floor(c / w) === z && blocks[c] === BlockType.WaterSource)
       ?? waterCells.find(c => blocks[c] === BlockType.WaterSource)!;
-    return { cell, startT: 350, endT: 1900, rate: .035 };
+    return { cell, startT: 1_200 + i * 90, endT: 58_000, rate: 0.018 };
   });
 
   // Crop the slab to the district bbox so empty map corners disappear.
@@ -322,12 +389,29 @@ export function createSixMile() {
     population: { count: 1100, mix: { carOwners: .32, limitedMobility: .08, needsAssist: .1 }, schedule: 'office-hours' },
     fleet: { ambulances: 5, policeCars: 4, boats: 4, helicopters: 1, doctors: 12, nurses: 24, policeOfficers: 16, boatOperators: 8 },
     weather: {
+      // 24 h monsoon compound event from a morning start (ticks = seconds).
+      // Early burst fills hollows for visible local waterlogging; ridges stay dry.
       rain: [
-        { t: 0, intensity: 0 }, { t: 200, intensity: .15 }, { t: 500, intensity: .5 },
-        { t: 900, intensity: .9 }, { t: 1400, intensity: .55 }, { t: 2200, intensity: .1 }, { t: 2800, intensity: 0 },
+        { t: 0, intensity: 0.12 },
+        { t: 900, intensity: 0.35 },
+        { t: 1_800, intensity: 0.55 },
+        { t: 3_600, intensity: 0.85 },
+        { t: 6_000, intensity: 1.0 },
+        { t: 10_000, intensity: 0.75 },
+        { t: 16_000, intensity: 0.4 },
+        { t: 24_000, intensity: 0.6 },
+        { t: 36_000, intensity: 0.3 },
+        { t: 48_000, intensity: 0.15 },
+        { t: 60_000, intensity: 0.06 },
+        { t: 72_000, intensity: 0 },
       ],
-      wind: [{ t: 0, speed: .2 }, { t: 900, speed: .5 }, { t: 1800, speed: .3 }],
-      floodKind: 'growing', warningDelay: 90,
+      wind: [
+        { t: 0, speed: 0.15 },
+        { t: 8_000, speed: 0.55 },
+        { t: 20_000, speed: 0.4 },
+        { t: 40_000, speed: 0.25 },
+      ],
+      floodKind: 'compound', warningDelay: 120,
       sources: sources.map(s => ({ ...s, cell: remap(s.cell) })),
     },
     injected: injected.map(e => e.cell !== undefined ? { ...e, cell: remap(e.cell) } : e),

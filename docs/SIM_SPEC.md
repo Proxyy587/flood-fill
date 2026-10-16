@@ -9,8 +9,11 @@ Everything here is the **intended behaviour**. Build the numbered milestone in `
 - Navigation costs use fixed-point 1/1024 increments in [1/1024,65536] on at most
   128x128 cells; Float64 path sums remain exact. Cost producers must quantize
   their BPR/uncertainty terms with Math.round(cost*1024)/1024 before search.
-- Piecewise-linear rain/wind. Headless rain adds 0.002m/tick at intensity 1;
-  grass/sand receive 80% of that and soak 0.00001m/tick (dirt also soaks).
+- Piecewise-linear rain/wind. Rain intensity 1 represents the UI's 150 mm/h
+  cloudburst, converted to 0.0000417m per cell per simulated second, then scaled
+  by land-cover runoff (grass .30, trees .15, sand .20, dirt .50, rock .70,
+  levee .40, water-source .00; paved/other surfaces .90). Flood extent may lag
+  the rainfall curve as runoff drains through the terrain.
 - Closed-boundary virtual pipes with momentum damping 0.9 and coefficient 0.08;
   outgoing volume capped by cell water. Drainage removes at most 0.02m/tick.
   Sources use [startT,endT). Foundation solver supports optional powered pumps;

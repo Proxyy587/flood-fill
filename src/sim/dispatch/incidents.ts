@@ -13,6 +13,7 @@ export interface IncidentSystem {
   confidence: Float32Array;
   createdTick: Int32Array;
   active: Uint8Array;
+  boatRescue: Uint8Array;
   reportCount: Int32Array;
   reportStart: Int32Array;
   reportIndices: Int32Array;
@@ -29,6 +30,7 @@ export interface IncidentSystem {
   patientLoaded: Uint8Array;
   patientHealth: Float32Array;
   patientSeverity: Uint8Array;
+  patientServed: Uint8Array;
 }
 
 export function createIncidentSystem(reports: ReportSystem): IncidentSystem {
@@ -41,6 +43,7 @@ export function createIncidentSystem(reports: ReportSystem): IncidentSystem {
     confidence: new Float32Array(capacity),
     createdTick: new Int32Array(capacity),
     active: new Uint8Array(capacity),
+    boatRescue: new Uint8Array(capacity),
     reportCount: new Int32Array(capacity),
     reportStart: new Int32Array(capacity),
     reportIndices: new Int32Array(capacity),
@@ -57,6 +60,7 @@ export function createIncidentSystem(reports: ReportSystem): IncidentSystem {
     patientLoaded: new Uint8Array(reports.inDistress.length),
     patientHealth: new Float32Array(reports.inDistress.length),
     patientSeverity: new Uint8Array(reports.inDistress.length),
+    patientServed: new Uint8Array(reports.inDistress.length),
   };
 }
 
@@ -147,10 +151,11 @@ export function incidentSnapshot(system: IncidentSystem): {
 }
 
 /** Called only when an ambulance reaches the incident; no report truth is read. */
-export function discoverIncidentAtScene(system: IncidentSystem, reports: ReportSystem, population: PopulationState, incident: number, tick: number): SimEvent[] {
+export function discoverIncidentAtScene(system: IncidentSystem, reports: ReportSystem, population: PopulationState, incident: number, tick: number, responder: "ambulance" | "boat" = "ambulance"): SimEvent[] {
   if (!Number.isInteger(incident) || incident < 0 || incident >= system.count) throw new RangeError("Incident index is outside the incident table");
   if (system.discovered[incident]) return [];
   system.discovered[incident] = 1;
+  system.boatRescue[incident] = Number(responder === "boat");
   const events: SimEvent[] = [];
   const reportStart = system.reportStart[incident];
   const reportEnd = reportStart + system.reportCount[incident];
@@ -184,7 +189,7 @@ export function discoverIncidentAtScene(system: IncidentSystem, reports: ReportS
     reports.status[report] = foundDistress ? ReportStatus.Verified : ReportStatus.False;
     events.push({ tick, type: foundDistress ? "REPORT_VERIFIED" : "REPORT_FALSE", cell: estimate,
       data: { reportId: reports.id[report], requestId: system.requestId[incident] },
-      reason: foundDistress ? "Ambulance field search found distress within the report uncertainty footprint" : "Ambulance field search found no distress within the report uncertainty footprint" });
+      reason: foundDistress ? `${responder === "boat" ? "Boat" : "Ambulance"} field search found distress within the report uncertainty footprint` : `${responder === "boat" ? "Boat" : "Ambulance"} field search found no distress within the report uncertainty footprint` });
   }
   if (system.casualtyCount[incident] === 0) system.active[incident] = 0;
   return events;
@@ -197,13 +202,13 @@ export function completeAdmittedIncidents(system: IncidentSystem, reports: Repor
     if (!system.discovered[incident] || system.casualtyCount[incident] === 0 || !system.active[incident]) continue;
     let admitted = 0;
     for (let patient = 0; patient < system.patientCount; patient++) {
-      if (system.patientIncident[patient] === incident && hospitals.patientAdmitted[patient]) admitted++;
+      if (system.patientIncident[patient] === incident && (hospitals.patientAdmitted[patient] || system.patientServed[patient])) admitted++;
     }
     if (admitted !== system.casualtyCount[incident]) continue;
     system.active[incident] = 0;
     for (let patient = 0; patient < system.patientCount; patient++) {
       if (system.patientIncident[patient] !== incident) continue;
-      events.push({ tick, type: "SERVED", actor: (system.patientNpc[patient] + 1) as NpcId, actorKind: "npc",
+      if (hospitals.patientAdmitted[patient] && !system.patientServed[patient]) events.push({ tick, type: "SERVED", actor: (system.patientNpc[patient] + 1) as NpcId, actorKind: "npc",
         target: system.requestId[incident] as RequestId, targetKind: "request",
         data: { reportToBedTicks: Math.max(0, tick - system.createdTick[incident]) }, reason: "Field-confirmed casualty admitted to a reserved operational hospital bed" });
     }

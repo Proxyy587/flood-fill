@@ -45,12 +45,32 @@
 .identity {
   position: absolute;
   top: 12px;
-  left: 12px;
+  left: 56px;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 12px 8px 8px;
   z-index: 4;
+}
+
+.atlasBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  margin-right: 2px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--hair-soft, #d4decc);
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--ink, #243834);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1;
+}
+.atlasBack:hover {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .mark {
@@ -807,14 +827,15 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 300px;
-  max-height: calc(100vh - 352px);
-  min-height: 160px;
+  width: min(300px, calc(100vw - 100px));
+  max-height: calc(100vh - 140px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 3;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .right > * {
@@ -1077,10 +1098,10 @@
 .dock {
   position: absolute;
   left: 50%;
-  bottom: 24px;
+  bottom: 16px;
   transform: translateX(-50%);
-  /* Fixed width so it doesn't jump with headline length; the timeline takes the slack. */
-  width: min(740px, calc(100vw - 150px));
+  /* Leave room for the left rail and right camera stack. */
+  width: min(920px, calc(100vw - 160px));
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1093,22 +1114,38 @@
 }
 
 .transport {
-  padding: 8px 10px;
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transportTop {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+
+.transportActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex: none;
 }
 
 .play {
-  height: 36px;
-  padding: 0 14px 0 12px;
-  border-radius: 9px;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  border-radius: 8px;
   border: 0;
   background: var(--ink);
   color: #fff;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   flex: none;
@@ -1134,30 +1171,78 @@
   flex-direction: column;
   line-height: 1.1;
   flex: none;
-  min-width: 58px;
+  min-width: 72px;
 }
 
 .clock strong {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
 
 .clock span {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--muted);
+  white-space: nowrap;
+}
+
+.speedControl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 140px;
+  min-width: 120px;
+  max-width: 220px;
+  padding: 4px 8px 4px 10px;
+  border-radius: 8px;
+  background: rgba(21, 35, 45, 0.06);
+}
+
+.speedValue {
+  flex: none;
+  min-width: 36px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.speedControl input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  accent-color: #15232d;
+  cursor: pointer;
+}
+
+.speedControl input[type='range']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .timeline {
   position: relative;
-  flex: 1 1 240px;
-  height: 40px;
+  width: 100%;
+  height: 36px;
   cursor: pointer;
   touch-action: none;
-  min-width: 120px;
+  border-radius: 8px;
+  background: rgba(21, 35, 45, 0.04);
+  outline: none;
+}
+
+.timeline:focus-visible {
+  box-shadow: 0 0 0 2px #397f83;
 }
 
 .timeline[data-disabled='true'] {
   cursor: default;
+}
+
+.timeline[data-busy='true'] {
+  cursor: progress;
 }
 
 .timeline svg {
@@ -1166,42 +1251,61 @@
   width: 100%;
   height: 100%;
   overflow: visible;
+  pointer-events: none;
+}
+
+.playhead {
+  position: absolute;
+  top: -4px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 999px;
+  background: #15232d;
+  box-shadow: 0 0 0 2px #fff;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.timelineTip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(21, 35, 45, 0.92);
+  color: #fff;
+  font-size: 11.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .timelineLabel {
   position: absolute;
-  left: 2px;
-  top: 0;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 10.5px;
   color: var(--faint);
   pointer-events: none;
 }
 
-.speeds {
-  display: flex;
-  gap: 1px;
-  padding: 2px;
-  border-radius: 8px;
-  background: rgba(21, 35, 45, 0.06);
-  flex: none;
+.timelineScale {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--faint);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
 }
 
-.speeds button {
-  height: 26px;
-  min-width: 32px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.speeds button[aria-pressed='true'] {
-  background: #fff;
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgba(21, 35, 45, 0.14);
+@media (max-width: 720px) {
+  .speedControl {
+    max-width: 160px;
+  }
 }
 
 .hotbar {
@@ -1322,8 +1426,9 @@
 .legendCard {
   position: absolute;
   left: 68px;
-  bottom: 96px;
-  width: 260px;
+  /* Sit above the docked alert stack so lenses never cover incident cards. */
+  bottom: 220px;
+  width: 240px;
   padding: 12px;
   z-index: 3;
   animation: rise 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -1391,6 +1496,10 @@
   line-height: 1.35;
   white-space: nowrap;
   transform: translate(14px, 14px);
+}
+
+.hoverTip[data-above] {
+  transform: translate(14px, calc(-100% - 12px));
 }
 
 .hoverTip b {

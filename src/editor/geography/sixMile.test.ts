@@ -69,8 +69,12 @@ describe('image-inspired Six Mile district', () => {
     }
     expect(forest).toBeGreaterThan(200);
     expect(trees / forest).toBeGreaterThan(0.45);
-    expect(s.hotspots?.length).toBeGreaterThanOrEqual(3);
+    expect(s.hotspots?.length).toBeGreaterThanOrEqual(4);
     expect(s.hotspots?.every(h => h.kind === 'waterlogging' && h.cells.length > 0)).toBe(true);
+    const lows = s.ground.filter((g) => g <= 3).length;
+    const highs = s.ground.filter((g) => g >= 7).length;
+    expect(lows).toBeGreaterThan(80);
+    expect(highs).toBeGreaterThan(80);
     expect(s.injected.length).toBeGreaterThanOrEqual(3);
     // Slab hugs the district — smaller than the old 128×128 empty-corner map.
     expect(s.size.w * s.size.h).toBeLessThan(128 * 128);

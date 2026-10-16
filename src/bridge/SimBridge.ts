@@ -43,8 +43,9 @@ export interface WorkerLike {
 export const DEFAULT_RUN_OPTIONS: RunOptions = {
   dispatchMode: 'negotiation',
   npcParams: DEFAULT_NPC_PARAMS,
-  maxTicks: 3600,
-  speed: 4,
+  /** 24 simulated hours — floods persist through the night after a morning start. */
+  maxTicks: 86_400,
+  speed: 16,
   mode: 'run',
 };
 
@@ -56,6 +57,8 @@ export class SimBridge {
   private _world: WorldSnapshot | null = null;
   private _snapshot: RenderSnapshot | null = null;
   private _status: WorkerStatus | null = null;
+  /** Drop already-posted worker output until the newly selected view is acknowledged. */
+  private pendingSeekLimit: number | null = null;
 
   constructor(private worker: WorkerLike) {
     worker.onmessage = (e) => this.receive(e.data);
@@ -88,7 +91,8 @@ export class SimBridge {
   }
 
   load(scenario: Scenario, seed: number, options: Partial<RunOptions> = {}): void {
-    this.fire('reset',undefined);
+    this.pendingSeekLimit = null;
+    this.fire('reset', undefined);
     this._world = null;
     this._snapshot = null;
     this.send({ type: 'load', scenario, seed, options: { ...DEFAULT_RUN_OPTIONS, dispatchMode: scenario.defaults.dispatchMode, ...options } });
@@ -127,8 +131,13 @@ export class SimBridge {
   }
 
   seek(tick: number): void {
-    this.fire('reset',undefined);
-    this.send({ type: 'seek', tick });
+    const target = Math.max(0, Math.floor(tick));
+    const current = this._status?.tick ?? 0;
+    // Only drop in-flight "future" events after a backward scrub. Forward seeks
+    // re-simulate ahead and must accept rising ticks during catch-up.
+    this.pendingSeekLimit = target < current ? target : null;
+    this.fire('reset', undefined);
+    this.send({ type: 'seek', tick: target });
   }
 
   inspect(ref: EntityRef): Promise<InspectorData | null> {
@@ -173,20 +182,26 @@ export class SimBridge {
         this._snapshot = msg.snapshot;
         this.fire('snapshot', msg.snapshot);
         break;
-      case 'events':
-        this.fire('events', msg.events);
+      case 'events': {
+        const limit = this.pendingSeekLimit;
+        this.fire('events', limit === null ? msg.events : msg.events.filter((event) => event.tick <= limit));
         break;
+      }
       case 'metrics':
-        this.fire('metrics', msg.frame);
+        if (this.pendingSeekLimit === null || msg.frame.tick <= this.pendingSeekLimit) this.fire('metrics', msg.frame);
         break;
       case 'done':
         this.fire('done', msg.summary);
         break;
       case 'status':
+        if (this.pendingSeekLimit !== null && msg.status.tick <= this.pendingSeekLimit) {
+          this.pendingSeekLimit = null;
+        }
         this._status = msg.status;
         this.fire('status', msg.status);
         break;
       case 'ready':
+        this.pendingSeekLimit = null;
         this._status = msg.status;
         this.fire('ready', msg.status);
         this.fire('status', msg.status);

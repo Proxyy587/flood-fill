@@ -43,15 +43,15 @@ const STORMS: { id: string; label: string; apply: (s: Scenario) => void }[] = [
 ];
 
 const STARTS = [
-  { id: String(8 * 3600), label: 'Morning', title: '08:00 — clear sky-blue morning' },
+  { id: String(DEFAULT_START_SECONDS), label: 'Morning', title: '08:00 — clear morning (default); the 24 h storm runs into the night' },
   { id: String(14 * 3600), label: 'Afternoon', title: '14:00 — bright afternoon' },
-  { id: String(DEFAULT_START_SECONDS), label: 'Evening', title: '17:15 — daylight into sunset (showcase default)' },
+  { id: String(17 * 3600 + 15 * 60), label: 'Evening', title: '17:15 — daylight into sunset' },
   { id: String(0), label: 'Midnight', title: '00:00 — deep night, city lights' },
 ];
 
 const ENGINE_HELP = {
-  core: 'AK’s validated simulator: flood, power, traffic, reports, ambulances and hospital beds. No boats, police or helicopters yet.',
-  preview: 'The fuller preview model with every responder type. Useful for the demo; its numbers are not the validated ones.',
+  core: 'AK’s deterministic simulator: flood, power, traffic, reports, ambulances, boats, hospital balancing, and independent police traffic, escort and crowd guidance. Helicopters are not yet modeled.',
+  preview: 'Visual showcase engine with helicopters, waterlogging set-pieces and cutaways. Use Core for evidence-backed judging runs.',
 } as const;
 
 function SimulationGroup({ disabled }: { disabled: boolean }) {
@@ -90,7 +90,7 @@ function SimulationGroup({ disabled }: { disabled: boolean }) {
         max={86340}
         step={300}
         disabled={playing}
-        help="The clock follows the simulation. Pause, set a new start, and the run restarts from that time."
+        help="Morning default. Play advances a 24 h flood into afternoon and night. Pause, change start, and the run restarts from that clock."
         onChange={(startSeconds) => setRunSettings({ startSeconds })}
       />
     </div>

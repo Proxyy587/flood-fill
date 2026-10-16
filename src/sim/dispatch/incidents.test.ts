@@ -149,3 +149,20 @@ it("does not confirm distress outside the bounded confidence footprint", () => {
   expect(incidents.casualtyCount[0]).toBe(0);
   expect(reports.status[0]).toBe(ReportStatus.False);
 });
+
+it("records boat field discovery and resolves a civilian served at shore without hospital admission", () => {
+  const { population, reports, incidents } = setup();
+  population.npcs.cell[0] = 8;
+  population.npcs.state[0] = NpcState.SeekHelp;
+  injectFalseReport(reports, 8, 1, 0);
+  stepReports(reports, population, 0);
+  updateIncidents(incidents, reports, 0);
+
+  const events = discoverIncidentAtScene(incidents, reports, population, 0, 1, "boat");
+  expect(incidents.boatRescue[0]).toBe(1);
+  expect(events.find((event) => event.type === "REPORT_VERIFIED")?.reason).toMatch(/Boat field search/);
+  incidents.patientServed[0] = 1;
+  expect(completeAdmittedIncidents(incidents, reports, createHospitalSystem(livingFixture(), 1), 2)).toEqual([]);
+  expect(incidents.active[0]).toBe(0);
+  expect(reports.status[0]).toBe(ReportStatus.Resolved);
+});

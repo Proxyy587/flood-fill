@@ -1,6 +1,9 @@
 import type { BlockType } from './blocks';
 import type { BuildingId } from './ids';
 
+/** Shared display/physics scale: rain intensity 1.0 represents a 150 mm/h cloudburst. */
+export const RAIN_MM_PER_HOUR_AT_FULL = 150;
+
 export type DispatchMode = 'negotiation' | 'centralised';
 
 export interface Scenario {
