@@ -19,6 +19,7 @@ import {
 } from '../contracts';
 import { applyCommands } from '../editor/commands';
 import { createEngine, type Engine } from './engines';
+import { applicableLayaTape } from '../ai/decisions/runTape';
 
 export const DEFAULT_ENGINE: SimEngine = 'core';
 /** A snapshot is kept every this many ticks for seek and replay. */
@@ -139,6 +140,7 @@ export class SimHost {
       npcParams: this.options.npcParams,
       maxTicks: this.options.maxTicks,
       startTimeSeconds: this.options.startTimeSeconds ?? DEFAULT_START_SECONDS,
+      layaTape: applicableLayaTape(this.scenario, this.seed, this.options.layaTape),
     });
   }
 

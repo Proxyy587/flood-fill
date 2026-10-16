@@ -55,6 +55,8 @@ export type Tone = 'info' | 'warn' | 'bad' | 'good';
 
 /** Plain-language headlines for the events people should notice. */
 export const HEADLINES: Partial<Record<SimEventType, { title: string; tone: Tone }>> = {
+  RUN_STARTED: { title: 'Run started', tone: 'info' },
+  RUN_FINISHED: { title: 'Run finished', tone: 'info' },
   WEATHER: { title: 'Weather update', tone: 'info' },
   FLOOD_THRESHOLD: { title: 'Flooding spreads', tone: 'warn' },
   LOCAL_FLOOD: { title: 'Street flooding', tone: 'warn' },

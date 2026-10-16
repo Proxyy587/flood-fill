@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_NPC_PARAMS, type RenderSnapshot, type RunOptions, type Scenario, type SimEngine, type SimEvent, type WorkerStatus, type WorkerToMain } from '../contracts';
 import { mockScenario } from '../contracts/mocks';
+import { scenarioFingerprint } from '../ai/decisions/runTape';
 import { RECORD_EVERY, SimHost, type Clock } from './host';
 import { parseManifest, parseTemplate } from './templates';
 
@@ -71,6 +72,17 @@ const harness = (scenario: Scenario, engine: SimEngine, extra: Partial<RunOption
 const cases = [...templates.map((t) => ({ name: t.id, scenario: t.scenario })), { name: 'preview city', scenario: mockScenario() }];
 
 describe('SimHost (worker protocol)', () => {
+  it('applies a matching Laya tape at run start and ignores a stale fingerprint', () => {
+    const scenario = mockScenario();
+    const tape = { version: 1 as const, modelRevision: 'test', scenarioFingerprint: scenarioFingerprint(scenario), seed: 3,
+      dispatchMode: 'centralised' as const, hospitalPreference: { severe: 1 } };
+    const assisted = harness(scenario, 'core', { dispatchMode: 'centralised', layaTape: tape });
+    expect(assisted.events().find((event) => event.type === 'RUN_STARTED')?.data).toMatchObject({
+      layaDispatchMode: 'centralised', layaHospitalSevere: 1,
+    });
+    const stale = harness(scenario, 'core', { dispatchMode: 'centralised', layaTape: { ...tape, scenarioFingerprint: '00000000' } });
+    expect(stale.events().find((event) => event.type === 'RUN_STARTED')?.data?.layaModelRevision).toBeUndefined();
+  });
   it('keeps pause responsive during playback catch-up', () => {
     const h = harness(mockScenario(), 'preview', { speed: 64 });
     h.host.handle({ type: 'play' });

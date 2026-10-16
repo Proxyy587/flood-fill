@@ -128,6 +128,7 @@ export interface RunSummary {
 }
 export interface RunOptions {
   durationTicks?: number; metricsEvery?: number; startTimeSeconds?: number; npcParams?: NpcParams;
+  layaTape?: import('./laya').LayaDecisionTape;
 }
 export type MainToWorker =
   | { kind: "load"; scenario: Scenario; seed: number; options?: RunOptions }

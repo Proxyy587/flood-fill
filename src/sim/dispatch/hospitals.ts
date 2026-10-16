@@ -127,7 +127,7 @@ export function listHospitalCandidates(system: HospitalSystem, health: number, f
   return candidates.sort((a, b) => a.score - b.score || a.hospitalId - b.hospitalId || a.accessCell - b.accessCell);
 }
 
-export function reserveHospitalBed(system: HospitalSystem, patient: number, health: number, fromCell: number, world: World, scenario: Scenario, blocked: Uint8Array): HospitalDestination | undefined {
+export function reserveHospitalBed(system: HospitalSystem, patient: number, health: number, fromCell: number, world: World, scenario: Scenario, blocked: Uint8Array, preferredHospitalId?: number): HospitalDestination | undefined {
   if (!Number.isInteger(patient) || patient < 0 || patient >= system.patientCapacity) throw new RangeError("Patient index is outside the hospital reservation table");
   if (system.patientAdmitted[patient]) return undefined;
   const current = system.patientReservation[patient];
@@ -136,7 +136,8 @@ export function reserveHospitalBed(system: HospitalSystem, patient: number, heal
     if (existing) return existing;
     releaseHospitalReservation(system, patient);
   }
-  const selected = listHospitalCandidates(system, health, fromCell, world, scenario, blocked)[0];
+  const candidates = listHospitalCandidates(system, health, fromCell, world, scenario, blocked);
+  const selected = candidates.find((candidate) => candidate.hospitalId === preferredHospitalId) ?? candidates[0];
   if (!selected) return undefined;
   system.reserved[selected.hospitalIndex]++;
   system.patientReservation[patient] = selected.hospitalIndex;

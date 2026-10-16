@@ -2,6 +2,7 @@ import type { EditCommand } from './edit';
 import type { SimEvent } from './events';
 import type { EntityRef } from './ids';
 import type { InspectorData } from './inspector';
+import type { LayaDecisionTape } from './laya';
 import type { MetricsFrame, RunSummary } from './metrics';
 import type { NpcParams } from './params';
 import type { DispatchMode, InjectedEvent, Scenario } from './scenario';
@@ -20,6 +21,7 @@ export interface RunOptions {
   engine?: SimEngine;
   /** Time of day at tick 0, in seconds after midnight (default 08:00 morning). */
   startTimeSeconds?: number;
+  layaTape?: LayaDecisionTape;
 }
 
 export type SimEngine = 'core' | 'preview';

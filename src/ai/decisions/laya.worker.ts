@@ -43,7 +43,8 @@ scope.onmessage = (event) => {
       }
       const candidates = message.candidates as LayaCandidate[];
       const start = performance.now();
-      const result = await evaluateLayaDecision((state, questions) => agent.predict(state, questions), message.state, candidates);
+      const result = await evaluateLayaDecision((state, questions) => agent.predict(state, questions), message.state, candidates,
+        typeof message.instructions === 'string' ? message.instructions : undefined);
       scope.postMessage({ type: 'prediction', id, generation, ...result, durationMs: performance.now() - start });
     } catch (error) {
       scope.postMessage({ type: 'error', id, generation, message: error instanceof Error ? error.message : String(error) });

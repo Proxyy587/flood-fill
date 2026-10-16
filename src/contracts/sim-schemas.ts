@@ -157,7 +157,12 @@ export const MetricsFrameSchema: z.ZodType<MetricsFrame> = z.strictObject({
   floodedCells: count, maxDepth: nonnegative, unpoweredPopPct: finite.min(0).max(100), heliRescues: count, routeViolations: count,
 });
 export const RunSummarySchema: z.ZodType<RunSummary> = z.strictObject({ scenario: z.string().min(1), seed: SeedSchema, mode: DispatchModeSchema, metrics: z.array(MetricsFrameSchema), events: z.array(SimEventSchema), hotspots: z.array(z.strictObject({ kind: z.enum(["gridlock", "isolated", "hospital_overload", "power"]), cells: z.array(count), score: nonnegative })) });
-export const RunOptionsSchema = z.strictObject({ durationTicks: count.min(1).max(86400).optional(), metricsEvery: count.min(1).max(86400).optional(), startTimeSeconds: count.max(86399).optional(), npcParams: NpcParamsSchema.optional() });
+export const LayaDecisionTapeSchema = z.strictObject({
+  version: z.literal(1), modelRevision: z.string().min(1).max(128), scenarioFingerprint: z.string().regex(/^[0-9a-f]{8}$/),
+  seed: SeedSchema, dispatchMode: DispatchModeSchema,
+  hospitalPreference: z.strictObject({ minor: BuildingIdSchema.optional(), moderate: BuildingIdSchema.optional(), severe: BuildingIdSchema.optional() }),
+});
+export const RunOptionsSchema = z.strictObject({ durationTicks: count.min(1).max(86400).optional(), metricsEvery: count.min(1).max(86400).optional(), startTimeSeconds: count.max(86399).optional(), npcParams: NpcParamsSchema.optional(), layaTape: LayaDecisionTapeSchema.optional() });
 export const MainToWorkerSchema: z.ZodType<MainToWorker> = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("load"), scenario: ScenarioSchema, seed: SeedSchema, options: RunOptionsSchema.optional() }),
   ...(["play", "pause", "step", "exportLog"] as const).map((kind) => z.strictObject({ kind: z.literal(kind) })),

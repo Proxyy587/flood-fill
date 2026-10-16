@@ -1,6 +1,8 @@
 # CHANGELOG
 One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order changes are marked **[ADR]**.
 
+- 2026-10-16 **[CONTRACT]** (Codex): added opt-in Laya run decision tape to UI/core run options and validation; browser ONNX selects dispatch policy and injury-tier hospital preferences before a Core run, while live simulator feasibility checks and deterministic fallback govern each patient assignment. Run-start and assignment events record applied choices.
+
 - 2026-10-15 (Worker 1, Assets & Templates): delivered full voxel palette and BLOCK_META in src/assets/palette.ts; implemented 36 procedural voxel models (17 buildings, 9 vehicles including animated rotor, 10 role-colored NPC figures <= 12 voxels) with VoxelBuilder, previewModel visualizer and registry in src/assets/models; authored deterministic generator scripts/gen-scenarios.ts producing riverside-town, coastal-grid, dense-basin-city, stress-triple and scenarios/index.json; verified 100% dry road connectivity from every house, shelter, and hospital to medical centers with BFS tests; full health passes with 370 tests, zero lint warnings and schema validation.
 
 - 2026-10-15 **[ADR]** (AK, M2 stage A): added delayed flood warnings, utility-based civilian evacuation, atomic reachable-shelter reservations, stranded/retry handling, flood and injected-overflow shelter closure at state boundaries, and measured evacDonePct. Mid-journey warnings preserve the active edge. Partial-information reports/rescue dispatch remain M3. TDD RED captured missing behavior; focused tests now pass.

@@ -2,6 +2,7 @@ import type {
   DispatchMode,
   EntityRef,
   InjectedEvent,
+  LayaDecisionTape,
   InspectorData,
   MetricsFrame,
   NpcParams,
@@ -22,6 +23,7 @@ export interface EngineOptions {
   npcParams: NpcParams;
   maxTicks: number;
   startTimeSeconds: number;
+  layaTape?: LayaDecisionTape;
 }
 
 /** One running simulation behind the worker protocol. */
@@ -118,6 +120,7 @@ export class CoreEngine implements Engine {
       metricsEvery: 10,
       startTimeSeconds: o.startTimeSeconds,
       npcParams: o.npcParams,
+      layaTape: o.layaTape,
     });
   }
   get tick() {

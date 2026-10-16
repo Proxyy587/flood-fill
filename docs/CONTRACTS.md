@@ -228,7 +228,7 @@ Each consumer ships a mock in `src/contracts/mocks/` so work can start before th
 
 ## Planned extension: bounded decisions and decision tape (2026-10-15)
 
-**Design proposal only.** These fields do not currently exist in `src/contracts`. AK/AJ must review a coherent types + Zod + mocks + changelog change before consumers implement them. See [LAYA_MIGRATION_PLAN.md](LAYA_MIGRATION_PLAN.md).
+The bounded run-start `LayaDecisionTape` is now implemented in `src/contracts/laya.ts` and both run-option contracts, with a strict Zod schema. It records a model revision, UI scenario fingerprint, seed, dispatch mode and one optional hospital preference per injury tier. The worker accepts it only for a matching UI scenario and seed. See [LAYA_MIGRATION_PLAN.md](LAYA_MIGRATION_PLAN.md) for the larger per-tick decision proposal below, which remains unimplemented.
 
 | Proposed surface | Required information |
 |---|---|

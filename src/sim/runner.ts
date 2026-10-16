@@ -15,7 +15,7 @@ import { buildHazardGrid, canEnter } from "./nav/hazards";
 import { buildFlowField, findPath } from "./nav";
 import { createReportSystem, injectFalseReport, reportSnapshot, stepReports } from "./reports/system";
 import { createIncidentSystem, completeAdmittedIncidents, discoverIncidentAtScene, updateIncidents } from "./dispatch/incidents";
-import { admitPatientToHospital, createHospitalSystem, reserveHospitalBed, releaseHospitalReservation, stepExposure } from "./dispatch/hospitals";
+import { admitPatientToHospital, createHospitalSystem, reserveHospitalBed, releaseHospitalReservation, stepExposure, triageHealth } from "./dispatch/hospitals";
 import { ambulanceSnapshot, createAmbulances, nearestSafeRoadRoute, planAmbulanceRoute, stepAmbulances } from "./dispatch/ambulances";
 import { createHotspotSystem, hotspotZoneForCell, stageIdleAmbulances, updateHotspots } from "./dispatch/hotspots";
 import type { HotspotAdmission, HotspotDemand } from "./dispatch/hotspots";
@@ -53,6 +53,7 @@ function quantile(sorted: readonly number[], fraction: number): number {
 export function createSimulation(input: Scenario, seedInput: number, modeInput: DispatchMode, options: RunOptions = {}) {
   const scenario = ScenarioSchema.parse(input); const seed = SeedSchema.parse(seedInput);
   const mode = DispatchModeSchema.parse(modeInput); const parsed = RunOptionsSchema.parse(options);
+  const layaTape = parsed.layaTape?.seed === seed && parsed.layaTape.dispatchMode === mode ? parsed.layaTape : undefined;
   const duration = parsed.durationTicks ?? 600; const every = parsed.metricsEvery ?? 10;
   for (const event of scenario.injected) {
     if (event.kind !== "substation_flooded" && event.kind !== "bridge_closed" && event.kind !== "road_blocked_by_debris" && event.kind !== "shelter_overflow" && event.kind !== "false_report" && event.kind !== "comms_outage" && event.kind !== "boat_failure") throw new Error(`Injected action ${event.kind} not implemented in M3C boat runner`);
@@ -61,7 +62,12 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
   }
   const world = createWorld(scenario); const power = createPowerState(scenario);
   const rng = createRng(seed);
-  const events: SimEvent[] = [{ tick: 0, type: "RUN_STARTED", data: { stage: "dispatch", seed, agentsImplemented: true, evacuationImplemented: true, reportsImplemented: true, dispatchImplemented: true }, reason: "Weather, flood, power, commuting, evacuation, reports, ambulance and boat rescue, shelter handoff, hospital balancing, police gridlock control and civilian escort are implemented; crowd control and aircraft remain follow-ons" }];
+  const events: SimEvent[] = [{ tick: 0, type: "RUN_STARTED", data: { stage: "dispatch", seed, agentsImplemented: true, evacuationImplemented: true, reportsImplemented: true, dispatchImplemented: true,
+    ...(layaTape ? { layaVersion: layaTape.version, layaModelRevision: layaTape.modelRevision, layaScenarioFingerprint: layaTape.scenarioFingerprint,
+      layaDispatchMode: layaTape.dispatchMode, layaHospitalMinor: layaTape.hospitalPreference.minor ?? 0,
+      layaHospitalModerate: layaTape.hospitalPreference.moderate ?? 0, layaHospitalSevere: layaTape.hospitalPreference.severe ?? 0 } : {}) },
+    reason: layaTape ? "Run started with recorded Laya dispatch and hospital preferences; simulator safety checks remain authoritative" :
+      "Weather, flood, power, commuting, evacuation, reports, ambulance and boat rescue, shelter handoff, hospital balancing, police gridlock control and civilian escort are implemented; crowd control and aircraft remain follow-ons" }];
   const frames: MetricsFrame[] = [];
   let tick = 0; let navVersion = 0; let lastRain = -1; let lastWind = -1;
   const blocked = new Uint8Array(world.water.length);
@@ -596,7 +602,8 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
       }
       if (!incidents.patientLoaded[patient]) continue;
       const previousHospital = hospitals.patientReservation[patient];
-      const destination = reserveHospitalBed(hospitals, patient, incidents.patientHealth[patient], ambulances.cell[unit], world, scenario, blocked);
+      const preference = layaTape?.hospitalPreference[triageHealth(incidents.patientHealth[patient])];
+      const destination = reserveHospitalBed(hospitals, patient, incidents.patientHealth[patient], ambulances.cell[unit], world, scenario, blocked, preference);
       if (!destination) {
         if (previousHospital >= 0) events.push({ tick: atTick, type: "HOSPITAL_DIVERT", actor: ambulances.id[unit] as VehicleId, actorKind: "vehicle",
           target: hospitals.id[previousHospital] as BuildingId, targetKind: "building", data: { requestId: incidents.requestId[incidents.patientIncident[patient]] },
@@ -604,7 +611,10 @@ export function createSimulation(input: Scenario, seedInput: number, modeInput: 
         continue;
       }
       if (previousHospital < 0) events.push({ tick: atTick, type: "HOSPITAL_ASSIGN", actor: ambulances.id[unit] as VehicleId, actorKind: "vehicle",
-        target: destination.hospitalId, targetKind: "building", data: { requestId: incidents.requestId[incidents.patientIncident[patient]], eta: destination.eta }, reason: "Field triage selected and atomically reserved an operational hospital bed" });
+        target: destination.hospitalId, targetKind: "building", data: { requestId: incidents.requestId[incidents.patientIncident[patient]], eta: destination.eta,
+          ...(preference ? { layaPreferredHospital: preference, layaApplied: destination.hospitalId === preference } : {}) },
+        reason: preference === destination.hospitalId ? "Recorded Laya preference passed live power, flood, route and capacity checks; bed reserved" :
+          preference ? "Laya preference unavailable; deterministic safe hospital fallback reserved a bed" : "Field triage selected and atomically reserved an operational hospital bed" });
       else if (previousHospital !== destination.hospitalIndex) events.push({ tick: atTick, type: "HOSPITAL_DIVERT", actor: ambulances.id[unit] as VehicleId, actorKind: "vehicle",
         target: destination.hospitalId, targetKind: "building", data: { previousHospital: hospitals.id[previousHospital], requestId: incidents.requestId[incidents.patientIncident[patient]] }, reason: "Hospital power, flood safety or route changed; bed reservation diverted to another safe hospital" });
       if (ambulances.cell[unit] === destination.accessCell) {

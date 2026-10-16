@@ -1,6 +1,8 @@
 import type { BuildingId, NpcId, RequestId, VehicleId } from './ids';
 
 export const SIM_EVENT_TYPES = [
+  'RUN_STARTED',
+  'RUN_FINISHED',
   'WEATHER',
   'FLOOD_THRESHOLD',
   /** Rainfall ponding in a local hollow (pluvial flooding), independent of the river. */

@@ -72,13 +72,14 @@ export class LayaClient {
     return this.request<void>('load', null);
   }
 
-  choose(state: string, candidates: readonly LayaCandidate[]): Promise<LayaPrediction> {
+  choose(state: string, candidates: readonly LayaCandidate[], instructions = 'Which feasible hospital should receive this simulated patient?'): Promise<LayaPrediction> {
     if (!state.trim() || state.length > 2048 || candidates.length < 1 || candidates.length > 5 ||
+        !instructions.trim() || instructions.length > 256 ||
         new Set(candidates.map((candidate) => candidate.id)).size !== candidates.length ||
-        candidates.some((candidate) => !/^h[1-9]\d*$/.test(candidate.id) || !candidate.description.trim() || candidate.description.length > 256)) {
+        candidates.some((candidate) => !/^[a-z][a-z0-9_-]{0,31}$/.test(candidate.id) || !candidate.description.trim() || candidate.description.length > 256)) {
       return Promise.reject(new Error('Invalid Laya decision request'));
     }
-    return this.request<LayaPrediction>('predict', candidates, { state, candidates });
+    return this.request<LayaPrediction>('predict', candidates, { state, candidates, instructions });
   }
 
   reset(): void {

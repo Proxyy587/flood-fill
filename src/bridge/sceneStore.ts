@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DEFAULT_START_SECONDS, sameEntity, type DispatchMode, type EntityRef, type InspectorData, type SimEngine } from '../contracts';
+import { DEFAULT_START_SECONDS, sameEntity, type DispatchMode, type EntityRef, type InspectorData, type SimEngine, type LayaDecisionTape } from '../contracts';
 
 export type CameraMode = 'overview' | 'focus' | 'follow' | 'free';
 export type ViewMode = 'truth' | 'belief';
@@ -68,6 +68,7 @@ export interface SceneState {
   /** Scenario inputs the running engine cannot execute. */
   notes: string[];
   runSettings: RunSettings;
+  layaTape: LayaDecisionTape | null;
   playing: boolean;
   speed: number;
   dispatchMode: DispatchMode;
@@ -102,6 +103,7 @@ export interface SceneState {
   setLens: (lens: Lens) => void;
   toggleOverlay: (key: keyof Overlays) => void;
   setRunSettings: (patch: Partial<RunSettings>) => void;
+  setLayaTape: (tape: LayaDecisionTape | null) => void;
 }
 
 export const useSceneStore = create<SceneState>()((set, get) => ({
@@ -117,6 +119,7 @@ export const useSceneStore = create<SceneState>()((set, get) => ({
   busy: null,
   notes: [],
   runSettings: { engine: 'core', startSeconds: DEFAULT_START_SECONDS },
+  layaTape: null,
   playing: false,
   /** Fast enough to feel morning → night over a multi-hour flood without waiting wall-hours. */
   speed: 16,
@@ -177,4 +180,5 @@ export const useSceneStore = create<SceneState>()((set, get) => ({
   setLens: (lens) => set({ lens }),
   toggleOverlay: (key) => set((s) => ({ overlays: { ...s.overlays, [key]: !s.overlays[key] } })),
   setRunSettings: (patch) => set((s) => ({ runSettings: { ...s.runSettings, ...patch } })),
+  setLayaTape: (layaTape) => set({ layaTape }),
 }));

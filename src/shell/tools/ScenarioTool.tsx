@@ -6,6 +6,7 @@ import { DEFAULT_START_SECONDS, type FleetDef, type NpcParams, type Scenario } f
 import { RAIN_MM_PER_HOUR_AT_FULL } from '../../contracts/mocks';
 import { NpcParamsSchema } from '../../contracts/schemas';
 import { useSceneStore } from '../../bridge/sceneStore';
+import { LayaRunSetup } from '../../ui/critic/LayaRunSetup';
 import { formatTimeOfDay } from '../city';
 import { updateScenario } from '../../ui/panels/ParamsPanel';
 import { useEditorStore } from '../../ui/store/editorStore';
@@ -348,6 +349,7 @@ export function ScenarioTool({ onClose }: { onClose: () => void }) {
         </div>
         <p className={styles.hint}>The same city, settings and seed always replay the same storm.</p>
       </div>
+      <LayaRunSetup scenario={scenario} disabled={disabled} />
     </Flyout>
   );
 }

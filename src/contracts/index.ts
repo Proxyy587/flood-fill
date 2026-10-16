@@ -9,4 +9,5 @@ export * from './snapshot';
 export * from './inspector';
 export * from './metrics';
 export * from './messages';
+export * from './laya';
 export * from './world';

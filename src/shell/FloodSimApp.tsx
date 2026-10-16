@@ -12,6 +12,7 @@ import { useSimFeedStore } from '../bridge/simFeedStore';
 import { BlockType, type Scenario, type ScenarioPatch } from '../contracts';
 import { mockScenario } from '../contracts/mocks';
 import { ScenarioSchema } from '../contracts/schemas';
+import { applicableLayaTape } from '../ai/decisions/runTape';
 import { startAutosave } from '../editor/autosave';
 import { BLOCK_META } from '../editor/catalog';
 import { daylightAt } from '../render/effects/daylight';
@@ -67,8 +68,12 @@ const editorToolFor = (tool: RailTool): EditorTool => {
 /** Load options shared by edit previews, runs and restarts. */
 const loadOptions = (mode: 'edit' | 'run') => {
   const scene = useSceneStore.getState();
+  const scenario = useEditorStore.getState().scenario;
+  const layaTape = mode === 'run' && scenario && scene.runSettings.engine === 'core'
+    ? applicableLayaTape(scenario, scenario.defaults.seed, scene.layaTape) : undefined;
   return {
     mode,
+    ...(layaTape ? { layaTape, dispatchMode: layaTape.dispatchMode } : {}),
     npcParams: useEditorStore.getState().params,
     speed: scene.speed,
     engine: scene.runSettings.engine,
