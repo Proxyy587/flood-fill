@@ -20,6 +20,7 @@
 # production
 /build
 /public/models/laya/
+.venv-laya/
 __pycache__/
 
 # misc

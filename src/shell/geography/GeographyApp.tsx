@@ -119,6 +119,7 @@ export function GeographyApp({ district = false }: { district?: boolean }) {
         <button type="button" className={styles.labelToggle} aria-pressed={labels} onClick={() => setLabels(!labels)}>
           <Layers size={14} /> Labels {labels && <Check size={12} />}
         </button>
+        <Link href="/laya" prefetch={false} className={styles.sandboxLink}>Laya lab <ArrowUpRight size={14} /></Link>
         <Link href="/sandbox" prefetch={false} className={styles.sandboxLink}>Sandbox <ArrowUpRight size={14} /></Link>
       </nav>
     </header>
