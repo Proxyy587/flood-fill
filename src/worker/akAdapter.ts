@@ -196,8 +196,7 @@ const UI_EVENT_TYPES: ReadonlySet<string> = new Set(SIM_EVENT_TYPES);
 
 /**
  * AK event → UI event. Per-person bookkeeping (`NPC_CREATED`, `ROUTE_PLANNED`,
- * `ARRIVED`, `NPC_STATE`) and run markers have no UI type and are left in the
- * core's own log; the bridge reports run start/finish through status/done.
+ * `ARRIVED`, `NPC_STATE`) have no UI type and are left in the core's own log.
  */
 export const eventFromCore = (e: Ak.SimEvent): SimEvent | null => {
   if (!UI_EVENT_TYPES.has(e.type)) return null;

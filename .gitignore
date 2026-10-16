@@ -19,6 +19,8 @@
 
 # production
 /build
+/public/models/laya/
+__pycache__/
 
 # misc
 .DS_Store

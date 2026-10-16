@@ -1,6 +1,9 @@
 # CHANGELOG
 One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order changes are marked **[ADR]**.
 
+- 2026-10-16 (AJ): merged `codex/laya-integration` onto the score-suggest branch — vendored `laya-ts` + `onnxruntime-web`, `/laya` shadow lab, Scenario → Prepare Laya decisions for Core runs. Replaced unused `@wexare/laya-web` with `file:vendor/laya-ts`. Model weights stay local via `pnpm laya:prepare` → `public/models/laya/`.
+- 2026-10-16 **[CONTRACT]** (Codex): added opt-in Laya run decision tape to UI/core run options and validation; browser ONNX selects dispatch policy and injury-tier hospital preferences before a Core run, while live simulator feasibility checks and deterministic fallback govern each patient assignment. Run-start and assignment events record applied choices.
+
 - 2026-10-15 (Worker 1, Assets & Templates): delivered full voxel palette and BLOCK_META in src/assets/palette.ts; implemented 36 procedural voxel models (17 buildings, 9 vehicles including animated rotor, 10 role-colored NPC figures <= 12 voxels) with VoxelBuilder, previewModel visualizer and registry in src/assets/models; authored deterministic generator scripts/gen-scenarios.ts producing riverside-town, coastal-grid, dense-basin-city, stress-triple and scenarios/index.json; verified 100% dry road connectivity from every house, shelter, and hospital to medical centers with BFS tests; full health passes with 370 tests, zero lint warnings and schema validation.
 
 - 2026-10-15 **[ADR]** (AK, M2 stage A): added delayed flood warnings, utility-based civilian evacuation, atomic reachable-shelter reservations, stranded/retry handling, flood and injected-overflow shelter closure at state boundaries, and measured evacDonePct. Mid-journey warnings preserve the active edge. Partial-information reports/rescue dispatch remain M3. TDD RED captured missing behavior; focused tests now pass.
@@ -127,3 +130,4 @@ One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order 
 - Verified schema/editor integrity and both engine adapters with six district tests; full baseline suite passed 548 tests before the two engine cases were added. TypeScript, lint and desktop/mobile browser checks passed.
 - Refined the perimeter and channel proportions against the attached Six Mile image; the final model contains 138 structures. Both engine compatibility tests still pass.
 - Final shared-app verification: Six Mile loads into the current showcase sandbox, runs past 260 simulated seconds and pauses normally. The temporary concurrent HUD export mismatch was resolved by the showcase agent. Scenario fixture schema validation also passes.
+- 2026-10-16 (Codex): added an opt-in browser ONNX Laya shadow lab at `/laya`, a pinned official-checkpoint export script, a dedicated inference worker, bounded hospital candidate comparison and fallback validation; live simulator assignments remain deterministic pending reviewed worker/tape contracts.

@@ -4,7 +4,7 @@ import type { BuildingId } from "../../contracts/types";
 import { createPopulation, defaultNpcParams } from "../agents/population";
 import { livingFixture } from "../agents/living-fixture";
 import { createWorld } from "../world/grid";
-import { admitPatientToHospital, createHospitalSystem, reserveHospitalBed, stepExposure, triageHealth } from "./hospitals";
+import { admitPatientToHospital, createHospitalSystem, listHospitalCandidates, reserveHospitalBed, stepExposure, triageHealth } from "./hospitals";
 
 function setup() {
   const scenario = livingFixture();
@@ -73,6 +73,16 @@ function hospitalSetup() {
   return { scenario, world, system, blocked };
 }
 
+it("lists only feasible hospital choices without reserving a bed", () => {
+  const { scenario, world, system, blocked } = hospitalSetup();
+  expect(listHospitalCandidates(system, 20, 13, world, scenario, blocked).map((candidate) => candidate.hospitalId)).toEqual([2, 5]);
+  expect(Array.from(system.reserved)).toEqual([0, 0]);
+  world.powered[14] = 0;
+  expect(listHospitalCandidates(system, 20, 13, world, scenario, blocked).map((candidate) => candidate.hospitalId)).toEqual([5]);
+  world.powered[34] = 0;
+  expect(listHospitalCandidates(system, 20, 13, world, scenario, blocked)).toEqual([]);
+});
+
 it("routes severe patients by fastest ETA but capacity-balances minor patients", () => {
   const { scenario, world, system, blocked } = hospitalSetup();
   const severe = reserveHospitalBed(system, 0, 20, 13, world, scenario, blocked);
@@ -81,6 +91,16 @@ it("routes severe patients by fastest ETA but capacity-balances minor patients",
   expect(minor?.hospitalId).toBe(5);
   const secondSevere = reserveHospitalBed(system, 2, 30, 13, world, scenario, blocked);
   expect(secondSevere?.hospitalId).toBe(2);
+});
+
+it("honours a preferred hospital only while it remains safe and has capacity", () => {
+  const { scenario, world, system, blocked } = hospitalSetup();
+  expect(reserveHospitalBed(system, 0, 20, 13, world, scenario, blocked, 5)?.hospitalId).toBe(5);
+  world.powered[34] = 0;
+  expect(reserveHospitalBed(system, 1, 20, 13, world, scenario, blocked, 5)?.hospitalId).toBe(2);
+  expect(system.reserved[1]).toBe(1);
+  system.capacity[0] = 1;
+  expect(reserveHospitalBed(system, 2, 20, 13, world, scenario, blocked, 5)).toBeUndefined();
 });
 
 it("reserves one bed atomically, admits only reserved patients and rejects duplicate admission", () => {

@@ -47,6 +47,17 @@ it("replays a batch byte-identically without mutating the input", () => {
   expect(JSON.stringify(s)).toBe(original);
   first.forEach((summary) => expect(RunSummarySchema.safeParse(summary).success).toBe(true));
 });
+it("records a Laya run-start tape and replays its decisions deterministically", () => {
+  const scenario = mockScenario();
+  const tape = { version: 1 as const, modelRevision: 'test-revision', scenarioFingerprint: '01234567', seed: 42,
+    dispatchMode: 'centralised' as const, hospitalPreference: { severe: 2 } };
+  const options = { durationTicks: 40, layaTape: tape };
+  const a = createSimulation(scenario, 42, 'centralised', options);
+  const b = createSimulation(scenario, 42, 'centralised', options);
+  for (let tick = 0; tick < 40; tick++) { a.step(); b.step(); }
+  expect(a.summary()).toEqual(b.summary());
+  expect(a.summary().events[0].data).toMatchObject({ layaModelRevision: 'test-revision', layaDispatchMode: 'centralised', layaHospitalSevere: 2 });
+});
 it.each([0, 1, 2])("applies injected substation faults at state boundary %s", (faultTick) => {
   const s = mockScenario(); s.buildings[1].generator = { fuelTicks: 2 };
   s.injected = [{ kind: "substation_flooded", tick: faultTick, nodeId: 1 }];

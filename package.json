@@ -18,12 +18,14 @@
     "sim:batch": "tsx scripts/batch.ts",
     "sim:compare": "tsx scripts/compare.ts",
     "health": "pnpm lint && pnpm typecheck && pnpm test && pnpm validate",
-    "critic:cache": "tsx scripts/critic-cache.ts"
+    "critic:cache": "tsx scripts/critic-cache.ts",
+    "laya:prepare": "python scripts/prepare-laya-model.py"
   },
   "dependencies": {
-    "@wexare/laya-web": "^0.1.1",
+    "laya-ts": "file:vendor/laya-ts",
     "lucide-react": "^1.57.0",
     "next": "16.4.1",
+    "onnxruntime-web": "1.30.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "three": "^0.186.1",
