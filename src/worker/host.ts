@@ -20,18 +20,20 @@ import {
 import { applyCommands } from '../editor/commands';
 import { createEngine, type Engine } from './engines';
 import { applicableLayaTape } from '../ai/decisions/runTape';
+import { MAX_WORKER_SPEED } from '../bridge/simClock';
 
 export const DEFAULT_ENGINE: SimEngine = 'core';
 /** A snapshot is kept every this many ticks for seek and replay. */
 export const RECORD_EVERY = 10;
 const MAX_TICKS_PER_FRAME = 240;
-const MAX_PLAY_TICKS_PER_SLICE = 8;
-const MAX_PENDING_PLAY_TICKS = 240;
-const PLAY_SLICE_MS = 40;
-const FLUSH_MS = 200;
+/** Enough headroom for 16× presentation rate (960 sim-sec / wall-sec). */
+const MAX_PLAY_TICKS_PER_SLICE = 48;
+const MAX_PENDING_PLAY_TICKS = 1920;
+const PLAY_SLICE_MS = 48;
+const FLUSH_MS = 160;
 /** Wall budget per catch-up slice — higher so timeline skip-ahead feels responsive. */
-const BUSY_SLICE_MS = 80;
-const BUSY_TICKS_PER_SLICE = 480;
+const BUSY_SLICE_MS = 100;
+const BUSY_TICKS_PER_SLICE = 960;
 
 export interface Clock {
   now(): number;
@@ -397,7 +399,7 @@ export class SimHost {
         break;
       }
       case 'setSpeed':
-        if (this.options) this.options = { ...this.options, speed: Math.max(0.25, Math.min(256, msg.speed)) };
+        if (this.options) this.options = { ...this.options, speed: Math.max(0.25, Math.min(MAX_WORKER_SPEED, msg.speed)) };
         break;
       case 'setDispatchMode':
         this.requireEdit('change the dispatch policy');

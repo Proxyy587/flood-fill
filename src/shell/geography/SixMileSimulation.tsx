@@ -7,6 +7,7 @@ import { AUTOSAVE_KEY } from '../../editor/autosave';
 import { createSixMile } from '../../editor/geography/sixMile';
 import { citySlot } from '../../editor/persistence';
 import { useEditorStore } from '../../ui/store/editorStore';
+import { DEFAULT_WORKER_SPEED } from '../../bridge/simClock';
 import { FloodSimApp } from '../FloodSimApp';
 import { CloudWipe, peekCloudEnter, takeCloudEnter, type WipePhase } from './CloudWipe';
 
@@ -22,7 +23,7 @@ export function SixMileSimulation() {
   useEffect(() => {
     loaded.current = false;
     useSceneStore.getState().setRunSettings({ engine: 'preview', startSeconds: DEFAULT_START_SECONDS });
-    useSceneStore.setState({ speed: 16 });
+    useSceneStore.setState({ speed: DEFAULT_WORKER_SPEED });
     const apply = () => {
       const { scenario } = createSixMile();
       const params = useEditorStore.getState().params;
@@ -49,7 +50,7 @@ export function SixMileSimulation() {
       const city = useEditorStore.getState().scenario?.name ?? '';
       if (st.connection !== 'ready' || !city.includes('Six Mile')) return;
       done = true;
-      window.setTimeout(() => setWipe('revealing'), 320);
+      window.setTimeout(() => setWipe('revealing'), 180);
     };
     tryReveal();
     const offScene = useSceneStore.subscribe(tryReveal);

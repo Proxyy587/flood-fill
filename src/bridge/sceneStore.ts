@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { DEFAULT_START_SECONDS, sameEntity, type DispatchMode, type EntityRef, type InspectorData, type SimEngine, type LayaDecisionTape } from '../contracts';
+import { DEFAULT_WORKER_SPEED } from './simClock';
 
 export type CameraMode = 'overview' | 'focus' | 'follow' | 'free';
 export type ViewMode = 'truth' | 'belief';
@@ -126,8 +127,8 @@ export const useSceneStore = create<SceneState>()((set, get) => ({
   runSettings: { engine: 'core', startSeconds: DEFAULT_START_SECONDS },
   layaTape: null,
   playing: false,
-  /** Fast enough to feel morning → night over a multi-hour flood without waiting wall-hours. */
-  speed: 16,
+  /** Worker speed: sim-seconds per wall-second. 1× UI = 60 (1 wall-min ≈ 1 sim-hour). */
+  speed: DEFAULT_WORKER_SPEED,
   dispatchMode: 'negotiation',
   weather: { rain: 0, wind: 0 },
 

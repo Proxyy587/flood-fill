@@ -7,7 +7,7 @@ import { GeographyRenderer, type ScreenAnchor } from './GeographyRenderer';
 
 export interface GeographyControls {
   focus: (x: number, z: number) => void;
-  flyInto: (x: number, z: number, zoomTo?: number) => Promise<void>;
+  flyInto: (x: number, z: number, zoomTo?: number, durationMs?: number) => Promise<void>;
   zoom: (factor: number) => void;
   reset: () => void;
 }
@@ -25,7 +25,7 @@ export function GeographyCanvas({ scenario, places, selected, onAnchors, onSelec
   const renderer = useRef<GeographyRenderer | null>(null);
   useImperativeHandle(controlsRef, () => ({
     focus: (x, z) => renderer.current?.focus(x, z),
-    flyInto: (x, z, zoomTo) => renderer.current?.flyInto(x, z, zoomTo) ?? Promise.resolve(),
+    flyInto: (x, z, zoomTo, durationMs) => renderer.current?.flyInto(x, z, zoomTo, durationMs) ?? Promise.resolve(),
     zoom: factor => renderer.current?.zoom(factor),
     reset: () => renderer.current?.reset(),
   }), []);

@@ -125,7 +125,7 @@ describe('SimHost (worker protocol)', () => {
   for (const c of cases)
     for (const engine of ['core', 'preview'] as const) {
       it(`${c.name} on ${engine}: load, step, play, pause without sharing buffers`, () => {
-        // Keep playback checks at a modest speed; the UI slider goes to 256×.
+        // Keep playback checks at a modest speed; the UI slider tops out at 16× presentation rate.
         const h = harness(c.scenario, engine, { speed: 16 });
         expect(h.errors()).toEqual([]);
         expect(h.of('world')).toHaveLength(1);

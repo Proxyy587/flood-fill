@@ -48,12 +48,12 @@ export function CloudWipe({
 }) {
   useEffect(() => {
     if (phase === 'covering') {
-      // Cover just long enough to hide the route swap — keep the handoff snappy.
-      const t = window.setTimeout(() => onCovered?.(), 720);
+      // Cover fully before the route swap so the page change stays invisible.
+      const t = window.setTimeout(() => onCovered?.(), 820);
       return () => window.clearTimeout(t);
     }
     if (phase === 'revealing') {
-      const t = window.setTimeout(() => onRevealed?.(), 680);
+      const t = window.setTimeout(() => onRevealed?.(), 780);
       return () => window.clearTimeout(t);
     }
   }, [phase, onCovered, onRevealed]);

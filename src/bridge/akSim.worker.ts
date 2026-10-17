@@ -22,6 +22,7 @@ import {
   toUiSummary,
   toWorldSnapshot,
 } from './akSimAdapter';
+import { MAX_WORKER_SPEED } from './simClock';
 
 interface WorkerScope {
   postMessage(msg: WorkerToMain, transfer?: Transferable[]): void;
@@ -173,7 +174,7 @@ const handle = (msg: MainToWorker) => {
       if (finishIfDone()) return;
       break;
     case 'setSpeed':
-      if (options) options = { ...options, speed: Math.max(0.25, Math.min(256, msg.speed)) };
+      if (options) options = { ...options, speed: Math.max(0.25, Math.min(MAX_WORKER_SPEED, msg.speed)) };
       break;
     case 'setDispatchMode':
       if (options?.mode !== 'edit' || !uiScenario) throw new Error('Change dispatch policy in edit mode.');

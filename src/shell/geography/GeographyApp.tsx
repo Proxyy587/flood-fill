@@ -79,20 +79,23 @@ export function GeographyApp({ district = false }: { district?: boolean }) {
     setNotice('');
     setTransitioning(true);
     if (hotspot.href) router.prefetch(hotspot.href);
-    // Soft lean toward the pin while clouds gather — keep the fly short so the wipe leads.
-    void controls.current?.flyInto(anchor.x, anchor.z, hotspot.ready ? 0.85 : 1.1);
+    // Dive toward the pin first; clouds gather mid-flight so the handoff feels continuous.
+    const flight = controls.current?.flyInto(anchor.x, anchor.z, hotspot.ready ? 1.05 : 1.2, 1400);
     if (hotspot.ready && hotspot.href) {
       pendingHref.current = hotspot.href;
-      // Cloud wipe only for the district sim handoff; sandbox jumps cleanly.
       if (hotspot.href.startsWith('/six-mile')) {
+        await new Promise((r) => setTimeout(r, 420));
         armCloudEnter(hotspot.href);
         setWipe('covering');
+        void flight;
       } else {
+        await flight;
         router.push(hotspot.href);
       }
       return;
     }
-    await new Promise(r => setTimeout(r, 700));
+    await flight;
+    await new Promise(r => setTimeout(r, 400));
     setNotice(`${hotspot.name} is a location preview — a full district model is planned next.`);
     setTransitioning(false);
   };

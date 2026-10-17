@@ -1,6 +1,7 @@
 # CHANGELOG
 One line per change. Contract changes are marked **[CONTRACT]**. Pipeline-order changes are marked **[ADR]**.
 
+- 2026-10-16 (AJ, UX): presentation clock — at 1×, 1 wall-minute ≈ 1 simulated hour; speed stops 1–16× (default 4×). Instant Navigation opted out on client pages. Smoother atlas→Six Mile cloud wipe + denser timeline scrub / faster seek catch-up.
 - 2026-10-16 (AJ): merged `codex/laya-integration` onto the score-suggest branch — vendored `laya-ts` + `onnxruntime-web`, `/laya` shadow lab, Scenario → Prepare Laya decisions for Core runs. Replaced unused `@wexare/laya-web` with `file:vendor/laya-ts`. Model weights stay local via `pnpm laya:prepare` → `public/models/laya/`.
 - 2026-10-16 **[CONTRACT]** (Codex): added opt-in Laya run decision tape to UI/core run options and validation; browser ONNX selects dispatch policy and injury-tier hospital preferences before a Core run, while live simulator feasibility checks and deterministic fallback govern each patient assignment. Run-start and assignment events record applied choices.
 

@@ -423,7 +423,7 @@ export class GeographyRenderer {
     this.dirty = true;
   }
   /** Smooth pan + zoom into a map point. Resolves when the flight finishes. */
-  flyInto(x: number, z: number, zoomTo = 3.6): Promise<void> {
+  flyInto(x: number, z: number, zoomTo = 3.6, durationMs = 2200): Promise<void> {
     const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const target = new THREE.Vector3(x, 0, z).sub(this.origin);
     if (reduce) {
@@ -442,7 +442,7 @@ export class GeographyRenderer {
     const toPos = fromPos.clone().add(target.clone().sub(fromTarget));
     // Slight dive: pull the camera a bit lower as we arrive so the district fills the frame.
     toPos.y = Math.max(40, fromPos.y * 0.55);
-    const duration = 2200;
+    const duration = Math.max(200, durationMs);
     const started = performance.now();
     this.controls.enabled = false;
     const ease = (t: number) => {

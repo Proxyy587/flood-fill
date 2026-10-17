@@ -4,8 +4,7 @@ import { useSceneStore } from '../bridge/sceneStore';
 import type { SimBridge } from '../bridge/SimBridge';
 import { useSimFeedStore } from '../bridge/simFeedStore';
 import type { InjectedEventKind } from '../contracts';
-
-const SPEEDS = [1, 4, 16, 64, 128, 256];
+import { nearestMultiplier, SPEED_MULTIPLIERS, workerSpeed } from '../bridge/simClock';
 
 const INJECTIONS: { kind: InjectedEventKind; label: string }[] = [
   { kind: 'bridge_closed', label: 'Close bridge' },
@@ -54,14 +53,14 @@ export function DevRunBar({ bridge }: { bridge: SimBridge }) {
           Step
         </button>
         <div className="flex overflow-hidden rounded-md" role="group" aria-label="Speed">
-          {SPEEDS.map((s) => (
+          {SPEED_MULTIPLIERS.map((m) => (
             <button
-              key={s}
+              key={m}
               type="button"
-              onClick={() => bridge.setSpeed(s)}
-              className={`px-2 py-1.5 ${s === speed ? 'bg-sky-700' : 'bg-slate-700 hover:bg-slate-600'}`}
+              onClick={() => bridge.setSpeed(workerSpeed(m))}
+              className={`px-2 py-1.5 ${m === nearestMultiplier(speed) ? 'bg-sky-700' : 'bg-slate-700 hover:bg-slate-600'}`}
             >
-              {s}×
+              {m}×
             </button>
           ))}
         </div>

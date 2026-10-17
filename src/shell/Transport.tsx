@@ -6,6 +6,12 @@ import { useSceneStore } from '../bridge/sceneStore';
 import type { SimBridge } from '../bridge/SimBridge';
 import { useSimFeedStore } from '../bridge/simFeedStore';
 import { useEditorStore } from '../ui/store/editorStore';
+import {
+  nearestMultiplier,
+  SPEED_MULTIPLIERS,
+  workerSpeed,
+  type SpeedMultiplier,
+} from '../bridge/simClock';
 import { clockOf, elapsed, eventTitle, formatTimeOfDay, HEADLINES } from './city';
 import styles from './shell.module.css';
 
@@ -14,24 +20,12 @@ const VH = 36;
 const TONE = { info: '#1e6fd9', warn: '#e8a317', bad: '#d93a2b', good: '#1f9d63' } as const;
 const RESCUE_TEAMS = 3;
 const MINUTE = 60;
-const SEEK_DRAG_MS = 80;
+/** ~30 fps live reverse scrub through recorded frames. */
+const SEEK_DRAG_MS = 33;
 
-/** Snapping speed stops (sim seconds per wall second). */
-export const SPEED_STOPS = [1, 2, 4, 8, 16, 32, 64, 128, 256] as const;
-export type SpeedStop = (typeof SPEED_STOPS)[number];
-
-const nearestStop = (value: number): SpeedStop => {
-  let best: SpeedStop = SPEED_STOPS[0];
-  let bestDist = Math.abs(value - best);
-  for (const stop of SPEED_STOPS) {
-    const dist = Math.abs(value - stop);
-    if (dist < bestDist) {
-      best = stop;
-      bestDist = dist;
-    }
-  }
-  return best;
-};
+/** @deprecated Use SPEED_MULTIPLIERS — kept for older imports. */
+export const SPEED_STOPS = SPEED_MULTIPLIERS;
+export type SpeedStop = SpeedMultiplier;
 
 /**
  * Bottom transport: run controls plus the storm timeline. The bar window grows
@@ -61,8 +55,8 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
   const seed = useSceneStore((s) => s.seed);
   const over = maxTicks > 0 && tick >= maxTicks;
   const replaying = running && tick < liveTick;
-  const snapped = nearestStop(speed);
-  const speedIndex = Math.max(0, SPEED_STOPS.indexOf(snapped));
+  const snapped = nearestMultiplier(speed);
+  const speedIndex = Math.max(0, SPEED_MULTIPLIERS.indexOf(snapped));
 
   const rainEnd = rain?.length ? rain[rain.length - 1]!.t : 0;
   const cap = maxTicks > 0 ? maxTicks : Math.max(3_600, rainEnd);
@@ -100,7 +94,7 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
   useEffect(() => {
     const target = pendingTarget.current;
     if (target === null || dragging.current) return;
-    if (Math.abs(tick - target) <= 12) {
+    if (Math.abs(tick - target) <= 20) {
       pendingTarget.current = null;
       setScrub(null);
     }
@@ -120,7 +114,8 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
     bridge.seek(target);
   };
 
-  const setSpeed = (n: SpeedStop) => {
+  const setSpeed = (multiplier: SpeedMultiplier) => {
+    const n = workerSpeed(multiplier);
     useSceneStore.setState({ speed: n });
     bridge.setSpeed(n);
   };
@@ -154,18 +149,18 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
           <span>{!running ? `Starts ${formatTimeOfDay(dayStart)}` : `${replaying ? 'Replay · ' : ''}${elapsed(shown)} · #${seed}`}</span>
         </div>
 
-        <label className={styles.speedControl} title={`${snapped}× simulated seconds per wall second`}>
+        <label className={styles.speedControl} title={`At 1×, 1 wall-minute ≈ 1 simulated hour · now ${snapped}×`}>
           <span className={styles.speedValue}>{snapped}×</span>
           <input
             type="range"
             min={0}
-            max={SPEED_STOPS.length - 1}
+            max={SPEED_MULTIPLIERS.length - 1}
             step={1}
             value={speedIndex}
             disabled={loading}
             aria-label="Simulation speed"
-            onInput={(e) => setSpeed(SPEED_STOPS[Number((e.target as HTMLInputElement).value)] ?? 1)}
-            onChange={(e) => setSpeed(SPEED_STOPS[Number(e.target.value)] ?? 1)}
+            onInput={(e) => setSpeed(SPEED_MULTIPLIERS[Number((e.target as HTMLInputElement).value)] ?? 1)}
+            onChange={(e) => setSpeed(SPEED_MULTIPLIERS[Number(e.target.value)] ?? 1)}
           />
         </label>
 
@@ -242,12 +237,13 @@ export function Transport({ bridge, onPlay, onRestart, onBranch }: { bridge: Sim
           pendingTarget.current = t;
           setScrub(t);
           useSceneStore.setState({ tick: t });
-          // Live reverse scrub through recorded frames; forward waits for release
-          // so we do not restart catch-up on every pixel.
+          // Live scrub through recorded history; forward past live waits for release.
           const now = performance.now();
           if (t <= liveTick && now - lastDragSeek.current >= SEEK_DRAG_MS) {
             lastDragSeek.current = now;
             bridge.seek(t);
+          } else if (t > liveTick) {
+            pendingTarget.current = t;
           }
         }}
         onPointerUp={(e) => {
