@@ -47,7 +47,8 @@ const FACILITY_DEFAULTS: Record<CriticFacility, { capacity: number; floorHeight:
 export const BUDGET_TIERS = { low: 80, mid: 200, high: 400 } as const;
 export type BudgetTier = keyof typeof BUDGET_TIERS;
 
-export const DEFAULT_BUDGET = BUDGET_TIERS.mid;
+/** Default Mid-tier budget. Typed as `number` so Low/High callers type-check. */
+export const DEFAULT_BUDGET: number = BUDGET_TIERS.mid;
 
 /** Blocks that count as "eco" — preferred when the Eco filter is on. */
 export const ECO_BLOCKS = new Set<number>([BlockType.Drainage, BlockType.Levee, BlockType.Tree]);
@@ -126,7 +127,7 @@ export type CompileResult =
 export function compileProposal(
   proposal: Pick<Proposal, 'title' | 'rationale' | 'commands'>,
   scenario: Scenario,
-  budget = DEFAULT_BUDGET,
+  budget: number = DEFAULT_BUDGET,
   opts: CompileOptions = {},
 ): CompileResult {
   const { w, h } = scenario.size;
